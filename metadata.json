@@ -1,0 +1,5 @@
+{
+  "name": "hushkey",
+  "description": "A secure, mobile-first password manager and digital vault.",
+  "requestFramePermissions": []
+}
