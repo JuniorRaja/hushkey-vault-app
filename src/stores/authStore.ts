@@ -1,0 +1,395 @@
+/**
+ * Auth Store using Zustand
+ * Manages authentication, master key, and unlock state
+ */
+
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { supabase } from "../supabaseClient";
+import EncryptionService from "../services/encryption";
+import DatabaseService from "../services/database";
+import IndexedDBService from "../services/indexedDB";
+
+interface User {
+  id: string;
+  email: string;
+  name?: string;
+  avatar?: string;
+}
+
+interface AuthState {
+  user: User | null;
+  isLoading: boolean;
+  masterKey: Uint8Array | null;
+  encryptedPinKey: string | null;
+  pinSalt: string | null;
+  isUnlocked: boolean;
+  deviceId: string;
+  unlockMethod: "pin" | "biometric" | "password";
+  failedAttempts: number;
+  lastActivity: number;
+  autoLockMinutes: number;
+}
+
+interface AuthActions {
+  signUp: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signInWithOAuth: (provider: "google" | "github") => Promise<void>;
+  signOut: () => Promise<void>;
+  lock: () => void;
+  setupMasterPin: (pin: string) => Promise<void>;
+  unlockWithPin: (pin: string) => Promise<void>;
+  unlockWithBiometrics: () => Promise<void>;
+  setUnlockMethod: (method: "pin" | "biometric" | "password") => void;
+  updateUserProfile: (updates: Partial<User>) => void;
+  checkNewDevice: () => Promise<boolean>;
+  logActivity: (action: string, details: string) => Promise<void>;
+  updateActivity: () => void;
+  hydrate: () => Promise<void>;
+}
+
+export const useAuthStore = create<AuthState & AuthActions>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      isLoading: true,
+      masterKey: null,
+      encryptedPinKey: null,
+      pinSalt: null,
+      isUnlocked: false,
+      deviceId: "",
+      unlockMethod: "password",
+      failedAttempts: 0,
+      lastActivity: Date.now(),
+      autoLockMinutes: 5,
+
+      async signUp(email: string, password: string) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+        if (!data.user) throw new Error("Signup failed");
+
+        if (!data.session) {
+          throw new Error(
+            "Please check your email to confirm your account before logging in"
+          );
+        }
+
+        console.log("Signup successful, creating profile...");
+
+        try {
+          // 1. Create user profile with salt
+          const salt = EncryptionService.generateSalt();
+          await DatabaseService.createUserProfile(data.user.id, salt);
+          await IndexedDBService.saveUserProfile(data.user.id, salt);
+          console.log("Profile created");
+
+          // 2. Create default settings
+          const defaultSettings = {
+            auto_lock_minutes: 5,
+            clipboard_clear_seconds: 30,
+            theme: "dark",
+            allow_screenshots: false,
+          };
+          await DatabaseService.saveUserSettings(data.user.id, defaultSettings);
+          await IndexedDBService.saveSettings(data.user.id, defaultSettings);
+          console.log("Settings created");
+
+          // 3. Register device
+          const deviceId = EncryptionService.generateRandomString();
+          const deviceName = navigator.userAgent.substring(0, 50);
+          await DatabaseService.saveDevice(data.user.id, deviceId, deviceName);
+          await IndexedDBService.saveDevice(data.user.id, deviceId, deviceName);
+          console.log("Device registered:", deviceId);
+
+          // 4. Log signup event
+          await DatabaseService.logActivity(data.user.id, "SIGNUP", "User account created");
+          await IndexedDBService.logActivity(data.user.id, "SIGNUP", "User account created");
+          console.log("Activity logged");
+
+          set({
+            user: { id: data.user.id, email: data.user.email! },
+            deviceId,
+            isLoading: false,
+            isUnlocked: false,
+            autoLockMinutes: 5,
+          });
+        } catch (err) {
+          console.error("Error during signup data creation:", err);
+          throw err;
+        }
+      },
+
+      async signIn(email: string, password: string) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+        if (!data.user) throw new Error("Login failed");
+
+        // Log signin event
+        await DatabaseService.logActivity(data.user.id, "LOGIN", "User signed in");
+        await IndexedDBService.logActivity(data.user.id, "LOGIN", "User signed in");
+
+        // Load settings from Supabase and cache in IndexedDB
+        const settings = await DatabaseService.getUserSettings(data.user.id);
+        if (settings) {
+          await IndexedDBService.saveSettings(data.user.id, settings);
+        }
+
+        set({
+          user: { id: data.user.id, email: data.user.email! },
+          isLoading: false,
+          isUnlocked: false,
+          autoLockMinutes: settings?.auto_lock_minutes ?? 5,
+        });
+      },
+
+      async signInWithOAuth(provider: "google" | "github") {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo: window.location.origin,
+          },
+        });
+
+        if (error) throw error;
+      },
+
+      async signOut() {
+        await supabase.auth.signOut();
+        await IndexedDBService.clearAll();
+        set({
+          user: null,
+          masterKey: null,
+          isUnlocked: false,
+          isLoading: false,
+        });
+      },
+
+      lock() {
+        set({
+          masterKey: null,
+          isUnlocked: false,
+          lastActivity: Date.now(),
+        });
+      },
+
+      async setupMasterPin(pin: string) {
+        const { user } = get();
+        if (!user) throw new Error("No user logged in");
+
+        // Get or create profile
+        let profile = await DatabaseService.getUserProfile(user.id);
+        let salt = profile?.salt;
+
+        if (!salt) {
+          salt = EncryptionService.generateSalt();
+          await DatabaseService.saveUserProfile(user.id, salt);
+          await IndexedDBService.saveUserProfile(user.id, salt);
+        }
+
+        // Derive master key from PIN
+        const masterKey = await EncryptionService.deriveMasterKey(pin, salt);
+
+        // Encrypt master key with PIN
+        const pinSalt = EncryptionService.generateSalt();
+        const pinKey = await EncryptionService.deriveMasterKey(pin, pinSalt);
+        const masterKeyBase64 = EncryptionService.toBase64(masterKey);
+        const encryptedPinKey = await EncryptionService.encrypt(
+          masterKeyBase64,
+          pinKey
+        );
+
+        // Get or create settings
+        let settings = await DatabaseService.getUserSettings(user.id);
+        if (!settings) {
+          const defaultSettings = {
+            auto_lock_minutes: 5,
+            clipboard_clear_seconds: 30,
+            theme: "dark",
+            allow_screenshots: false,
+          };
+          await DatabaseService.saveUserSettings(user.id, defaultSettings);
+          await IndexedDBService.saveSettings(user.id, defaultSettings);
+          settings = defaultSettings;
+        }
+
+        set({ 
+          masterKey, 
+          encryptedPinKey, 
+          pinSalt, 
+          isUnlocked: true, 
+          lastActivity: Date.now(),
+          autoLockMinutes: settings?.auto_lock_minutes ?? 5,
+        });
+
+        // Log PIN creation
+        await DatabaseService.logActivity(user.id, "CREATE", "Master PIN created");
+        await IndexedDBService.logActivity(user.id, "CREATE", "Master PIN created");
+        
+        // Check and register device
+        await get().checkNewDevice();
+      },
+
+      async unlockWithPin(pin: string) {
+        const { encryptedPinKey, pinSalt, user } = get();
+        if (!encryptedPinKey || !pinSalt || !user) throw new Error("PIN not set");
+
+        try {
+          const pinKey = await EncryptionService.deriveMasterKey(pin, pinSalt);
+          const masterKeyBase64 = await EncryptionService.decrypt(
+            encryptedPinKey,
+            pinKey
+          );
+          const masterKey = EncryptionService.fromBase64(masterKeyBase64);
+
+          // Load settings from Supabase and cache
+          const settings = await DatabaseService.getUserSettings(user.id);
+          if (settings) {
+            await IndexedDBService.saveSettings(user.id, settings);
+          }
+
+          set({ 
+            masterKey, 
+            isUnlocked: true, 
+            failedAttempts: 0, 
+            lastActivity: Date.now(),
+            autoLockMinutes: settings?.auto_lock_minutes ?? 5,
+          });
+          
+          // Log unlock
+          await DatabaseService.logActivity(user.id, "LOGIN", "Vault unlocked via PIN");
+          await IndexedDBService.logActivity(user.id, "LOGIN", "Vault unlocked via PIN");
+          
+          // Check device
+          await get().checkNewDevice();
+        } catch (error) {
+          const newFailedAttempts = get().failedAttempts + 1;
+          set({ failedAttempts: newFailedAttempts });
+          
+          // Log failed attempt
+          await DatabaseService.logActivity(user.id, "FAILED_LOGIN", `Failed PIN attempt #${newFailedAttempts}`);
+          await IndexedDBService.logActivity(user.id, "FAILED_LOGIN", `Failed PIN attempt #${newFailedAttempts}`);
+          
+          throw new Error("Invalid PIN");
+        }
+      },
+
+      async unlockWithBiometrics() {
+        const { user } = get();
+        if (!user) throw new Error("No user logged in");
+
+        // Simulate biometric authentication
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        
+        // In production, use Web Authentication API or native biometric
+        const success = true;
+        
+        if (success) {
+          // Retrieve stored master key or prompt for password
+          // For now, just mark as unlocked (requires password setup)
+          throw new Error("Biometric unlock requires password setup first");
+        }
+        
+        await DatabaseService.logActivity(user.id, "LOGIN", "User logged in via Biometrics");
+        await get().checkNewDevice();
+      },
+
+
+
+      setUnlockMethod(method) {
+        set({ unlockMethod: method });
+      },
+
+      updateUserProfile(updates) {
+        set((state) => ({
+          user: state.user ? { ...state.user, ...updates } : null,
+        }));
+      },
+
+      async checkNewDevice() {
+        const { user, deviceId } = get();
+        if (!user) return false;
+
+        const storedDeviceId = localStorage.getItem("hushkey_device_id");
+        
+        if (!storedDeviceId) {
+          localStorage.setItem("hushkey_device_id", deviceId);
+          
+          // Register device
+          const deviceName = navigator.userAgent.substring(0, 50);
+          await DatabaseService.saveDevice(user.id, deviceId, deviceName);
+          await IndexedDBService.saveDevice(user.id, deviceId, deviceName);
+          
+          // Log new device
+          await DatabaseService.logActivity(
+            user.id,
+            "SECURITY",
+            "New device login detected"
+          );
+          await IndexedDBService.logActivity(
+            user.id,
+            "SECURITY",
+            "New device login detected"
+          );
+          
+          return true;
+        }
+        
+        return false;
+      },
+
+      async logActivity(action, details) {
+        const { user } = get();
+        if (user) {
+          await DatabaseService.logActivity(user.id, action, details);
+          await IndexedDBService.logActivity(user.id, action, details);
+        }
+      },
+
+      updateActivity: () => {
+        set({ lastActivity: Date.now() });
+      },
+
+      async hydrate() {
+        try {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+
+          if (user) {
+            const settings = await DatabaseService.getUserSettings(user.id);
+            set({
+              user: { id: user.id, email: user.email! },
+              autoLockMinutes: settings?.auto_lock_minutes ?? 5,
+              isLoading: false,
+            });
+          } else {
+            set({ isLoading: false });
+          }
+        } catch (error) {
+          console.error("Hydration error:", error);
+          set({ isLoading: false });
+        }
+      },
+    }),
+    {
+      name: "hushkey-auth",
+      partialize: (state) => ({
+        user: state.user,
+        encryptedPinKey: state.encryptedPinKey,
+        pinSalt: state.pinSalt,
+        deviceId: state.deviceId,
+        unlockMethod: state.unlockMethod,
+        lastActivity: state.lastActivity,
+        autoLockMinutes: state.autoLockMinutes,
+      }),
+    }
+  )
+);
