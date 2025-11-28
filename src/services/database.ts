@@ -501,7 +501,7 @@ class DatabaseService {
         last_seen: new Date().toISOString(),
       },
       {
-        onConflict: "user_id,device_id",
+        onConflict: "device_id",
       }
     );
 

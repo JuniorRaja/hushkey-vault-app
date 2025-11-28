@@ -132,9 +132,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         if (error) throw error;
         if (!data.user) throw new Error("Login failed");
 
-        // Log signin event
-        await DatabaseService.logActivity(data.user.id, "LOGIN", "User signed in");
-        await IndexedDBService.logActivity(data.user.id, "LOGIN", "User signed in");
+        // Log signin event with session details
+        const deviceName = navigator.userAgent.substring(0, 50);
+        await DatabaseService.logActivity(data.user.id, "LOGIN", `User signed in from ${deviceName}`);
+        await IndexedDBService.logActivity(data.user.id, "LOGIN", `User signed in from ${deviceName}`);
 
         // Load settings from Supabase and cache in IndexedDB
         const settings = await DatabaseService.getUserSettings(data.user.id);
@@ -162,6 +163,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       async signOut() {
+        const { user } = get();
+        if (user) {
+          await DatabaseService.logActivity(user.id, "LOGOUT", "User signed out");
+          await IndexedDBService.logActivity(user.id, "LOGOUT", "User signed out");
+        }
         await supabase.auth.signOut();
         await IndexedDBService.clearAll();
         set({
@@ -172,7 +178,12 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         });
       },
 
-      lock() {
+      async lock() {
+        const { user } = get();
+        if (user) {
+          await DatabaseService.logActivity(user.id, "LOCK", "Vault locked");
+          await IndexedDBService.logActivity(user.id, "LOCK", "Vault locked");
+        }
         set({
           masterKey: null,
           isUnlocked: false,
@@ -263,19 +274,21 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             autoLockMinutes: settings?.auto_lock_minutes ?? 5,
           });
           
-          // Log unlock
-          await DatabaseService.logActivity(user.id, "LOGIN", "Vault unlocked via PIN");
-          await IndexedDBService.logActivity(user.id, "LOGIN", "Vault unlocked via PIN");
+          // Log unlock with session details
+          const deviceName = navigator.userAgent.substring(0, 50);
+          await DatabaseService.logActivity(user.id, "LOGIN", `Vault unlocked via PIN from ${deviceName}`);
+          await IndexedDBService.logActivity(user.id, "LOGIN", `Vault unlocked via PIN from ${deviceName}`);
           
-          // Check device
+          // Check and update device
           await get().checkNewDevice();
         } catch (error) {
           const newFailedAttempts = get().failedAttempts + 1;
           set({ failedAttempts: newFailedAttempts });
           
-          // Log failed attempt
-          await DatabaseService.logActivity(user.id, "FAILED_LOGIN", `Failed PIN attempt #${newFailedAttempts}`);
-          await IndexedDBService.logActivity(user.id, "FAILED_LOGIN", `Failed PIN attempt #${newFailedAttempts}`);
+          // Log failed attempt with session details
+          const deviceName = navigator.userAgent.substring(0, 50);
+          await DatabaseService.logActivity(user.id, "FAILED_LOGIN", `Failed PIN attempt #${newFailedAttempts} from ${deviceName}`);
+          await IndexedDBService.logActivity(user.id, "FAILED_LOGIN", `Failed PIN attempt #${newFailedAttempts} from ${deviceName}`);
           
           throw new Error("Invalid PIN");
         }
@@ -314,18 +327,20 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       async checkNewDevice() {
-        const { user, deviceId } = get();
+        const { user } = get();
         if (!user) return false;
 
-        const storedDeviceId = localStorage.getItem("hushkey_device_id");
+        let storedDeviceId = localStorage.getItem("hushkey_device_id");
         
         if (!storedDeviceId) {
-          localStorage.setItem("hushkey_device_id", deviceId);
+          storedDeviceId = EncryptionService.generateRandomString();
+          localStorage.setItem("hushkey_device_id", storedDeviceId);
+          set({ deviceId: storedDeviceId });
           
           // Register device
           const deviceName = navigator.userAgent.substring(0, 50);
-          await DatabaseService.saveDevice(user.id, deviceId, deviceName);
-          await IndexedDBService.saveDevice(user.id, deviceId, deviceName);
+          await DatabaseService.saveDevice(user.id, storedDeviceId, deviceName);
+          await IndexedDBService.saveDevice(user.id, storedDeviceId, deviceName);
           
           // Log new device
           await DatabaseService.logActivity(
@@ -340,6 +355,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           );
           
           return true;
+        } else {
+          set({ deviceId: storedDeviceId });
         }
         
         return false;
