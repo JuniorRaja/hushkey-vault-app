@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth, useData } from "../App";
 import { useAuthStore } from "../src/stores/authStore";
 import DatabaseService from "../src/services/database";
+import { supabase } from "../src/supabaseClient";
 import { LogEntry, AppSettings, Category, AccentColor } from "../types";
 import { storageService } from "../services/storage";
 import {
@@ -441,11 +442,18 @@ const BackupModal = ({ onClose }: { onClose: () => void }) => {
 };
 
 const ProfileModal = ({ onClose }: { onClose: () => void }) => {
-  const { user, updateUserProfile } = useAuth();
+  const { user: authUser } = useAuthStore();
   const { items, vaults } = useData();
-  const [name, setName] = useState(user?.name || "");
-  const [email, setEmail] = useState(user?.email || "");
-  const [recoveryEmail, setRecoveryEmail] = useState(user?.recoveryEmail || "");
+  const [name, setName] = useState(authUser?.name || authUser?.email || "");
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [currentPin, setCurrentPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
 
   const handleClearData = () => {
     if (
@@ -460,9 +468,73 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
     }
   };
 
-  const handleSave = () => {
-    updateUserProfile({ name, email, recoveryEmail });
-    onClose();
+  const handleSave = async () => {
+    if (!authUser) return;
+    const masterKey = useAuthStore.getState().masterKey;
+    if (!masterKey) {
+      alert("Master key not available");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await DatabaseService.updateUserProfileName(authUser.id, name, masterKey);
+      useAuthStore.getState().updateUserProfile({ name });
+      alert("Profile updated successfully");
+      onClose();
+    } catch (err: any) {
+      alert("Error updating profile: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
+    if (newPassword.length < 8) {
+      alert("Password must be at least 8 characters");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      alert("Password changed successfully");
+      setShowPasswordModal(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      alert("Error changing password: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleChangePin = async () => {
+    if (newPin !== confirmPin) {
+      alert("PINs do not match");
+      return;
+    }
+    if (newPin.length !== 6) {
+      alert("PIN must be 6 digits");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await useAuthStore.getState().setupMasterPin(newPin);
+      alert("PIN changed successfully");
+      setShowPinModal(false);
+      setCurrentPin("");
+      setNewPin("");
+      setConfirmPin("");
+    } catch (err: any) {
+      alert("Error changing PIN: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -471,11 +543,11 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
         {/* Header Stats */}
         <div className="flex items-center gap-4 pb-6 border-b border-gray-800">
           <div className="w-16 h-16 rounded-full bg-primary-600 flex items-center justify-center text-2xl font-bold text-white shadow-lg shadow-primary-900/40">
-            {user?.avatar}
+            {(authUser?.name || authUser?.email || "U").charAt(0).toUpperCase()}
           </div>
           <div>
-            <h4 className="text-xl font-bold text-white">{user?.name}</h4>
-            <p className="text-gray-400 text-sm">{user?.email}</p>
+            <h4 className="text-xl font-bold text-white">{authUser?.name || authUser?.email}</h4>
+            <p className="text-gray-400 text-sm">{authUser?.email}</p>
             <div className="flex gap-4 mt-2 text-xs font-medium text-gray-500">
               <span className="px-2 py-0.5 bg-gray-800 rounded">
                 {items.length} Items
@@ -490,23 +562,23 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-              User Name
+              Display Name
             </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
+              placeholder={authUser?.email}
               className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-white focus:border-primary-500 outline-none transition-colors"
             />
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-              Recovery Email
+              Email (Read-only)
             </label>
             <input
-              value={recoveryEmail}
-              onChange={(e) => setRecoveryEmail(e.target.value)}
-              placeholder="Optional backup email"
-              className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-white focus:border-primary-500 outline-none transition-colors"
+              value={authUser?.email || ""}
+              disabled
+              className="w-full bg-gray-900 border border-gray-800 rounded-lg p-3 text-gray-500 cursor-not-allowed"
             />
           </div>
         </div>
@@ -514,17 +586,79 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
         <div className="grid grid-cols-2 gap-3 pt-2">
           <button
             className="py-2.5 px-4 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors border border-gray-700"
-            onClick={() => alert("Mock: Change Password Flow")}
+            onClick={() => setShowPasswordModal(true)}
           >
             Change Password
           </button>
           <button
             className="py-2.5 px-4 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors border border-gray-700"
-            onClick={() => alert("Mock: Change PIN Flow")}
+            onClick={() => setShowPinModal(true)}
           >
             Change Master PIN
           </button>
         </div>
+
+        {showPasswordModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowPasswordModal(false)}>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+              <h4 className="text-lg font-bold text-white">Change Password</h4>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-white focus:border-primary-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Confirm Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-white focus:border-primary-500 outline-none"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setShowPasswordModal(false)} className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors">Cancel</button>
+                <button onClick={handleChangePassword} disabled={isLoading} className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">{isLoading ? "Saving..." : "Save"}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showPinModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowPinModal(false)}>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+              <h4 className="text-lg font-bold text-white">Change Master PIN</h4>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">New PIN (6 digits)</label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-white focus:border-primary-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Confirm PIN</label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  value={confirmPin}
+                  onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))}
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-white focus:border-primary-500 outline-none"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setShowPinModal(false)} className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors">Cancel</button>
+                <button onClick={handleChangePin} disabled={isLoading} className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">{isLoading ? "Saving..." : "Save"}</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="pt-6 border-t border-gray-800">
           <h5 className="text-red-400 font-bold text-sm mb-3 flex items-center gap-2">
@@ -574,9 +708,10 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
         <div className="pt-2">
           <button
             onClick={handleSave}
-            className="w-full py-3 bg-primary-600 hover:bg-primary-500 text-white rounded-xl font-medium shadow-lg shadow-primary-900/20 transition-all active:scale-95"
+            disabled={isLoading}
+            className="w-full py-3 bg-primary-600 hover:bg-primary-500 text-white rounded-xl font-medium shadow-lg shadow-primary-900/20 transition-all active:scale-95 disabled:opacity-50"
           >
-            Save Changes
+            {isLoading ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </div>
@@ -697,10 +832,60 @@ const TextModal = ({ title, onClose, content }: any) => (
 );
 
 const Settings: React.FC = () => {
-  const { user, logout: oldLogout } = useAuth();
-  const { lock, signOut: authSignOut, setUnlockMethod, unlockMethod: authUnlockMethod } = useAuthStore();
+  const { user: oldUser, logout: oldLogout } = useAuth();
+  const { user: authUser, lock, signOut: authSignOut, setUnlockMethod, unlockMethod: authUnlockMethod, autoLockMinutes } = useAuthStore();
   const navigate = useNavigate();
   const { items, vaults, logs, settings, updateSettings, addLog } = useData();
+  const [userSettings, setUserSettings] = useState<any>(null);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (!authUser) return;
+      try {
+        const dbSettings = await DatabaseService.getUserSettings(authUser.id);
+        setUserSettings(dbSettings);
+        // Map database settings to local settings format
+        if (dbSettings) {
+          updateSettings({
+            ...settings,
+            autoLockMinutes: dbSettings.auto_lock_minutes ?? settings.autoLockMinutes,
+            clipboardClearSeconds: dbSettings.clipboard_clear_seconds ?? settings.clipboardClearSeconds,
+            allowScreenshots: dbSettings.allow_screenshots ?? settings.allowScreenshots,
+            unlockMethod: dbSettings.unlock_method ?? settings.unlockMethod,
+            notifications: {
+              ...settings.notifications,
+              newDeviceLogin: dbSettings.notify_new_device_login ?? settings.notifications.newDeviceLogin,
+              failedLoginAttempts: dbSettings.notify_failed_login_attempts ?? settings.notifications.failedLoginAttempts,
+              weakPasswordAlerts: dbSettings.notify_weak_password_alerts ?? settings.notifications.weakPasswordAlerts,
+              expiryReminders: dbSettings.notify_expiry_reminders ?? settings.notifications.expiryReminders,
+              backupHealth: dbSettings.notify_backup_health ?? settings.notifications.backupHealth,
+              monthlyReport: dbSettings.notify_monthly_report ?? settings.notifications.monthlyReport,
+              sessionAlerts: dbSettings.notify_session_alerts ?? settings.notifications.sessionAlerts,
+              sharedVaultUpdates: dbSettings.notify_shared_vault_updates ?? settings.notifications.sharedVaultUpdates,
+              pushNotifications: dbSettings.notify_push_notifications ?? settings.notifications.pushNotifications,
+              emailNotifications: dbSettings.notify_email_notifications ?? settings.notifications.emailNotifications,
+            },
+          });
+        }
+      } catch (err) {
+        console.error("Error loading settings:", err);
+      } finally {
+        setIsLoadingSettings(false);
+      }
+    };
+    loadSettings();
+  }, [authUser]);
+
+  const saveSettingsToDB = async (newSettings: any) => {
+    if (!authUser) return;
+    try {
+      await DatabaseService.saveUserSettings(authUser.id, newSettings);
+      setUserSettings(newSettings);
+    } catch (err: any) {
+      alert("Error saving settings: " + err.message);
+    }
+  };
 
   // Modals
   const [activeModal, setActiveModal] = useState<
@@ -714,14 +899,33 @@ const Settings: React.FC = () => {
   const [verifyingBiometric, setVerifyingBiometric] = useState(false);
 
   // Handlers
-  const handleSettingChange = (key: keyof AppSettings, value: any) => {
+  const handleSettingChange = async (key: string, value: any) => {
+    const newSettings = { ...userSettings, [key]: value };
+    await saveSettingsToDB(newSettings);
     updateSettings({ ...settings, [key]: value });
   };
 
-  const handleNotificationChange = (
-    key: keyof AppSettings["notifications"],
+  // Map UI notification keys to database column names
+  const notificationKeyMap: Record<string, string> = {
+    newDeviceLogin: 'notify_new_device_login',
+    failedLoginAttempts: 'notify_failed_login_attempts',
+    weakPasswordAlerts: 'notify_weak_password_alerts',
+    expiryReminders: 'notify_expiry_reminders',
+    backupHealth: 'notify_backup_health',
+    monthlyReport: 'notify_monthly_report',
+    sessionAlerts: 'notify_session_alerts',
+    sharedVaultUpdates: 'notify_shared_vault_updates',
+    pushNotifications: 'notify_push_notifications',
+    emailNotifications: 'notify_email_notifications',
+  };
+
+  const handleNotificationChange = async (
+    key: string,
     value: boolean
   ) => {
+    const dbKey = notificationKeyMap[key] || key;
+    const newSettings = { ...userSettings, [dbKey]: value };
+    await saveSettingsToDB(newSettings);
     updateSettings({
       ...settings,
       notifications: { ...settings.notifications, [key]: value },
@@ -736,11 +940,11 @@ const Settings: React.FC = () => {
       await new Promise((resolve) => setTimeout(resolve, 1500));
       setVerifyingBiometric(false);
       setUnlockMethod(val);
-      updateSettings({ ...settings, unlockMethod: val });
+      await handleSettingChange("unlock_method", val);
       alert("Face ID / Touch ID enabled successfully.");
     } else {
       setUnlockMethod(val);
-      updateSettings({ ...settings, unlockMethod: val });
+      await handleSettingChange("unlock_method", val);
     }
   };
 
@@ -801,13 +1005,13 @@ const Settings: React.FC = () => {
       >
         <div className="flex items-center gap-5">
           <div className="w-16 h-16 rounded-full bg-primary-600 flex items-center justify-center text-2xl font-bold text-white shadow-lg shadow-primary-900/40 group-hover:scale-105 transition-transform">
-            {user?.avatar}
+            {(authUser?.name || authUser?.email || "U").charAt(0).toUpperCase()}
           </div>
           <div>
             <h2 className="text-xl font-bold text-white group-hover:text-primary-400 transition-colors">
-              {user?.name}
+              {authUser?.name || authUser?.email}
             </h2>
-            <p className="text-gray-400">{user?.email}</p>
+            <p className="text-gray-400">{authUser?.email}</p>
             <div className="flex gap-4 mt-2 text-xs font-medium text-gray-500">
               <span className="bg-gray-800 px-2 py-0.5 rounded">
                 {items.length} Items
@@ -924,7 +1128,7 @@ const Settings: React.FC = () => {
                 Email Notifications
               </span>
               <span className="text-[11px] text-gray-500">
-                Send alerts to {user?.email}.
+                Send alerts to {authUser?.email}.
               </span>
             </div>
             <ToggleSwitch
@@ -982,8 +1186,8 @@ const Settings: React.FC = () => {
               <span className="text-gray-200 font-medium">Auto Lock</span>
             </div>
             <CustomDropdown
-              value={settings.autoLockMinutes}
-              onChange={(val) => handleSettingChange("autoLockMinutes", val)}
+              value={userSettings?.auto_lock_minutes ?? autoLockMinutes}
+              onChange={(val) => handleSettingChange("auto_lock_minutes", val)}
               options={[
                 { label: "Immediately", value: 0 },
                 { label: "1 Minute", value: 1 },
@@ -1003,9 +1207,9 @@ const Settings: React.FC = () => {
               <span className="text-gray-200 font-medium">Clear Clipboard</span>
             </div>
             <CustomDropdown
-              value={settings.clipboardClearSeconds}
+              value={userSettings?.clipboard_clear_seconds ?? settings.clipboardClearSeconds}
               onChange={(val) =>
-                handleSettingChange("clipboardClearSeconds", val)
+                handleSettingChange("clipboard_clear_seconds", val)
               }
               options={[
                 { label: "10 Seconds", value: 10 },
@@ -1029,8 +1233,8 @@ const Settings: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              checked={settings.allowScreenshots}
-              onChange={(val) => handleSettingChange("allowScreenshots", val)}
+              checked={userSettings?.allow_screenshots ?? settings.allowScreenshots}
+              onChange={(val) => handleSettingChange("allow_screenshots", val)}
             />
           </div>
         </div>

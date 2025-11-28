@@ -36,6 +36,21 @@ class DatabaseService {
   }
 
   /**
+   * Update user profile name (encrypted)
+   */
+  async updateUserProfileName(userId: string, name: string, masterKey: Uint8Array): Promise<void> {
+    const nameEncrypted = await EncryptionService.encrypt(name, masterKey);
+    const { error } = await supabase.from("user_profiles").update(
+      {
+        name_encrypted: nameEncrypted,
+        updated_at: new Date().toISOString(),
+      }
+    ).eq("user_id", userId);
+
+    if (error) throw error;
+  }
+
+  /**
    * Create initial user profile (for signup only)
    */
   async createUserProfile(userId: string, salt: string): Promise<void> {
