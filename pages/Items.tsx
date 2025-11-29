@@ -563,7 +563,26 @@ const Items: React.FC = () => {
       </div>
 
       <div className="flex-1 bg-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden flex flex-col">
-         {filteredItems.length === 0 ? (
+         {isLoading ? (
+             <div className="overflow-y-auto pb-20 md:pb-0">
+                 {[...Array(8)].map((_, i) => (
+                     <div key={i} className={`p-4 flex items-center justify-between animate-pulse ${i !== 7 ? 'border-b border-gray-800/50' : ''}`}>
+                         <div className="flex items-center gap-4">
+                             <div className="w-10 h-10 rounded-full bg-gray-800"></div>
+                             <div>
+                                 <div className="h-4 w-32 bg-gray-800 rounded mb-2"></div>
+                                 <div className="h-3 w-24 bg-gray-800 rounded"></div>
+                             </div>
+                         </div>
+                         <div className="flex items-center gap-2">
+                             <div className="w-8 h-8 bg-gray-800 rounded-lg"></div>
+                             <div className="w-8 h-8 bg-gray-800 rounded-lg"></div>
+                             <div className="w-8 h-8 bg-gray-800 rounded-lg"></div>
+                         </div>
+                     </div>
+                 ))}
+             </div>
+         ) : filteredItems.length === 0 ? (
              <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-8">
                  <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mb-4">
                     <Search size={32} />

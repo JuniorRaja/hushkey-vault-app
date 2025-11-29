@@ -147,8 +147,24 @@ const Vaults: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-gray-400">Loading vaults...</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pb-20 md:pb-0">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-gray-900 border border-gray-800 rounded-xl p-3 animate-pulse">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-lg bg-gray-800"></div>
+                  <div>
+                    <div className="h-4 w-24 bg-gray-800 rounded mb-2"></div>
+                    <div className="h-3 w-16 bg-gray-800 rounded"></div>
+                  </div>
+                </div>
+                <div className="w-6 h-6 bg-gray-800 rounded"></div>
+              </div>
+              <div className="h-3 w-full bg-gray-800 rounded mb-1"></div>
+              <div className="h-3 w-3/4 bg-gray-800 rounded mb-2"></div>
+              <div className="h-2 w-20 bg-gray-800 rounded mt-auto"></div>
+            </div>
+          ))}
         </div>
       ) : activeVaults.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-8">
