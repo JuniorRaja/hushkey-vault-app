@@ -889,6 +889,7 @@ const Settings: React.FC = () => {
             allowScreenshots: dbSettings.allow_screenshots ?? settings.allowScreenshots,
             unlockMethod: dbSettings.unlock_method ?? settings.unlockMethod,
             groupItemsByCategory: dbSettings.group_items_by_category ?? settings.groupItemsByCategory,
+            accentColor: dbSettings.accent_color ?? settings.accentColor,
             notifications: {
               ...settings.notifications,
               newDeviceLogin: dbSettings.notify_new_device_login ?? settings.notifications.newDeviceLogin,
@@ -938,6 +939,7 @@ const Settings: React.FC = () => {
   const handleSettingChange = async (key: string, value: any) => {
     const keyMapping: Record<string, string> = {
       groupItemsByCategory: 'group_items_by_category',
+      accentColor: 'accent_color',
     };
     const dbKey = keyMapping[key] || key;
     const newSettings = { ...userSettings, [dbKey]: value };

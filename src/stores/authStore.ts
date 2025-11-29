@@ -9,6 +9,9 @@ import { supabase } from "../supabaseClient";
 import EncryptionService from "../services/encryption";
 import DatabaseService from "../services/database";
 import IndexedDBService from "../services/indexedDB";
+import SecureMemoryService from "../services/secureMemory";
+import RateLimiterService from "../services/rateLimiter";
+import IntegrityCheckerService from "../services/integrityChecker";
 
 interface User {
   id: string;
@@ -21,6 +24,7 @@ interface AuthState {
   user: User | null;
   isLoading: boolean;
   masterKey: Uint8Array | null;
+  wrappedMasterKey: string | null;
   encryptedPinKey: string | null;
   pinSalt: string | null;
   isUnlocked: boolean;
@@ -54,6 +58,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       user: null,
       isLoading: true,
       masterKey: null,
+      wrappedMasterKey: null,
       encryptedPinKey: null,
       pinSalt: null,
       isUnlocked: false,
@@ -163,27 +168,51 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       async signOut() {
-        const { user } = get();
+        const { user, masterKey } = get();
+        
+        // Securely wipe master key from memory
+        if (masterKey) {
+          SecureMemoryService.secureWipe(masterKey);
+        }
+        
+        // Clear all security services
+        IntegrityCheckerService.clear();
+        await SecureMemoryService.clearSecureStorage();
+        RateLimiterService.clearAll();
+        
         if (user) {
           await DatabaseService.logActivity(user.id, "LOGOUT", "User signed out");
           await IndexedDBService.logActivity(user.id, "LOGOUT", "User signed out");
         }
+        
         await supabase.auth.signOut();
         await IndexedDBService.clearAll();
+        
         set({
           user: null,
           masterKey: null,
+          wrappedMasterKey: null,
           isUnlocked: false,
           isLoading: false,
         });
       },
 
       async lock() {
-        const { user } = get();
+        const { user, masterKey } = get();
+        
+        // Securely wipe master key from memory
+        if (masterKey) {
+          SecureMemoryService.secureWipe(masterKey);
+        }
+        
+        // Clear integrity checker
+        IntegrityCheckerService.clear();
+        
         if (user) {
           await DatabaseService.logActivity(user.id, "LOCK", "Vault locked");
           await IndexedDBService.logActivity(user.id, "LOCK", "Vault locked");
         }
+        
         set({
           masterKey: null,
           isUnlocked: false,
@@ -208,7 +237,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         // Derive master key from PIN
         const masterKey = await EncryptionService.deriveMasterKey(pin, salt);
 
-        // Encrypt master key with PIN
+        // Wrap master key for secure storage
+        await SecureMemoryService.initializeWrappingKey();
+        const wrappedMasterKey = await SecureMemoryService.wrapMasterKey(masterKey);
+
+        // Encrypt master key with PIN (legacy support)
         const pinSalt = EncryptionService.generateSalt();
         const pinKey = await EncryptionService.deriveMasterKey(pin, pinSalt);
         const masterKeyBase64 = EncryptionService.toBase64(masterKey);
@@ -216,6 +249,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           masterKeyBase64,
           pinKey
         );
+
+        // Initialize integrity checker
+        await IntegrityCheckerService.initialize(masterKey);
 
         // Get or create settings
         let settings = await DatabaseService.getUserSettings(user.id);
@@ -232,7 +268,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         }
 
         set({ 
-          masterKey, 
+          masterKey,
+          wrappedMasterKey,
           encryptedPinKey, 
           pinSalt, 
           isUnlocked: true, 
@@ -252,6 +289,12 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const { encryptedPinKey, pinSalt, user } = get();
         if (!encryptedPinKey || !pinSalt || !user) throw new Error("PIN not set");
 
+        // Check rate limiting
+        const rateLimitCheck = RateLimiterService.canAttempt(user.id);
+        if (!rateLimitCheck.allowed) {
+          throw new Error(rateLimitCheck.reason || "Too many attempts");
+        }
+
         try {
           const pinKey = await EncryptionService.deriveMasterKey(pin, pinSalt);
           const masterKeyBase64 = await EncryptionService.decrypt(
@@ -260,14 +303,25 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           );
           const masterKey = EncryptionService.fromBase64(masterKeyBase64);
 
+          // Initialize secure memory and integrity checker
+          await SecureMemoryService.initializeWrappingKey();
+          await IntegrityCheckerService.initialize(masterKey);
+
+          // Wrap master key for secure storage
+          const wrappedMasterKey = await SecureMemoryService.wrapMasterKey(masterKey);
+
           // Load settings from Supabase and cache
           const settings = await DatabaseService.getUserSettings(user.id);
           if (settings) {
             await IndexedDBService.saveSettings(user.id, settings);
           }
 
+          // Record successful attempt
+          RateLimiterService.recordSuccessfulAttempt(user.id);
+
           set({ 
-            masterKey, 
+            masterKey,
+            wrappedMasterKey,
             isUnlocked: true, 
             failedAttempts: 0, 
             lastActivity: Date.now(),
@@ -282,7 +336,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           // Check and update device
           await get().checkNewDevice();
         } catch (error) {
+          // Record failed attempt
+          RateLimiterService.recordFailedAttempt(user.id);
+          
           const newFailedAttempts = get().failedAttempts + 1;
+          const remaining = RateLimiterService.getRemainingAttempts(user.id);
           set({ failedAttempts: newFailedAttempts });
           
           // Log failed attempt with session details
@@ -290,7 +348,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           await DatabaseService.logActivity(user.id, "FAILED_LOGIN", `Failed PIN attempt #${newFailedAttempts} from ${deviceName}`);
           await IndexedDBService.logActivity(user.id, "FAILED_LOGIN", `Failed PIN attempt #${newFailedAttempts} from ${deviceName}`);
           
-          throw new Error("Invalid PIN");
+          throw new Error(`Invalid PIN. ${remaining} attempts remaining.`);
         }
       },
 
@@ -400,6 +458,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       name: "hushkey-auth",
       partialize: (state) => ({
         user: state.user,
+        wrappedMasterKey: state.wrappedMasterKey,
         encryptedPinKey: state.encryptedPinKey,
         pinSalt: state.pinSalt,
         deviceId: state.deviceId,
