@@ -286,17 +286,19 @@ const Items: React.FC = () => {
       closeMenu();
   };
 
-  const handleDuplicate = async (e: React.MouseEvent, item: Item) => {
+  const handleDuplicate = (e: React.MouseEvent, item: Item) => {
       e.stopPropagation();
-      const { createItem } = useItemStore.getState();
-      try {
-          await createItem(item.vaultId, {
-              ...item,
-              name: `${item.name} (Copy)`,
-          });
-      } catch (error) {
-          console.error('Failed to duplicate item:', error);
-      }
+      navigate('/items/new?type=' + item.type, {
+          state: {
+              duplicateData: {
+                  ...item,
+                  name: `${item.name} (Copy)`,
+                  id: undefined,
+                  createdAt: undefined,
+                  lastUpdated: undefined
+              }
+          }
+      });
       closeMenu();
   };
   

@@ -5,7 +5,7 @@ import { useAuthStore } from '../src/stores/authStore';
 import { useData } from '../App';
 import FileStorageService from '../src/services/fileStorage';
 import { Item, ItemType, FileAttachment } from '../types';
-import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers, Lock, Check } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers, Lock, Check, Copy as CopyIcon } from 'lucide-react';
 import { generatePassword, generateTOTP } from '../services/passwordGenerator';
 import ShareModal from '../components/ShareModal';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -146,13 +146,23 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       if (isNew) {
         setIsEditing(true);
         const initialVaultId = vaults[0]?.id || '';
-        setFormData({
-          type: typeParam || ItemType.LOGIN,
-          vaultId: initialVaultId,
-          categoryId: '',
-          name: '',
-          data: { passwordExpiryInterval: 0 } as any
-        });
+        
+        // Check if duplicating from another item
+        if (location.state && (location.state as any).duplicateData) {
+          const duplicateData = (location.state as any).duplicateData;
+          setFormData({
+            ...duplicateData,
+            vaultId: duplicateData.vaultId || initialVaultId
+          });
+        } else {
+          setFormData({
+            type: typeParam || ItemType.LOGIN,
+            vaultId: initialVaultId,
+            categoryId: '',
+            name: '',
+            data: { passwordExpiryInterval: 0 } as any
+          });
+        }
       } else if (itemId) {
         const existing = await getItem(itemId);
         if (existing) {
@@ -301,6 +311,20 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
 
   const handleShare = () => {
       setIsShareModalOpen(true);
+  };
+
+  const handleDuplicate = () => {
+      navigate('/items/new?type=' + formData.type, {
+          state: {
+              duplicateData: {
+                  ...formData,
+                  name: `${formData.name} (Copy)`,
+                  id: undefined,
+                  createdAt: undefined,
+                  lastUpdated: undefined
+              }
+          }
+      });
   };
 
   const updateDataField = (field: string, value: any) => {
@@ -1667,6 +1691,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         <div className="flex items-center gap-2">
             {!isEditing ? (
                 <>
+                    <button onClick={handleDuplicate} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors" title="Duplicate">
+                        <CopyIcon size={20} />
+                    </button>
                     <button onClick={handleShare} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors" title="Share">
                         <Share2 size={20} />
                     </button>
