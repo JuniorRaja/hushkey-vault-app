@@ -246,6 +246,7 @@ class DatabaseService {
     const { error } = await supabase
       .from("vaults")
       .update({ 
+        is_deleted: true,
         deleted_at: new Date().toISOString() 
       })
       .eq("id", vaultId);
@@ -260,6 +261,7 @@ class DatabaseService {
     const { error } = await supabase
       .from("vaults")
       .update({ 
+        is_deleted: false,
         deleted_at: null 
       })
       .eq("id", vaultId);
@@ -523,6 +525,7 @@ class DatabaseService {
     const { error } = await supabase
       .from("items")
       .update({ 
+        is_deleted: true,
         deleted_at: new Date().toISOString() 
       })
       .eq("id", itemId);
@@ -537,6 +540,7 @@ class DatabaseService {
     const { error } = await supabase
       .from("items")
       .update({ 
+        is_deleted: false,
         deleted_at: null 
       })
       .eq("id", itemId);
