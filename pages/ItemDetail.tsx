@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useItemStore } from '../src/stores/itemStore';
 import { useAuthStore } from '../src/stores/authStore';
+import { useData } from '../App';
 import FileStorageService from '../src/services/fileStorage';
 import { Item, ItemType, FileAttachment } from '../types';
-import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers, Lock, Check } from 'lucide-react';
 import { generatePassword, generateTOTP } from '../services/passwordGenerator';
 import ShareModal from '../components/ShareModal';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -97,6 +98,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const typeParam = searchParams.get('type') as ItemType;
   const { items, vaults, categories, getItem, createItem, updateItem, deleteItem } = useItemStore();
   const { masterKey } = useAuthStore();
+  const { settings } = useData();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const multipleFileInputRef = useRef<HTMLInputElement>(null);
   const [fileAttachments, setFileAttachments] = useState<Array<{ id: string; name: string; size: number; mimeType: string }>>([]);
@@ -114,6 +116,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const [showPin, setShowPin] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [copyTimer, setCopyTimer] = useState<number>(0);
   
   // Validation State
   const [urlError, setUrlError] = useState('');
@@ -239,6 +244,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         }
     }
 
+    setIsSaving(true);
     try {
       if (isNew) {
         const newItem = await createItem(formData.vaultId!, {
@@ -248,14 +254,18 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
           isFavorite: false,
           data: finalData as any
         });
+        await new Promise(resolve => setTimeout(resolve, 800));
         navigate(-1);
       } else {
         await updateItem(itemId!, { ...formData, data: finalData });
+        await new Promise(resolve => setTimeout(resolve, 800));
         setIsEditing(false);
       }
     } catch (error) {
       console.error('Failed to save item:', error);
       alert('Failed to save item. Please try again.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -309,8 +319,26 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       updateDataField('password', newPass);
   };
 
-  const copyToClipboard = (text: string) => {
-      if(text) navigator.clipboard.writeText(text);
+  const copyToClipboard = (text: string, fieldId: string) => {
+      if(!text) return;
+      
+      navigator.clipboard.writeText(text);
+      setCopiedField(fieldId);
+      
+      const clearSeconds = settings.clipboardClearSeconds || 30;
+      setCopyTimer(clearSeconds);
+      
+      const interval = setInterval(() => {
+          setCopyTimer(prev => {
+              if (prev <= 1) {
+                  clearInterval(interval);
+                  navigator.clipboard.writeText('');
+                  setCopiedField(null);
+                  return 0;
+              }
+              return prev - 1;
+          });
+      }, 1000);
   };
   
   const simulateQrScan = () => {
@@ -487,8 +515,21 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     placeholder={isEditing ? "e.g. user@example.com" : "—"}
                 />
                 {!isEditing && formData.data?.username && (
-                    <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.username || '')}>
-                        <Copy size={16}/>
+                    <button 
+                        className="text-gray-600 hover:text-white p-2 transition-opacity flex items-center gap-1 shrink-0" 
+                        onClick={() => copyToClipboard(formData.data?.username || '', 'username')}
+                    >
+                        {copiedField === 'username' ? (
+                            <div className="relative w-8 h-8 flex items-center justify-center">
+                                <svg className="absolute inset-0 -rotate-90" viewBox="0 0 32 32">
+                                    <circle cx="16" cy="16" r="14" fill="none" stroke="#1f2937" strokeWidth="2"/>
+                                    <circle cx="16" cy="16" r="14" fill="none" stroke="#22c55e" strokeWidth="2" strokeDasharray="87.96" strokeDashoffset={87.96 * (1 - copyTimer / (settings.clipboardClearSeconds || 30))} className="transition-all duration-1000 linear"/>
+                                </svg>
+                                <span className="text-[10px] font-bold text-green-500">{copyTimer}</span>
+                            </div>
+                        ) : (
+                            <Copy size={16}/>
+                        )}
                     </button>
                 )}
               </div>
@@ -512,8 +553,21 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             <button className="p-2 text-gray-500 hover:text-white" onClick={() => setShowPassword(!showPassword)}>
                                 {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
                             </button>
-                            <button className="p-2 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.password || '')}>
-                                <Copy size={18}/>
+                            <button 
+                                className="p-2 text-gray-500 hover:text-white transition-opacity flex items-center gap-1 shrink-0" 
+                                onClick={() => copyToClipboard(formData.data?.password || '', 'password')}
+                            >
+                                {copiedField === 'password' ? (
+                                    <div className="relative w-9 h-9 flex items-center justify-center">
+                                        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 36 36">
+                                            <circle cx="18" cy="18" r="16" fill="none" stroke="#1f2937" strokeWidth="2"/>
+                                            <circle cx="18" cy="18" r="16" fill="none" stroke="#22c55e" strokeWidth="2" strokeDasharray="100.53" strokeDashoffset={100.53 * (1 - copyTimer / (settings.clipboardClearSeconds || 30))} className="transition-all duration-1000 linear"/>
+                                        </svg>
+                                        <span className="text-[10px] font-bold text-green-500">{copyTimer}</span>
+                                    </div>
+                                ) : (
+                                    <Copy size={18}/>
+                                )}
                             </button>
                         </>
                     )}
@@ -613,11 +667,21 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 </div>
                             </div>
                             <button 
-                                onClick={() => copyToClipboard(totpCode)}
-                                className="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors"
+                                onClick={() => copyToClipboard(totpCode, 'totp')}
+                                className="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors flex items-center gap-2"
                                 title="Copy OTP"
                             >
-                                <Copy size={20} />
+                                {copiedField === 'totp' ? (
+                                    <div className="relative w-10 h-10 flex items-center justify-center">
+                                        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 40 40">
+                                            <circle cx="20" cy="20" r="18" fill="none" stroke="#1f2937" strokeWidth="2"/>
+                                            <circle cx="20" cy="20" r="18" fill="none" stroke="#22c55e" strokeWidth="2" strokeDasharray="113.1" strokeDashoffset={113.1 * (1 - copyTimer / (settings.clipboardClearSeconds || 30))} className="transition-all duration-1000 linear"/>
+                                        </svg>
+                                        <span className="text-xs font-bold text-green-500">{copyTimer}</span>
+                                    </div>
+                                ) : (
+                                    <Copy size={20} />
+                                )}
                             </button>
                         </div>
                      ) : null
@@ -1590,6 +1654,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         title="Delete Item?"
         message="This item will be moved to Trash. You can restore it later."
         confirmText="Move to Trash"
+        type="warning"
       />
 
       {/* Header Actions */}
@@ -1618,11 +1683,21 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         Cancel
                     </button>
                     <button 
-                        onClick={handleSave} 
-                        className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium shadow-lg shadow-primary-900/30 transition-all active:scale-95"
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium shadow-lg shadow-primary-900/30 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed relative overflow-hidden"
                     >
-                        <Save size={18} />
-                        Save Item
+                        {isSaving ? (
+                            <>
+                                <Lock size={18} className="animate-[wiggle_0.8s_ease-in-out_infinite]" />
+                                <span>Securing...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Save size={18} />
+                                <span>Save Item</span>
+                            </>
+                        )}
                     </button>
                 </>
             )}

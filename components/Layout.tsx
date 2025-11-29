@@ -297,7 +297,7 @@ const Header = memo(({
   }, []);
 
   return (
-    <header className="sticky top-0 z-10 bg-gray-950/80 backdrop-blur-md border-b border-gray-850 px-4 py-3 md:px-8 md:py-4 flex items-center justify-between">
+    <header className="sticky top-0 z-50 bg-gray-950/80 backdrop-blur-md border-b border-gray-850 px-4 py-3 md:px-8 md:py-4 flex items-center justify-between">
       <div className="md:hidden flex items-center gap-2">
         <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
           <HushkeyLogo size={16} />

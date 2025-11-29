@@ -133,7 +133,9 @@ const Items: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string, type: 'item' | 'vault' } | null>(null);
 
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ top: number, right: number } | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number, right: number, bottom?: number } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [copyTimer, setCopyTimer] = useState<number>(0);
 
   const filteredItems = useMemo(() => {
     let res = items;
@@ -241,10 +243,14 @@ const Items: React.FC = () => {
       } else {
           const rect = e.currentTarget.getBoundingClientRect();
           setMenuOpenId(id);
-          // Position relative to viewport (Fixed)
-          // Align right edge of menu with right edge of button
+          
+          const menuHeight = 350;
+          const spaceBelow = window.innerHeight - rect.bottom;
+          const shouldOpenUpward = spaceBelow < menuHeight;
+          
           setMenuPosition({ 
-              top: rect.bottom + 8, 
+              top: shouldOpenUpward ? undefined : rect.bottom + 8,
+              bottom: shouldOpenUpward ? window.innerHeight - rect.top + 8 : undefined,
               right: window.innerWidth - rect.right 
           });
       }
@@ -255,9 +261,28 @@ const Items: React.FC = () => {
       setMenuPosition(null);
   }
   
-  const handleCopy = (e: React.MouseEvent, text: string) => {
+  const handleCopy = (e: React.MouseEvent, text: string, fieldId: string) => {
       e.stopPropagation();
-      if(text) navigator.clipboard.writeText(text);
+      if(!text) return;
+      
+      navigator.clipboard.writeText(text);
+      setCopiedField(fieldId);
+      
+      const clearSeconds = settings.clipboardClearSeconds || 30;
+      setCopyTimer(clearSeconds);
+      
+      const interval = setInterval(() => {
+          setCopyTimer(prev => {
+              if (prev <= 1) {
+                  clearInterval(interval);
+                  navigator.clipboard.writeText('');
+                  setCopiedField(null);
+                  return 0;
+              }
+              return prev - 1;
+          });
+      }, 1000);
+      
       closeMenu();
   };
 
@@ -345,10 +370,20 @@ const Items: React.FC = () => {
                 {(item.data?.password || item.data?.pin || item.data?.privateKey) && (
                     <button 
                         className="p-2 text-gray-500 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-                        onClick={(e) => handleCopy(e, item.data?.password || item.data?.pin || item.data?.privateKey || '')}
+                        onClick={(e) => handleCopy(e, item.data?.password || item.data?.pin || item.data?.privateKey || '', `item-${item.id}`)}
                         title="Copy Secret"
                     >
-                        <Copy size={16} />
+                        {copiedField === `item-${item.id}` ? (
+                            <div className="relative w-4 h-4 flex items-center justify-center">
+                                <svg className="absolute inset-0 -rotate-90" viewBox="0 0 16 16">
+                                    <circle cx="8" cy="8" r="7" fill="none" stroke="#1f2937" strokeWidth="1.5"/>
+                                    <circle cx="8" cy="8" r="7" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeDasharray="43.98" strokeDashoffset={43.98 * (1 - copyTimer / (settings.clipboardClearSeconds || 30))} className="transition-all duration-1000 linear"/>
+                                </svg>
+                                <span className="text-[8px] font-bold text-green-500">{copyTimer}</span>
+                            </div>
+                        ) : (
+                            <Copy size={16} />
+                        )}
                     </button>
                 )}
                 <button 
@@ -395,6 +430,7 @@ const Items: React.FC = () => {
             ? "This vault and all items within it will be moved to Trash. You can restore them later." 
             : "This item will be moved to Trash. You can restore it later."}
         confirmText="Move to Trash"
+        type="warning"
       />
 
       {/* New Item Type Selection Modal - List View */}
@@ -432,16 +468,16 @@ const Items: React.FC = () => {
       {activeMenuItem && menuPosition && (
             <div 
                 className="fixed z-50 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-fade-in origin-top-right"
-                style={{ top: menuPosition.top, right: menuPosition.right }}
+                style={{ top: menuPosition.top, bottom: menuPosition.bottom, right: menuPosition.right }}
                 onClick={(e) => e.stopPropagation()}
             >
                 {activeMenuItem.data?.username && (
-                    <button onClick={(e) => handleCopy(e, activeMenuItem.data?.username || '')} className="w-full text-left px-4 py-3 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 flex items-center gap-3">
+                    <button onClick={(e) => handleCopy(e, activeMenuItem.data?.username || '', `menu-username-${activeMenuItem.id}`)} className="w-full text-left px-4 py-3 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 flex items-center gap-3">
                         <User size={14} /> Copy Username
                     </button>
                 )}
                 {(activeMenuItem.data?.password || activeMenuItem.data?.privateKey) && (
-                    <button onClick={(e) => handleCopy(e, activeMenuItem.data?.password || activeMenuItem.data?.privateKey || '')} className="w-full text-left px-4 py-3 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 flex items-center gap-3">
+                    <button onClick={(e) => handleCopy(e, activeMenuItem.data?.password || activeMenuItem.data?.privateKey || '', `menu-password-${activeMenuItem.id}`)} className="w-full text-left px-4 py-3 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 flex items-center gap-3">
                         <Copy size={14} /> Copy {activeMenuItem.type === ItemType.SSH_KEY ? 'Private Key' : 'Password'}
                     </button>
                 )}
