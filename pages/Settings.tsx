@@ -7,6 +7,7 @@ import DatabaseService from "../src/services/database";
 import { supabase } from "../src/supabaseClient";
 import { LogEntry, AppSettings, Category, AccentColor } from "../types";
 import { storageService } from "../services/storage";
+import { BiometricService } from "../src/services/biometric";
 import {
   User,
   Shield,
@@ -861,6 +862,17 @@ const TextModal = ({ title, onClose, content }: any) => (
   </ModalLayout>
 );
 
+const NOTIFICATION_CONFIGS = [
+  { key: "newDeviceLogin", label: "New Device Login Alert", desc: "When your account is accessed from a new browser." },
+  { key: "failedLoginAttempts", label: "Failed Login Attempts", desc: "Notify on incorrect PIN or biometric failures." },
+  { key: "weakPasswordAlerts", label: "Weak/Reused Passwords", desc: "Guardian analysis alerts for vulnerable credentials." },
+  { key: "expiryReminders", label: "Expiry Reminders", desc: "Notify before cards or IDs expire (30 days)." },
+  { key: "backupHealth", label: "Backup Health", desc: "Alert if backup is outdated or fails." },
+  { key: "monthlyReport", label: "Monthly Security Report", desc: "Regular summary of your vault health." },
+  { key: "sessionAlerts", label: "Session Monitoring", desc: "Alerts for unusual session activity." },
+  { key: "sharedVaultUpdates", label: "Shared Vault Updates", desc: "Notify when items are changed in shared vaults." },
+];
+
 const Settings: React.FC = () => {
   const { user: oldUser, logout: oldLogout } = useAuth();
   const { user: authUser, lock, signOut: authSignOut, setUnlockMethod, unlockMethod: authUnlockMethod, autoLockMinutes } = useAuthStore();
@@ -978,12 +990,22 @@ const Settings: React.FC = () => {
     val: "pin" | "biometric" | "password"
   ) => {
     if (val === "biometric") {
+      if (!await BiometricService.isAvailable()) {
+        alert("Biometric authentication is not available on this device.");
+        return;
+      }
       setVerifyingBiometric(true);
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setVerifyingBiometric(false);
-      setUnlockMethod(val);
-      await handleSettingChange("unlock_method", val);
-      alert("Face ID / Touch ID enabled successfully.");
+      try {
+        if (!authUser) throw new Error("User not authenticated");
+        await BiometricService.register(authUser.id);
+        setUnlockMethod(val);
+        await handleSettingChange("unlock_method", val);
+        alert("Face ID / Touch ID enabled successfully.");
+      } catch (err: any) {
+        alert("Biometric setup failed: " + err.message);
+      } finally {
+        setVerifyingBiometric(false);
+      }
     } else {
       setUnlockMethod(val);
       await handleSettingChange("unlock_method", val);
@@ -1086,48 +1108,7 @@ const Settings: React.FC = () => {
           </div>
 
           {/* Configurations */}
-          {[
-            {
-              key: "newDeviceLogin",
-              label: "New Device Login Alert",
-              desc: "When your account is accessed from a new browser.",
-            },
-            {
-              key: "failedLoginAttempts",
-              label: "Failed Login Attempts",
-              desc: "Notify on incorrect PIN or biometric failures.",
-            },
-            {
-              key: "weakPasswordAlerts",
-              label: "Weak/Reused Passwords",
-              desc: "Guardian analysis alerts for vulnerable credentials.",
-            },
-            {
-              key: "expiryReminders",
-              label: "Expiry Reminders",
-              desc: "Notify before cards or IDs expire (30 days).",
-            },
-            {
-              key: "backupHealth",
-              label: "Backup Health",
-              desc: "Alert if backup is outdated or fails.",
-            },
-            {
-              key: "monthlyReport",
-              label: "Monthly Security Report",
-              desc: "Regular summary of your vault health.",
-            },
-            {
-              key: "sessionAlerts",
-              label: "Session Monitoring",
-              desc: "Alerts for unusual session activity.",
-            },
-            {
-              key: "sharedVaultUpdates",
-              label: "Shared Vault Updates",
-              desc: "Notify when items are changed in shared vaults.",
-            },
-          ].map((item) => (
+          {NOTIFICATION_CONFIGS.map((item) => (
             <div
               key={item.key}
               className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors"

@@ -33,32 +33,58 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, item, type }) 
   }, [isOpen, item, type]);
 
   const generateLink = () => {
-      setLinkEnabled(true);
-      setShareUrl(`https://hushkey.app/share/${type}/${Math.random().toString(36).substring(7)}`);
+      try {
+          setLinkEnabled(true);
+          setShareUrl(`https://hushkey.app/share/${type}/${Math.random().toString(36).substring(7)}`);
+      } catch (error) {
+          console.error('Failed to generate link:', error);
+      }
   };
 
   const revokeLink = () => {
-      if(window.confirm('Are you sure? The existing link and QR code will stop working immediately.')) {
+      const confirmMessage = 'Are you sure? The existing link and QR code will stop working immediately.';
+      if(window.confirm(confirmMessage)) {
           setLinkEnabled(false);
           setShareUrl('');
       }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const getQRCodeUrl = () => {
+      try {
+          return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
+      } catch (error) {
+          console.error('Failed to encode QR code URL:', error);
+          return '';
+      }
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+    }
   };
 
   const grantAccess = () => {
-      if(emailInput && emailInput.includes('@')) {
-          setAccessList([...accessList, emailInput]);
-          setEmailInput('');
+      try {
+          if(emailInput && emailInput.includes('@')) {
+              setAccessList([...accessList, emailInput]);
+              setEmailInput('');
+          }
+      } catch (error) {
+          console.error('Failed to grant access:', error);
       }
   };
 
   const revokeAccess = (email: string) => {
-      setAccessList(accessList.filter(e => e !== email));
+      try {
+          setAccessList(accessList.filter(e => e !== email));
+      } catch (error) {
+          console.error('Failed to revoke access:', error);
+      }
   };
 
   if (!isOpen || !item) return null;
@@ -119,9 +145,13 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, item, type }) 
                             {/* QR Display */}
                             <div className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-xl border-4 border-white">
                                 <img 
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`} 
+                                    src={getQRCodeUrl()} 
                                     alt="QR Code" 
                                     className="w-48 h-48 mix-blend-multiply" 
+                                    onError={(e) => {
+                                        console.error('Failed to load QR code');
+                                        e.currentTarget.style.display = 'none';
+                                    }}
                                 />
                                 <div className="text-black text-[10px] font-bold mt-4 uppercase tracking-wider flex items-center gap-1.5 bg-gray-100 px-3 py-1 rounded-full">
                                     <Scan size={14} /> Scan to {type === 'vault' ? 'Access' : 'View'}

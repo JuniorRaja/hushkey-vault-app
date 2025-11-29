@@ -12,6 +12,9 @@ export const generatePassword = (
   if (options.numbers) charset += numbers;
   if (options.symbols) charset += symbols;
 
+  if (length < 1) throw new Error('Password length must be at least 1');
+  if (!charset) throw new Error('At least one character type must be selected');
+
   let retVal = '';
   // Ensure at least one of each selected type
   if (options.uppercase) retVal += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
@@ -28,10 +31,13 @@ export const generatePassword = (
 
 export const generateMemorablePassword = (): string => {
   const words = ['correct', 'horse', 'battery', 'staple', 'blue', 'sky', 'mountain', 'river', 'cosmic', 'nebula', 'coffee', 'jazz'];
+  if (words.length === 0) throw new Error('Word list cannot be empty');
   const separator = '-';
   let ret = '';
   for (let i = 0; i < 4; i++) {
-    ret += words[Math.floor(Math.random() * words.length)];
+    const index = Math.floor(Math.random() * words.length);
+    if (index < 0 || index >= words.length) throw new Error('Invalid word index');
+    ret += words[index];
     if (i < 3) ret += separator;
   }
   return ret;

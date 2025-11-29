@@ -225,6 +225,20 @@ export interface NotificationSettings {
     emailNotifications: boolean;
 }
 
+export function isValidNotificationSettings(obj: any): obj is NotificationSettings {
+    return obj && typeof obj === 'object' &&
+        typeof obj.newDeviceLogin === 'boolean' &&
+        typeof obj.failedLoginAttempts === 'boolean' &&
+        typeof obj.weakPasswordAlerts === 'boolean' &&
+        typeof obj.expiryReminders === 'boolean' &&
+        typeof obj.backupHealth === 'boolean' &&
+        typeof obj.monthlyReport === 'boolean' &&
+        typeof obj.sessionAlerts === 'boolean' &&
+        typeof obj.sharedVaultUpdates === 'boolean' &&
+        typeof obj.pushNotifications === 'boolean' &&
+        typeof obj.emailNotifications === 'boolean';
+}
+
 export enum NotificationType {
     SECURITY = 'SECURITY',
     ALERT = 'ALERT',

@@ -657,8 +657,11 @@ const Guardian: React.FC = () => {
       setScanModalOpen(false);
       setIsScanning(true);
       setScanProgress(0);
-      
-      // Simulation Sequence
+  };
+
+  useEffect(() => {
+      if (!isScanning) return;
+
       const steps = [
           { pct: 10, text: 'Initializing secure environment...' },
           { pct: 30, text: 'Analyzing vault items...' },
@@ -679,7 +682,9 @@ const Guardian: React.FC = () => {
           setScanStatus(steps[currentStep].text);
           currentStep++;
       }, 800);
-  };
+
+      return () => clearInterval(interval);
+  }, [isScanning]);
 
   const handleGenerate = () => {
     if (genType === 'memorable') {
@@ -690,16 +695,24 @@ const Guardian: React.FC = () => {
     setCopied(false);
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
       if(generatedPass) {
-          navigator.clipboard.writeText(generatedPass);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
+          try {
+              await navigator.clipboard.writeText(generatedPass);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+          } catch (error) {
+              console.error('Failed to copy to clipboard:', error);
+          }
       }
   }
 
   React.useEffect(() => {
-      if(!generatedPass) handleGenerate();
+      try {
+          if(!generatedPass) handleGenerate();
+      } catch (error) {
+          console.error('Failed to generate initial password:', error);
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

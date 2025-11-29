@@ -12,6 +12,7 @@ import IndexedDBService from "../services/indexedDB";
 import SecureMemoryService from "../services/secureMemory";
 import RateLimiterService from "../services/rateLimiter";
 import IntegrityCheckerService from "../services/integrityChecker";
+import { BiometricService } from "../services/biometric";
 
 interface User {
   id: string;
@@ -353,22 +354,33 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       async unlockWithBiometrics() {
-        const { user } = get();
+        const { user, encryptedPinKey, pinSalt } = get();
         if (!user) throw new Error("No user logged in");
+        if (!encryptedPinKey || !pinSalt) throw new Error("PIN not set");
 
-        // Simulate biometric authentication
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        const authenticated = await BiometricService.authenticate(user.id);
+        if (!authenticated) throw new Error("Biometric authentication failed");
+
+        // Retrieve master key from secure storage
+        const { wrappedMasterKey } = get();
+        if (!wrappedMasterKey) throw new Error("Master key not found");
+
+        const masterKey = await SecureMemoryService.unwrapMasterKey(wrappedMasterKey);
+        await IntegrityCheckerService.initialize(masterKey);
+
+        const settings = await DatabaseService.getUserSettings(user.id);
+        if (settings) await IndexedDBService.saveSettings(user.id, settings);
+
+        set({ 
+          masterKey,
+          isUnlocked: true, 
+          failedAttempts: 0, 
+          lastActivity: Date.now(),
+          autoLockMinutes: settings?.auto_lock_minutes ?? 5,
+        });
         
-        // In production, use Web Authentication API or native biometric
-        const success = true;
-        
-        if (success) {
-          // Retrieve stored master key or prompt for password
-          // For now, just mark as unlocked (requires password setup)
-          throw new Error("Biometric unlock requires password setup first");
-        }
-        
-        await DatabaseService.logActivity(user.id, "LOGIN", "User logged in via Biometrics");
+        await DatabaseService.logActivity(user.id, "LOGIN", "Vault unlocked via biometrics");
+        await IndexedDBService.logActivity(user.id, "LOGIN", "Vault unlocked via biometrics");
         await get().checkNewDevice();
       },
 
