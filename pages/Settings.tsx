@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth, useData } from "../App";
 import { useAuthStore } from "../src/stores/authStore";
+import { useCategoryStore } from "../src/stores/categoryStore";
 import DatabaseService from "../src/services/database";
 import { supabase } from "../src/supabaseClient";
 import { LogEntry, AppSettings, Category, AccentColor } from "../types";
@@ -173,9 +174,11 @@ const ModalLayout = ({
 // --- Section Components ---
 
 const CategoriesModal = ({ onClose }: { onClose: () => void }) => {
-  const { settings, updateSettings } = useData();
+  const { items } = useData();
+  const { categories, isLoading, loadCategories, addCategory, deleteCategory } = useCategoryStore();
   const [newCatName, setNewCatName] = useState("");
   const [newCatColor, setNewCatColor] = useState("bg-gray-500");
+  const [deleteConfirm, setDeleteConfirm] = useState<{ category: Category; linkedItemsCount: number } | null>(null);
 
   const COLORS = [
     "bg-blue-500",
@@ -189,32 +192,37 @@ const CategoriesModal = ({ onClose }: { onClose: () => void }) => {
     "bg-gray-500",
   ];
 
-  const handleAdd = () => {
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  const handleAdd = async () => {
     if (!newCatName.trim()) return;
-    const newCat: Category = {
-      id: `cat_${crypto.randomUUID()}`,
-      name: newCatName.trim(),
-      color: newCatColor,
-    };
-    updateSettings({
-      ...settings,
-      categories: [...settings.categories, newCat],
-    });
-    setNewCatName("");
+    try {
+      await addCategory(newCatName.trim(), newCatColor);
+      setNewCatName("");
+    } catch (err: any) {
+      alert("Error creating category: " + err.message);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    if (
-      window.confirm("Delete this category? Items will become uncategorized.")
-    ) {
-      updateSettings({
-        ...settings,
-        categories: settings.categories.filter((c) => c.id !== id),
-      });
+  const handleDeleteClick = (category: Category) => {
+    const linkedItemsCount = items.filter(item => item.categoryId === category.id).length;
+    setDeleteConfirm({ category, linkedItemsCount });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm) return;
+    try {
+      await deleteCategory(deleteConfirm.category.id);
+      setDeleteConfirm(null);
+    } catch (err: any) {
+      alert("Error deleting category: " + err.message);
     }
   };
 
   return (
+    <>
     <ModalLayout
       title="Manage Categories"
       onClose={onClose}
@@ -260,37 +268,59 @@ const CategoriesModal = ({ onClose }: { onClose: () => void }) => {
         {/* List */}
         <div className="space-y-2">
           <label className="text-xs font-bold text-gray-500 uppercase">
-            Existing Categories ({settings.categories.length})
+            Existing Categories ({categories.length})
           </label>
           <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-            {settings.categories.map((cat) => (
-              <div
-                key={cat.id}
-                className="flex items-center justify-between p-3 bg-gray-900 border border-gray-800 rounded-lg group hover:border-gray-700 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${cat.color}`} />
-                  <span className="text-sm font-medium text-gray-200">
-                    {cat.name}
-                  </span>
-                </div>
-                <button
-                  onClick={() => handleDelete(cat.id)}
-                  className="text-gray-600 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-            {settings.categories.length === 0 && (
-              <div className="text-center text-gray-600 text-sm py-4">
-                No categories created.
-              </div>
+            {isLoading ? (
+              <div className="text-center py-4"><Loader2 className="animate-spin mx-auto text-primary-500" size={20} /></div>
+            ) : (
+              categories.map((cat) => {
+                const linkedItemsCount = items.filter(item => item.categoryId === cat.id).length;
+                return (
+                  <div key={cat.id} className="flex items-center justify-between p-3 bg-gray-900 border border-gray-800 rounded-lg group hover:border-gray-700 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full ${cat.color}`} />
+                      <div>
+                        <span className="text-sm font-medium text-gray-200">{cat.name}</span>
+                        {linkedItemsCount > 0 && <div className="text-xs text-gray-500">{linkedItemsCount} item{linkedItemsCount !== 1 ? 's' : ''}</div>}
+                      </div>
+                    </div>
+                    <button onClick={() => handleDeleteClick(cat)} className="text-gray-600 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+            {!isLoading && categories.length === 0 && (
+              <div className="text-center text-gray-600 text-sm py-4">No categories created.</div>
             )}
           </div>
         </div>
       </div>
     </ModalLayout>
+    {deleteConfirm && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)}>
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="text-center">
+            <div className="w-12 h-12 rounded-full bg-red-900/30 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={24} className="text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Delete Category</h3>
+            <p className="text-gray-400 text-sm mb-6">
+              {deleteConfirm.linkedItemsCount > 0
+                ? `This category has ${deleteConfirm.linkedItemsCount} linked item${deleteConfirm.linkedItemsCount !== 1 ? 's' : ''}. Items will become uncategorized.`
+                : `Delete "${deleteConfirm.category.name}"?`}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors">Cancel</button>
+            <button onClick={handleDeleteConfirm} className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-medium transition-colors">Delete</button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 };
 
@@ -858,6 +888,7 @@ const Settings: React.FC = () => {
             clipboardClearSeconds: dbSettings.clipboard_clear_seconds ?? settings.clipboardClearSeconds,
             allowScreenshots: dbSettings.allow_screenshots ?? settings.allowScreenshots,
             unlockMethod: dbSettings.unlock_method ?? settings.unlockMethod,
+            groupItemsByCategory: dbSettings.group_items_by_category ?? settings.groupItemsByCategory,
             notifications: {
               ...settings.notifications,
               newDeviceLogin: dbSettings.notify_new_device_login ?? settings.notifications.newDeviceLogin,
@@ -905,7 +936,11 @@ const Settings: React.FC = () => {
 
   // Handlers
   const handleSettingChange = async (key: string, value: any) => {
-    const newSettings = { ...userSettings, [key]: value };
+    const keyMapping: Record<string, string> = {
+      groupItemsByCategory: 'group_items_by_category',
+    };
+    const dbKey = keyMapping[key] || key;
+    const newSettings = { ...userSettings, [dbKey]: value };
     await saveSettingsToDB(newSettings);
     updateSettings({ ...settings, [key]: value });
   };
@@ -1346,7 +1381,7 @@ const Settings: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              checked={settings.groupItemsByCategory}
+              checked={userSettings?.group_items_by_category ?? settings.groupItemsByCategory}
               onChange={(val) =>
                 handleSettingChange("groupItemsByCategory", val)
               }

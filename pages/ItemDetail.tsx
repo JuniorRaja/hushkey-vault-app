@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useData } from '../App';
+import { useCategoryStore } from '../src/stores/categoryStore';
 import { Item, ItemType, FileAttachment } from '../types';
 import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers } from 'lucide-react';
 import { generatePassword, generateTOTP } from '../services/passwordGenerator';
@@ -93,7 +94,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const typeParam = searchParams.get('type') as ItemType;
-  const { items, addItem, updateItem, deleteItem, vaults, settings } = useData();
+  const { items, addItem, updateItem, deleteItem, vaults } = useData();
+  const { categories } = useCategoryStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const multipleFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1642,7 +1644,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                                     className="bg-transparent text-gray-300 text-xs focus:outline-none"
                                                 >
                                                     <option value="">No Category</option>
-                                                    {settings.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                 </select>
                                             </div>
                                         </>
@@ -1651,10 +1653,10 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                             <div className="text-xs text-gray-500 bg-gray-950/50 px-2 py-1 rounded-lg border border-gray-800/50">
                                                 {vaults.find(v => v.id === formData.vaultId)?.name || 'Unknown Vault'}
                                             </div>
-                                            {formData.categoryId && settings.categories.find(c => c.id === formData.categoryId) && (
+                                            {formData.categoryId && categories.find(c => c.id === formData.categoryId) && (
                                                 <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-950/50 px-2 py-1 rounded-lg border border-gray-800/50">
-                                                    <div className={`w-2 h-2 rounded-full ${settings.categories.find(c => c.id === formData.categoryId)?.color}`} />
-                                                    {settings.categories.find(c => c.id === formData.categoryId)?.name}
+                                                    <div className={`w-2 h-2 rounded-full ${categories.find(c => c.id === formData.categoryId)?.color}`} />
+                                                    {categories.find(c => c.id === formData.categoryId)?.name}
                                                 </div>
                                             )}
                                         </>
