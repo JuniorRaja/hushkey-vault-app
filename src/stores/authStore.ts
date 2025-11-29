@@ -13,6 +13,7 @@ import SecureMemoryService from "../services/secureMemory";
 import RateLimiterService from "../services/rateLimiter";
 import IntegrityCheckerService from "../services/integrityChecker";
 import { BiometricService } from "../services/biometric";
+import { SoundService } from "../services/soundService";
 
 interface User {
   id: string;
@@ -214,6 +215,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           await IndexedDBService.logActivity(user.id, "LOCK", "Vault locked");
         }
         
+        SoundService.playLock();
+        
         set({
           masterKey: null,
           isUnlocked: false,
@@ -268,6 +271,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           settings = defaultSettings;
         }
 
+        SoundService.playUnlock();
+        
         set({ 
           masterKey,
           wrappedMasterKey,
@@ -320,6 +325,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           // Record successful attempt
           RateLimiterService.recordSuccessfulAttempt(user.id);
 
+          SoundService.playUnlock();
+
           set({ 
             masterKey,
             wrappedMasterKey,
@@ -370,6 +377,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
         const settings = await DatabaseService.getUserSettings(user.id);
         if (settings) await IndexedDBService.saveSettings(user.id, settings);
+
+        SoundService.playUnlock();
 
         set({ 
           masterKey,

@@ -59,6 +59,7 @@ const Login: React.FC = () => {
   const [confirmPin, setConfirmPin] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [isSettingPin, setIsSettingPin] = useState(false);
 
   const {
@@ -75,8 +76,6 @@ const Login: React.FC = () => {
   } = useAuthStore();
   
   const navigate = useNavigate();
-  const location = useLocation();
-  const from = (location.state as any)?.from?.pathname || "/vaults";
 
   useEffect(() => {
     if (user && !isUnlocked && !encryptedPinKey) {
@@ -84,16 +83,16 @@ const Login: React.FC = () => {
     } else if (user && !isUnlocked && encryptedPinKey) {
       setMode("unlock");
     } else if (user && isUnlocked) {
-      navigate(from, { replace: true });
+      navigate("/vaults", { replace: true });
     }
-  }, [user, isUnlocked, encryptedPinKey, navigate, from]);
+  }, [user, isUnlocked, encryptedPinKey, navigate]);
 
   const handleSuccess = async () => {
     const isNewDevice = await checkNewDevice();
     if (isNewDevice) {
       console.log("New device detected");
     }
-    navigate(from, { replace: true });
+    navigate("/vaults", { replace: true });
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -167,6 +166,8 @@ const Login: React.FC = () => {
   };
 
   const attemptUnlock = async (inputPin: string) => {
+    setIsVerifying(true);
+    await new Promise(resolve => setTimeout(resolve, 300));
     setIsLoading(true);
     try {
       await unlockWithPin(inputPin);
@@ -176,6 +177,7 @@ const Login: React.FC = () => {
       setTimeout(() => setPin(""), 500);
     } finally {
       setIsLoading(false);
+      setIsVerifying(false);
     }
   };
 
@@ -224,20 +226,26 @@ const Login: React.FC = () => {
           </div>
 
           <div className="h-8 mb-8 flex items-center justify-center">
-            <div className="flex gap-3">
-              {[0, 1, 2, 3, 4, 5].map((i) => (
-                <div
-                  key={i}
-                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                    i < currentPin.length
-                      ? error
-                        ? "bg-red-500 scale-110"
-                        : "bg-primary-500 scale-110"
-                      : "bg-gray-800"
-                  }`}
-                />
-              ))}
-            </div>
+            {isVerifying ? (
+              <Loader2 className="animate-spin text-primary-500" size={24} />
+            ) : (
+              <div className="flex gap-3">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <div
+                    key={i}
+                    className={`rounded-full transition-all duration-300 ${
+                      i < currentPin.length
+                        ? error
+                          ? "bg-red-500 w-3 h-3 scale-110"
+                          : currentPin.length === 6
+                          ? "bg-primary-500 w-2 h-2"
+                          : "bg-primary-500 w-3 h-3 scale-110"
+                        : "bg-gray-800 w-3 h-3"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
           {error && (
