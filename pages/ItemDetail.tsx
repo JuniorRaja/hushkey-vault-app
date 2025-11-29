@@ -136,6 +136,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       additional: false
   });
 
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+
   const toggleIdentitySection = (key: keyof typeof identitySections) => {
       setIdentitySections(prev => ({...prev, [key]: !prev[key]}));
   };
@@ -1752,7 +1754,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                         placeholder="Item Name"
                                         value={formData.name}
                                         onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                                        autoFocus
+                                        autoFocus={!isMobile}
                                    />
                                ) : (
                                    <h1 className="text-2xl font-bold text-white">{formData.name}</h1>
