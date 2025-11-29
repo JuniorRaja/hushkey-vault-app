@@ -271,6 +271,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           settings = defaultSettings;
         }
 
+        // Load user name
+        const userName = await DatabaseService.getUserProfileName(user.id, masterKey);
+
         SoundService.playUnlock();
         
         set({ 
@@ -281,6 +284,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           isUnlocked: true, 
           lastActivity: Date.now(),
           autoLockMinutes: settings?.auto_lock_minutes ?? 5,
+          user: userName ? { ...user, name: userName } : user,
         });
 
         // Log PIN creation
@@ -322,6 +326,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             await IndexedDBService.saveSettings(user.id, settings);
           }
 
+          // Load user name
+          const userName = await DatabaseService.getUserProfileName(user.id, masterKey);
+
           // Record successful attempt
           RateLimiterService.recordSuccessfulAttempt(user.id);
 
@@ -334,6 +341,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             failedAttempts: 0, 
             lastActivity: Date.now(),
             autoLockMinutes: settings?.auto_lock_minutes ?? 5,
+            user: userName ? { ...user, name: userName } : user,
           });
           
           // Log unlock with session details

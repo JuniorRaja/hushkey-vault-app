@@ -101,6 +101,15 @@ class DatabaseService {
   }
 
   /**
+   * Get user profile name (decrypted)
+   */
+  async getUserProfileName(userId: string, masterKey: Uint8Array): Promise<string | null> {
+    const profile = await this.getUserProfile(userId);
+    if (!profile?.name_encrypted) return null;
+    return await EncryptionService.decrypt(profile.name_encrypted, masterKey);
+  }
+
+  /**
    * Create a vault (encrypt name and description)
    */
   async createVault(
