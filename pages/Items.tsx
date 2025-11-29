@@ -156,7 +156,7 @@ const Items: React.FC = () => {
 
       filteredItems.forEach(item => {
           if (item.categoryId) {
-              const cat = settings.categories.find(c => c.id === item.categoryId);
+              const cat = categories.find(c => c.id === item.categoryId);
               const key = cat ? cat.name : 'Uncategorized';
               if (!groups[key]) groups[key] = [];
               groups[key].push(item);
@@ -168,14 +168,14 @@ const Items: React.FC = () => {
       // Sort keys logic if needed, but simply returning object
       const result: Record<string, Item[]> = {};
       
-      // Add existing categories in order defined in settings to maintain sort order
-      settings.categories.forEach(cat => {
+      // Add existing categories in order defined in categories to maintain sort order
+      categories.forEach(cat => {
           if (groups[cat.name]) {
               result[cat.name] = groups[cat.name];
           }
       });
 
-      // Add dynamic categories (if any existed that weren't in settings)
+      // Add dynamic categories (if any existed that weren't in categories)
       Object.keys(groups).forEach(key => {
           if (!result[key] && key !== 'Uncategorized') result[key] = groups[key];
       });
@@ -186,7 +186,7 @@ const Items: React.FC = () => {
 
       return result;
 
-  }, [filteredItems, settings.groupItemsByCategory, settings.categories]);
+  }, [filteredItems, settings.groupItemsByCategory, categories]);
 
   const currentVault = vaultFilter ? vaults.find(v => v.id === vaultFilter) : null;
   const currentVaultName = currentVault ? currentVault.name : 'All Items';
@@ -585,7 +585,7 @@ const Items: React.FC = () => {
                          <div key={category}>
                              {category !== 'All Items' && (
                                 <div className="sticky top-0 z-10 bg-gray-950/90 backdrop-blur px-4 py-2 border-b border-gray-800 flex items-center gap-2">
-                                     <div className={`w-2 h-2 rounded-full ${settings.categories.find(c => c.name === category)?.color || 'bg-gray-500'}`} />
+                                     <div className={`w-2 h-2 rounded-full ${categories.find(c => c.name === category)?.color || 'bg-gray-500'}`} />
                                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{category}</h3>
                                      <span className="text-xs text-gray-600">({items.length})</span>
                                 </div>
