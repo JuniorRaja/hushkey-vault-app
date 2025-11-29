@@ -751,6 +751,38 @@ class DatabaseService {
     const { error } = await supabase.auth.admin.deleteUser(userId);
     if (error) throw error;
   }
+
+  /**
+   * Clear all user data except auth and profile
+   */
+  async clearAllUserData(userId: string): Promise<void> {
+    // Get all vaults to find items
+    const { data: vaults } = await supabase.from("vaults").select("id").eq("user_id", userId);
+    const vaultIds = vaults?.map(v => v.id) || [];
+
+    // Delete file attachments from storage
+    if (vaultIds.length > 0) {
+      const { data: items } = await supabase.from("items").select("id").in("vault_id", vaultIds);
+      const itemIds = items?.map(i => i.id) || [];
+      
+      if (itemIds.length > 0) {
+        const { data: files } = await supabase.from("file_attachments").select("id").in("item_id", itemIds);
+        if (files && files.length > 0) {
+          await supabase.storage.from("hushkey-vault").remove([`${userId}/*`]);
+          await supabase.from("file_attachments").delete().in("item_id", itemIds);
+        }
+      }
+
+      await supabase.from("items").delete().in("vault_id", vaultIds);
+    }
+
+    await supabase.from("vaults").delete().eq("user_id", userId);
+    await supabase.from("categories").delete().eq("user_id", userId);
+    await supabase.from("user_settings").delete().eq("user_id", userId);
+    await supabase.from("devices").delete().eq("user_id", userId);
+    await supabase.from("activity_logs").delete().eq("user_id", userId);
+    await supabase.from("notifications").delete().eq("user_id", userId);
+  }
 }
 
 export default new DatabaseService();

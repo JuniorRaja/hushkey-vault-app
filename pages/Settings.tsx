@@ -485,17 +485,29 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
   const [confirmPin, setConfirmPin] = useState("");
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
+  const [showClearDataModal, setShowClearDataModal] = useState(false);
+  const [clearDataConfirmText, setClearDataConfirmText] = useState("");
 
-  const handleClearData = () => {
-    if (
-      window.confirm(
-        "CRITICAL WARNING: This will permanently wipe all local data, including vaults and items. This cannot be undone. Are you sure?"
-      )
-    ) {
-      if (window.confirm("Are you really sure? Final Warning.")) {
-        storageService.clearAll();
-        window.location.reload();
-      }
+  const handleClearData = async () => {
+    if (clearDataConfirmText !== "yes, delete") {
+      alert('Please type "yes, delete" to confirm');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      if (!authUser) throw new Error("User not authenticated");
+      
+      await DatabaseService.clearAllUserData(authUser.id);
+      storageService.clearDataOnly();
+      await storageService.clearIndexedDB();
+      
+      alert("All data cleared successfully. Redirecting...");
+      window.location.href = "/dashboard";
+    } catch (err: any) {
+      alert("Error clearing data: " + err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -691,19 +703,49 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
           </div>
         )}
 
+        {showClearDataModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowClearDataModal(false)}>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-red-900/30 flex items-center justify-center mx-auto mb-4">
+                  <AlertTriangle size={24} className="text-red-500" />
+                </div>
+                <h4 className="text-lg font-bold text-white mb-2">Clear All Data</h4>
+                <p className="text-gray-400 text-sm mb-4">
+                  This will permanently delete all vaults, items, categories, file attachments, devices, and preferences. Auth and profile will be preserved.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Type "yes, delete" to confirm</label>
+                <input
+                  type="text"
+                  value={clearDataConfirmText}
+                  onChange={(e) => setClearDataConfirmText(e.target.value)}
+                  placeholder="yes, delete"
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-white focus:border-primary-500 outline-none"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => { setShowClearDataModal(false); setClearDataConfirmText(""); }} className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors">Cancel</button>
+                <button onClick={handleClearData} disabled={isLoading || clearDataConfirmText !== "yes, delete"} className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">{isLoading ? "Clearing..." : "Clear Data"}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="pt-6 border-t border-gray-800">
           <h5 className="text-red-400 font-bold text-sm mb-3 flex items-center gap-2">
             <AlertTriangle size={16} /> Danger Zone
           </h5>
           <div className="space-y-3">
             <button
-              onClick={handleClearData}
+              onClick={() => setShowClearDataModal(true)}
               className="w-full py-3 bg-red-900/10 hover:bg-red-900/20 border border-red-900/30 text-red-400 rounded-xl text-sm font-bold transition-colors"
             >
               Clear All Data
             </button>
             <p className="text-[10px] text-gray-600 text-center">
-              Permanently deletes all local storage data. Cannot be undone.
+              Deletes vaults, items, categories, file attachments, devices, and preferences. Auth and profile preserved.
             </p>
             <button
               onClick={async () => {
