@@ -4,6 +4,7 @@
  */
 
 import { create } from 'zustand';
+import { supabase } from '../supabaseClient';
 import DatabaseService from '../services/database';
 import IndexedDBService from '../services/indexedDB';
 import { useAuthStore } from './authStore';
@@ -134,14 +135,24 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
   },
 
   async deleteVault(vaultId: string) {
+    const { user } = useAuthStore.getState();
     try {
       await DatabaseService.deleteVault(vaultId);
       
-      // Update local state (soft delete)
-      const vaults = get().vaults.map(v => 
-        v.id === vaultId ? { ...v, deletedAt: new Date().toISOString() } : v
-      );
-      set({ vaults });
+      // Also soft delete all items in this vault
+      const { data } = await supabase
+        .from('items')
+        .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+        .eq('vault_id', vaultId);
+      
+      // Log activity
+      if (user) {
+        await DatabaseService.logActivity(user.id, 'DELETE', 'Moved vault to trash');
+      }
+      
+      // Reload vaults and items
+      await get().loadVaults();
+      await get().loadItems();
     } catch (error) {
       console.error('Failed to delete vault:', error);
       throw error;
@@ -290,8 +301,14 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
   },
 
   async deleteItem(itemId: string) {
+    const { user } = useAuthStore.getState();
     try {
       await DatabaseService.deleteItem(itemId);
+      
+      // Log activity
+      if (user) {
+        await DatabaseService.logActivity(user.id, 'DELETE', 'Moved item to trash');
+      }
       
       // Update local state (soft delete)
       const items = get().items.map(i => 

@@ -1155,7 +1155,7 @@ const Settings: React.FC = () => {
         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider px-2 flex items-center gap-2">
           <Shield size={14} /> Security
         </h3>
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden divide-y divide-gray-800">
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-visible divide-y divide-gray-800">
           <div className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
@@ -1244,6 +1244,30 @@ const Settings: React.FC = () => {
             <ToggleSwitch
               checked={userSettings?.allow_screenshots ?? settings.allowScreenshots}
               onChange={(val) => handleSettingChange("allow_screenshots", val)}
+            />
+          </div>
+
+          <div className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
+                <Trash2 size={18} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-gray-200 font-medium">Auto-Delete Trash</span>
+                <span className="text-xs text-gray-500">Permanently delete after</span>
+              </div>
+            </div>
+            <CustomDropdown
+              value={userSettings?.auto_delete_days ?? 30}
+              onChange={(val) => handleSettingChange("auto_delete_days", val)}
+              options={[
+                { label: "7 Days", value: 7 },
+                { label: "14 Days", value: 14 },
+                { label: "30 Days", value: 30 },
+                { label: "60 Days", value: 60 },
+                { label: "90 Days", value: 90 },
+                { label: "Never", value: 0 },
+              ]}
             />
           </div>
         </div>

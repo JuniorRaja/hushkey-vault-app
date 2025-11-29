@@ -27,6 +27,7 @@ import {
 import { storageService } from "./services/storage";
 import { INITIAL_USER } from "./services/mockData";
 import { useAuthStore } from "./src/stores/authStore";
+import DatabaseService from "./src/services/database";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Items from "./pages/Items";
@@ -710,11 +711,32 @@ const AppRoutes = () => {
 };
 
 const App: React.FC = () => {
-  const { hydrate, isLoading } = useAuthStore();
+  const { hydrate, isLoading, user } = useAuthStore();
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  // Auto-cleanup expired trash on app launch
+  // TODO: Change to cron job
+  useEffect(() => {
+    const cleanupTrash = async () => {
+      if (!user) return;
+      
+      try {
+        const { useTrashStore } = await import('./src/stores/trashStore');
+        const { cleanupExpiredTrash } = useTrashStore.getState();
+        const autoDeleteDays = await DatabaseService.getAutoDeleteDays(user.id);
+        await cleanupExpiredTrash(autoDeleteDays);
+      } catch (error) {
+        console.error('Failed to cleanup expired trash:', error);
+      }
+    };
+
+    if (user) {
+      cleanupTrash();
+    }
+  }, [user]);
 
   if (isLoading) {
     return (

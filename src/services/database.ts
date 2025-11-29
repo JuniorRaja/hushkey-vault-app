@@ -164,7 +164,7 @@ class DatabaseService {
       .from("vaults")
       .select("*, items(count)")
       .eq("user_id", userId)
-      .is("deleted_at", null);
+      .eq("is_deleted", false);
 
     if (error) throw error;
 
@@ -245,7 +245,10 @@ class DatabaseService {
   async deleteVault(vaultId: string): Promise<void> {
     const { error } = await supabase
       .from("vaults")
-      .update({ deleted_at: new Date().toISOString() })
+      .update({ 
+        is_deleted: true,
+        deleted_at: new Date().toISOString() 
+      })
       .eq("id", vaultId);
 
     if (error) throw error;
@@ -257,7 +260,10 @@ class DatabaseService {
   async restoreVault(vaultId: string): Promise<void> {
     const { error } = await supabase
       .from("vaults")
-      .update({ deleted_at: null })
+      .update({ 
+        is_deleted: false,
+        deleted_at: null 
+      })
       .eq("id", vaultId);
 
     if (error) throw error;
@@ -330,7 +336,7 @@ class DatabaseService {
       .from("items")
       .select("*")
       .eq("vault_id", vaultId)
-      .is("deleted_at", null);
+      .eq("is_deleted", false);
 
     if (error) throw error;
 
@@ -366,7 +372,7 @@ class DatabaseService {
       .from("items")
       .select("*, vaults!inner(user_id)")
       .eq("vaults.user_id", userId)
-      .is("deleted_at", null);
+      .eq("is_deleted", false);
 
     if (error) throw error;
 
@@ -402,7 +408,7 @@ class DatabaseService {
       .select("*, vaults!inner(user_id)")
       .eq("vaults.user_id", userId)
       .eq("is_favorite", true)
-      .is("deleted_at", null)
+      .eq("is_deleted", false)
       .order("last_accessed_at", { ascending: false, nullsFirst: false })
       .limit(limit);
 
@@ -451,7 +457,7 @@ class DatabaseService {
       .from("items")
       .select("*", { count: "exact", head: true })
       .eq("vault_id", vaultId)
-      .is("deleted_at", null);
+      .eq("is_deleted", false);
 
     if (error) throw error;
     return count || 0;
@@ -500,7 +506,10 @@ class DatabaseService {
   async deleteItem(itemId: string): Promise<void> {
     const { error } = await supabase
       .from("items")
-      .update({ deleted_at: new Date().toISOString() })
+      .update({ 
+        is_deleted: true,
+        deleted_at: new Date().toISOString() 
+      })
       .eq("id", itemId);
 
     if (error) throw error;
@@ -512,7 +521,10 @@ class DatabaseService {
   async restoreItem(itemId: string): Promise<void> {
     const { error } = await supabase
       .from("items")
-      .update({ deleted_at: null })
+      .update({ 
+        is_deleted: false,
+        deleted_at: null 
+      })
       .eq("id", itemId);
 
     if (error) throw error;
@@ -667,6 +679,14 @@ class DatabaseService {
 
     if (error && error.code !== "PGRST116") throw error;
     return data;
+  }
+
+  /**
+   * Get auto-delete days setting
+   */
+  async getAutoDeleteDays(userId: string): Promise<number> {
+    const settings = await this.getUserSettings(userId);
+    return settings?.auto_delete_days ?? 30;
   }
 
   /**

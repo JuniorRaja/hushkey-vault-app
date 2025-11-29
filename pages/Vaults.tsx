@@ -44,6 +44,7 @@ const Vaults: React.FC = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareVault, setShareVault] = useState<Vault | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteWithItems, setDeleteWithItems] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,7 +86,19 @@ const Vaults: React.FC = () => {
     if (deleteTarget) {
       await deleteVault(deleteTarget);
       setDeleteTarget(null);
+      setDeleteWithItems(false);
+      loadVaults();
     }
+  };
+
+  const getDeleteMessage = () => {
+    const vault = vaults.find(v => v.id === deleteTarget);
+    if (!vault) return "This vault will be moved to Trash.";
+    
+    if (vault.itemCount > 0) {
+      return `This vault contains ${vault.itemCount} item${vault.itemCount > 1 ? 's' : ''}. All items will also be moved to Trash. You can restore them later.`;
+    }
+    return "This vault will be moved to Trash. You can restore it later.";
   };
 
   return (
@@ -108,11 +121,15 @@ const Vaults: React.FC = () => {
 
       <ConfirmationModal
         isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
+        onClose={() => {
+          setDeleteTarget(null);
+          setDeleteWithItems(false);
+        }}
         onConfirm={confirmDelete}
         title="Delete Vault?"
-        message="This vault and all items within it will be moved to Trash. You can restore them later."
+        message={getDeleteMessage()}
         confirmText="Move to Trash"
+        type="warning"
       />
 
       <div className="flex items-center justify-between mb-6">
