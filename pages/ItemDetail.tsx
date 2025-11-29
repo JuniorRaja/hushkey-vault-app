@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { useData } from '../App';
-import { useCategoryStore } from '../src/stores/categoryStore';
+import { useItemStore } from '../src/stores/itemStore';
+import { useAuthStore } from '../src/stores/authStore';
+import FileStorageService from '../src/services/fileStorage';
 import { Item, ItemType, FileAttachment } from '../types';
 import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers } from 'lucide-react';
 import { generatePassword, generateTOTP } from '../services/passwordGenerator';
@@ -94,10 +95,11 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const typeParam = searchParams.get('type') as ItemType;
-  const { items, addItem, updateItem, deleteItem, vaults } = useData();
-  const { categories } = useCategoryStore();
+  const { items, vaults, categories, getItem, createItem, updateItem, deleteItem } = useItemStore();
+  const { masterKey } = useAuthStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const multipleFileInputRef = useRef<HTMLInputElement>(null);
+  const [fileAttachments, setFileAttachments] = useState<Array<{ id: string; name: string; size: number; mimeType: string }>>([]);
 
   const [isEditing, setIsEditing] = useState(!!isNew);
   const [formData, setFormData] = useState<Partial<Item>>({
@@ -135,31 +137,45 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
 
   // Load data
   useEffect(() => {
-    if (isNew) {
-      setIsEditing(true);
-      const initialVaultId = vaults[0]?.id || '';
-      setFormData({
-        type: typeParam || ItemType.LOGIN,
-        vaultId: initialVaultId,
-        categoryId: '',
-        name: '',
-        data: { passwordExpiryInterval: 0 } as any // Default to 0
-      });
-    } else if (itemId) {
-      const existing = items.find(i => i.id === itemId);
-      if (existing) {
-        setFormData(JSON.parse(JSON.stringify(existing))); // Deep copy
-        // Check if we navigated here with intent to edit
-        if (location.state && (location.state as any).isEditing) {
+    const loadData = async () => {
+      if (isNew) {
+        setIsEditing(true);
+        const initialVaultId = vaults[0]?.id || '';
+        setFormData({
+          type: typeParam || ItemType.LOGIN,
+          vaultId: initialVaultId,
+          categoryId: '',
+          name: '',
+          data: { passwordExpiryInterval: 0 } as any
+        });
+      } else if (itemId) {
+        const existing = await getItem(itemId);
+        if (existing) {
+          setFormData(JSON.parse(JSON.stringify(existing)));
+          
+          // Load file attachments if available
+          if (masterKey) {
+            try {
+              const attachments = await FileStorageService.getItemAttachments(itemId, masterKey);
+              setFileAttachments(attachments);
+            } catch (error) {
+              console.error('Failed to load attachments:', error);
+            }
+          }
+          
+          if (location.state && (location.state as any).isEditing) {
             setIsEditing(true);
+          } else {
+            setIsEditing(false);
+          }
         } else {
-            setIsEditing(false); 
+          navigate('/items');
         }
-      } else {
-        navigate('/items');
       }
-    }
-  }, [itemId, isNew, items, navigate, vaults, typeParam, location.state]);
+    };
+    
+    loadData();
+  }, [itemId, isNew, vaults, typeParam, location.state]);
 
   // Live TOTP Update
   useEffect(() => {
@@ -197,7 +213,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name || !formData.vaultId) {
         alert("Please enter a name and select a vault.");
         return;
@@ -223,32 +239,32 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         }
     }
 
-    if (isNew) {
-      const newItem: Item = {
-        id: crypto.randomUUID(),
-        vaultId: formData.vaultId!,
-        categoryId: formData.categoryId,
-        type: formData.type || ItemType.LOGIN,
-        name: formData.name,
-        isFavorite: false,
-        lastUpdated: now,
-        notes: formData.notes,
-        data: finalData as any
-      };
-      addItem(newItem);
-      navigate(-1); // Go back after creating
-    } else {
-      updateItem({ ...formData, data: finalData, lastUpdated: now } as Item);
-      setIsEditing(false); // Switch to view mode after saving
+    try {
+      if (isNew) {
+        const newItem = await createItem(formData.vaultId!, {
+          ...formData,
+          name: formData.name!,
+          type: formData.type || ItemType.LOGIN,
+          isFavorite: false,
+          data: finalData as any
+        });
+        navigate(-1);
+      } else {
+        await updateItem(itemId!, { ...formData, data: finalData });
+        setIsEditing(false);
+      }
+    } catch (error) {
+      console.error('Failed to save item:', error);
+      alert('Failed to save item. Please try again.');
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (isNew) {
         navigate(-1);
     } else {
         // Revert data
-        const existing = items.find(i => i.id === itemId);
+        const existing = await getItem(itemId!);
         if (existing) {
             setFormData(JSON.parse(JSON.stringify(existing)));
         }
@@ -261,10 +277,15 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       setDeleteConfirmationOpen(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (itemId) {
-      deleteItem(itemId);
-      navigate('/items');
+      try {
+        await deleteItem(itemId);
+        navigate('/items');
+      } catch (error) {
+        console.error('Failed to delete item:', error);
+        alert('Failed to delete item. Please try again.');
+      }
     }
   };
 
@@ -356,47 +377,52 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
 
   const handleMultiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
-      if (!files || files.length === 0) return;
+      if (!files || files.length === 0 || !itemId || !masterKey) return;
 
-      const newAttachments: FileAttachment[] = [];
-      
-      for (let i = 0; i < files.length; i++) {
+      try {
+        for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          const reader = new FileReader();
-          
-          const attachmentPromise = new Promise<FileAttachment>((resolve) => {
-              reader.onloadend = () => {
-                  resolve({
-                      id: crypto.randomUUID(),
-                      name: file.name,
-                      size: file.size,
-                      type: file.type || 'unknown',
-                      data: reader.result as string
-                  });
-              };
-              reader.readAsDataURL(file);
-          });
-          
-          newAttachments.push(await attachmentPromise);
+          await FileStorageService.uploadFile(itemId, file, masterKey);
+        }
+        
+        // Reload attachments
+        const attachments = await FileStorageService.getItemAttachments(itemId, masterKey);
+        setFileAttachments(attachments);
+        
+        if(multipleFileInputRef.current) multipleFileInputRef.current.value = '';
+      } catch (error) {
+        console.error('Failed to upload files:', error);
+        alert('Failed to upload files. Please try again.');
       }
-
-      const currentAttachments = formData.data?.attachments || [];
-      updateDataField('attachments', [...currentAttachments, ...newAttachments]);
-      if(multipleFileInputRef.current) multipleFileInputRef.current.value = '';
   };
 
-  const removeAttachment = (id: string) => {
-      const currentAttachments = formData.data?.attachments || [];
-      updateDataField('attachments', currentAttachments.filter((f: FileAttachment) => f.id !== id));
+  const removeAttachment = async (id: string) => {
+      try {
+        await FileStorageService.deleteFile(id);
+        setFileAttachments(prev => prev.filter(f => f.id !== id));
+      } catch (error) {
+        console.error('Failed to delete attachment:', error);
+        alert('Failed to delete attachment. Please try again.');
+      }
   };
 
-  const downloadAttachment = (file: FileAttachment) => {
-      const link = document.createElement('a');
-      link.href = file.data;
-      link.download = file.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+  const downloadAttachment = async (fileId: string, fileName: string) => {
+      if (!masterKey) return;
+      
+      try {
+        const { data, mimeType } = await FileStorageService.downloadFile(fileId, masterKey);
+        const url = URL.createObjectURL(data);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Failed to download attachment:', error);
+        alert('Failed to download attachment. Please try again.');
+      }
   };
 
   // --- Field Components based on Type ---
@@ -408,6 +434,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         : "w-full bg-transparent border border-transparent px-0 py-2 text-white font-medium text-lg focus:outline-none cursor-text";
     
     const labelClass = "text-xs text-gray-400 font-medium ml-1 uppercase tracking-wider";
+    const autoCompleteProps = { autoComplete: 'off', 'data-form-type': 'other' };
 
     // Expiry Dropdown Component
     const renderExpiryDropdown = () => (
@@ -452,6 +479,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
               <div className="relative flex items-center">
                 <input 
                     type="text" 
+                    {...autoCompleteProps}
                     readOnly={!isEditing}
                     className={inputBaseClass}
                     value={formData.data?.username || ''}
@@ -471,6 +499,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
               <div className="relative flex items-center">
                 <input 
                     type={showPassword || isEditing ? "text" : "password"} 
+                    {...autoCompleteProps}
                     readOnly={!isEditing}
                     className={`${inputBaseClass} font-mono`}
                     value={formData.data?.password || ''}
@@ -544,6 +573,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             <div className="relative flex items-center">
                                 <input 
                                     type={showTotpSecret ? "text" : "password"}
+                                    {...autoCompleteProps}
                                     className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-white focus:border-primary-500 outline-none transition-colors font-mono text-sm"
                                     value={formData.data?.totp || ''}
                                     onChange={(e) => updateDataField('totp', e.target.value)}
@@ -599,6 +629,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
               <div className="relative flex items-center">
                 <input 
                     type="url" 
+                    {...autoCompleteProps}
                     readOnly={!isEditing}
                     className={`${inputBaseClass} ${urlError ? 'border-red-500 focus:border-red-500' : ''} text-primary-400`}
                     value={formData.data?.url || ''}
@@ -726,15 +757,15 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                      )}
 
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                         {formData.data?.attachments?.map((file: FileAttachment) => (
+                         {fileAttachments.map((file) => (
                              <div key={file.id} className="bg-gray-900 border border-gray-800 p-3 rounded-lg flex items-center justify-between group">
                                  <div className="flex items-center gap-3 overflow-hidden">
                                      <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center shrink-0 text-gray-400">
-                                         {file.type.startsWith('image/') ? <ImageIcon size={20} /> : <FileText size={20} />}
+                                         {file.mimeType.startsWith('image/') ? <ImageIcon size={20} /> : <FileText size={20} />}
                                      </div>
                                      <div className="min-w-0">
                                          <p className="text-sm font-medium text-white truncate">{file.name}</p>
-                                         <p className="text-xs text-gray-500">{formatBytes(file.size)} • {file.type.split('/')[1]?.toUpperCase() || 'FILE'}</p>
+                                         <p className="text-xs text-gray-500">{formatBytes(file.size)} • {file.mimeType.split('/')[1]?.toUpperCase() || 'FILE'}</p>
                                      </div>
                                  </div>
                                  
@@ -748,7 +779,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                          </button>
                                      ) : (
                                           <button 
-                                            onClick={() => downloadAttachment(file)}
+                                            onClick={() => downloadAttachment(file.id, file.name)}
                                             className="p-2 text-gray-500 hover:text-primary-400 transition-colors"
                                             title="Download"
                                          >
@@ -759,7 +790,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                              </div>
                          ))}
                          
-                         {(!formData.data?.attachments || formData.data.attachments.length === 0) && !isEditing && (
+                         {fileAttachments.length === 0 && !isEditing && (
                              <div className="col-span-full text-center py-4 text-gray-500 text-sm">
                                  No files attached.
                              </div>
@@ -1745,7 +1776,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                       {isEditing && <input type="file" multiple ref={multipleFileInputRef} className="hidden" onChange={handleMultiFileUpload} />}
 
                       <div className="space-y-2">
-                          {formData.data?.attachments?.map((file: FileAttachment) => (
+                          {fileAttachments.map((file) => (
                               <div key={file.id} className="flex items-center justify-between p-2 bg-gray-950 rounded-lg border border-gray-800 group">
                                   <div className="flex items-center gap-2 overflow-hidden">
                                       <File size={16} className="text-gray-500 shrink-0" />
@@ -1755,12 +1786,12 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                       {isEditing ? (
                                            <button onClick={() => removeAttachment(file.id)} className="p-1 text-gray-500 hover:text-red-400"><X size={14}/></button>
                                       ) : (
-                                           <button onClick={() => downloadAttachment(file)} className="p-1 text-gray-500 hover:text-white"><Download size={14}/></button>
+                                           <button onClick={() => downloadAttachment(file.id, file.name)} className="p-1 text-gray-500 hover:text-white"><Download size={14}/></button>
                                       )}
                                   </div>
                               </div>
                           ))}
-                          {(!formData.data?.attachments || formData.data.attachments.length === 0) && (
+                          {fileAttachments.length === 0 && (
                               <div className="text-xs text-gray-600 text-center py-4">No attachments</div>
                           )}
                       </div>

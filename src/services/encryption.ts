@@ -168,6 +168,70 @@ class EncryptionService {
     const json = await this.decrypt(encryptedData, masterKey);
     return JSON.parse(json);
   }
+
+  /**
+   * Encrypt binary data (for files)
+   */
+  async encryptBinary(data: Uint8Array, masterKey: Uint8Array): Promise<Uint8Array> {
+    // Generate random IV
+    const iv = crypto.getRandomValues(new Uint8Array(this.IV_LENGTH));
+
+    // Import key
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      masterKey.buffer as ArrayBuffer,
+      { name: 'AES-GCM' },
+      false,
+      ['encrypt']
+    );
+
+    // Encrypt
+    const encryptedBuffer = await crypto.subtle.encrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv
+      },
+      cryptoKey,
+      data
+    );
+
+    // Combine IV + encrypted data
+    const combined = new Uint8Array(iv.length + encryptedBuffer.byteLength);
+    combined.set(iv, 0);
+    combined.set(new Uint8Array(encryptedBuffer), iv.length);
+
+    return combined;
+  }
+
+  /**
+   * Decrypt binary data (for files)
+   */
+  async decryptBinary(encryptedData: Uint8Array, masterKey: Uint8Array): Promise<Uint8Array> {
+    // Extract IV and encrypted data
+    const iv = encryptedData.slice(0, this.IV_LENGTH);
+    const encryptedBuffer = encryptedData.slice(this.IV_LENGTH);
+
+    // Import key
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      masterKey.buffer as ArrayBuffer,
+      { name: 'AES-GCM' },
+      false,
+      ['decrypt']
+    );
+
+    // Decrypt
+    const decryptedBuffer = await crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv
+      },
+      cryptoKey,
+      encryptedBuffer
+    );
+
+    return new Uint8Array(decryptedBuffer);
+  }
 }
 
 export default new EncryptionService();

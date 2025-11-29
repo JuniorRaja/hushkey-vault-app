@@ -162,9 +162,9 @@ class DatabaseService {
   async getVaults(userId: string, masterKey: Uint8Array): Promise<Vault[]> {
     const { data, error } = await supabase
       .from("vaults")
-      .select("*, items(count)")
+      .select("*")
       .eq("user_id", userId)
-      .eq("is_deleted", false);
+      .is("deleted_at", null);
 
     if (error) throw error;
 
@@ -181,7 +181,7 @@ class DatabaseService {
           : undefined,
         icon: vault.icon,
         createdAt: vault.created_at,
-        itemCount: vault.items?.[0]?.count || 0,
+        itemCount: 0, // Will be populated separately
         isShared: vault.is_shared,
         sharedWith: vault.shared_with || [],
         notes: vault.notes_encrypted
@@ -296,11 +296,11 @@ class DatabaseService {
       .from("items")
       .insert({
         vault_id: vaultId,
-        category_id: itemData.categoryId,
+        category_id: itemData.categoryId || null,
         type: itemData.type,
         data_encrypted: dataEncrypted,
         is_favorite: itemData.isFavorite || false,
-        folder: itemData.folder,
+        folder: itemData.folder || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -455,7 +455,7 @@ class DatabaseService {
   async getVaultItemCount(vaultId: string): Promise<number> {
     const { count, error } = await supabase
       .from("items")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("vault_id", vaultId)
       .eq("is_deleted", false);
 
@@ -483,13 +483,13 @@ class DatabaseService {
     };
 
     if (updates.categoryId !== undefined) {
-      updateData.category_id = updates.categoryId;
+      updateData.category_id = updates.categoryId || null;
     }
     if (updates.isFavorite !== undefined) {
       updateData.is_favorite = updates.isFavorite;
     }
     if (updates.folder !== undefined) {
-      updateData.folder = updates.folder;
+      updateData.folder = updates.folder || null;
     }
 
     const { error } = await supabase

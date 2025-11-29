@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useItemStore } from '../src/stores/itemStore';
 import { useVaultStore } from '../src/stores/vaultStore';
 import { useData } from '../App';
 import { Plus, Search, Filter, Globe, CreditCard, StickyNote, Wifi, FileText, User, ArrowUpRight, Edit2, Share2, MoreVertical, Trash2, X, Landmark, RectangleHorizontal, Check, ChevronDown, Copy, Star, Files, FolderInput, Database, Server, Terminal, IdCard } from 'lucide-react';
@@ -37,7 +38,7 @@ const ItemIcon = ({ item }: { item: Item }) => {
         }
     };
 
-    if (item.type === ItemType.LOGIN && item.data.url) {
+    if (item.type === ItemType.LOGIN && item.data?.url) {
         const favicon = getFaviconUrl(item.data.url);
         if (favicon) {
             return (
@@ -60,8 +61,8 @@ const ItemIcon = ({ item }: { item: Item }) => {
     }
     
     // Attempt to show bank logo if website is present
-    if (item.type === ItemType.BANK && item.data.website) {
-         const favicon = getFaviconUrl(item.data.website.startsWith('http') ? item.data.website : `https://${item.data.website}`);
+    if (item.type === ItemType.BANK && item.data?.website) {
+         const favicon = getFaviconUrl(item.data.website?.startsWith('http') ? item.data.website : `https://${item.data.website}`);
          if (favicon) {
             return (
                 <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden p-2 shrink-0">
@@ -105,7 +106,8 @@ const ITEM_TYPE_OPTIONS = [
 ];
 
 const Items: React.FC = () => {
-  const { items, vaults, loadItems, loadVaults, updateItem, deleteItem, isLoading } = useVaultStore();
+  const { items, vaults, categories, loadItems, loadVaults, loadCategories, updateItem, deleteItem, toggleFavorite, isLoading } = useItemStore();
+  const { deleteVault } = useVaultStore();
   const { settings } = useData();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -113,8 +115,9 @@ const Items: React.FC = () => {
 
   useEffect(() => {
     loadVaults();
+    loadCategories();
     loadItems(vaultFilter || undefined);
-  }, [vaultFilter]);
+  }, [vaultFilter, loadVaults, loadCategories, loadItems]);
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
 
   // Modal & Menu State
@@ -205,8 +208,6 @@ const Items: React.FC = () => {
       }
   };
 
-  const { deleteVault } = useVaultStore();
-
   const handleConfirmDelete = () => {
       if (!deleteTarget) return;
 
@@ -262,7 +263,7 @@ const Items: React.FC = () => {
 
   const handleDuplicate = async (e: React.MouseEvent, item: Item) => {
       e.stopPropagation();
-      const { createItem } = useVaultStore.getState();
+      const { createItem } = useItemStore.getState();
       try {
           await createItem(item.vaultId, {
               ...item,
@@ -276,7 +277,6 @@ const Items: React.FC = () => {
   
   const handleToggleFavorite = async (e: React.MouseEvent, item: Item) => {
       e.stopPropagation();
-      const { toggleFavorite } = useVaultStore.getState();
       try {
           await toggleFavorite(item.id);
       } catch (error) {
@@ -318,7 +318,17 @@ const Items: React.FC = () => {
                     {item.isFavorite && <Star size={12} className="text-yellow-500 fill-yellow-500" />}
                 </h4>
                 <div className="text-gray-500 text-xs md:text-sm flex items-center gap-2">
-                    <span>{item.data.username || item.data.content?.slice(0, 20) || item.data.hostname || item.data.host || item.data.accountNumber || item.data.fileName || '****'}</span>
+                    <span>
+                        {item.type === ItemType.NOTE ? (item.data?.content?.slice(0, 30) || 'No content') :
+                         item.type === ItemType.LOGIN ? item.data?.username :
+                         item.type === ItemType.WIFI ? item.data?.ssid :
+                         item.type === ItemType.DATABASE ? item.data?.databaseName :
+                         item.type === ItemType.SERVER ? (item.data?.hostname || item.data?.ip) :
+                         item.type === ItemType.SSH_KEY ? item.data?.host :
+                         item.type === ItemType.BANK ? item.data?.accountNumber :
+                         item.type === ItemType.FILE ? item.data?.fileName :
+                         item.data?.username || '****'}
+                    </span>
                     {item.folder && (
                         <>
                             <span className="w-1 h-1 bg-gray-600 rounded-full"></span>
@@ -332,10 +342,10 @@ const Items: React.FC = () => {
         <div className="flex items-center gap-1 md:gap-2">
             {/* Action Buttons - Visible on Mobile by default, hover on Desktop */}
             <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                {(item.data.password || item.data.pin || item.data.privateKey) && (
+                {(item.data?.password || item.data?.pin || item.data?.privateKey) && (
                     <button 
                         className="p-2 text-gray-500 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-                        onClick={(e) => handleCopy(e, item.data.password || item.data.pin || item.data.privateKey || '')}
+                        onClick={(e) => handleCopy(e, item.data?.password || item.data?.pin || item.data?.privateKey || '')}
                         title="Copy Secret"
                     >
                         <Copy size={16} />
@@ -425,13 +435,13 @@ const Items: React.FC = () => {
                 style={{ top: menuPosition.top, right: menuPosition.right }}
                 onClick={(e) => e.stopPropagation()}
             >
-                {activeMenuItem.data.username && (
-                    <button onClick={(e) => handleCopy(e, activeMenuItem.data.username || '')} className="w-full text-left px-4 py-3 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 flex items-center gap-3">
+                {activeMenuItem.data?.username && (
+                    <button onClick={(e) => handleCopy(e, activeMenuItem.data?.username || '')} className="w-full text-left px-4 py-3 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 flex items-center gap-3">
                         <User size={14} /> Copy Username
                     </button>
                 )}
-                {(activeMenuItem.data.password || activeMenuItem.data.privateKey) && (
-                    <button onClick={(e) => handleCopy(e, activeMenuItem.data.password || activeMenuItem.data.privateKey || '')} className="w-full text-left px-4 py-3 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 flex items-center gap-3">
+                {(activeMenuItem.data?.password || activeMenuItem.data?.privateKey) && (
+                    <button onClick={(e) => handleCopy(e, activeMenuItem.data?.password || activeMenuItem.data?.privateKey || '')} className="w-full text-left px-4 py-3 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 flex items-center gap-3">
                         <Copy size={14} /> Copy {activeMenuItem.type === ItemType.SSH_KEY ? 'Private Key' : 'Password'}
                     </button>
                 )}

@@ -61,11 +61,19 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     try {
       const vaults = await DatabaseService.getVaults(user.id, masterKey);
       
+      // Get actual item counts for each vault
+      const vaultsWithCounts = await Promise.all(
+        vaults.map(async (v) => ({
+          ...v,
+          itemCount: await DatabaseService.getVaultItemCount(v.id)
+        }))
+      );
+      
       // Cache in IndexedDB
-      const vaultRecords = vaults.map(v => ({
+      const vaultRecords = vaultsWithCounts.map(v => ({
         id: v.id,
         userId: user.id,
-        nameEncrypted: '', // Already decrypted, would need to re-encrypt for cache
+        nameEncrypted: '',
         icon: v.icon,
         isShared: v.isShared,
         sharedWith: v.sharedWith,
@@ -75,7 +83,8 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       }));
       
       await IndexedDBService.bulkSaveVaults(vaultRecords as any);
-      set({ vaults, isLoading: false });
+      console.log('loadVaults: Loaded', vaultsWithCounts.length, 'vaults with counts');
+      set({ vaults: vaultsWithCounts, isLoading: false });
     } catch (error) {
       console.error('Failed to load vaults:', error);
       set({ isLoading: false });

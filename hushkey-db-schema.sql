@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS user_settings (
     
     -- Sync
     last_sync TIMESTAMPTZ DEFAULT NOW(),
-    
+    auto_delete_days INTEGER DEFAULT 30,
+
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -126,6 +127,8 @@ CREATE TABLE IF NOT EXISTS items (
     
     -- Metadata (not sensitive)
     is_favorite BOOLEAN DEFAULT FALSE,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    last_accessed_at TIMESTAMPTZ DEFAULT NOW(),
     folder VARCHAR(255),
     
     -- Timestamps
@@ -200,6 +203,17 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Create biometric credentials table
+CREATE TABLE IF NOT EXISTS biometric_credentials (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  credential_id TEXT NOT NULL,
+  public_key TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
 -- ============================================================================
 -- INDEXES FOR PERFORMANCE
 -- ============================================================================
@@ -212,6 +226,7 @@ CREATE INDEX IF NOT EXISTS idx_vaults_user_id ON vaults(user_id);
 CREATE INDEX IF NOT EXISTS idx_vaults_deleted_at ON vaults(deleted_at);
 CREATE INDEX IF NOT EXISTS idx_vaults_is_shared ON vaults(is_shared);
 CREATE INDEX IF NOT EXISTS idx_vaults_created_at ON vaults(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_vaults_is_deleted ON vaults(is_deleted, deleted_at);
 
 -- Items indexes
 CREATE INDEX IF NOT EXISTS idx_items_vault_id ON items(vault_id);
@@ -220,6 +235,8 @@ CREATE INDEX IF NOT EXISTS idx_items_type ON items(type);
 CREATE INDEX IF NOT EXISTS idx_items_deleted_at ON items(deleted_at);
 CREATE INDEX IF NOT EXISTS idx_items_is_favorite ON items(is_favorite);
 CREATE INDEX IF NOT EXISTS idx_items_created_at ON items(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_items_is_favorite_accessed ON items(is_favorite, last_accessed_at DESC) WHERE is_favorite = TRUE AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_items_is_deleted ON items(is_deleted, deleted_at);
 
 -- Categories indexes
 CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id);
@@ -245,6 +262,7 @@ CREATE INDEX IF NOT EXISTS idx_file_attachments_mime_type ON file_attachments(mi
 
 -- User settings indexes
 CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON user_settings(user_id);
+CREATE INDEX IF NOT EXISTS idx_biometric_credentials_user_id ON biometric_credentials(user_id);
 
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS)
@@ -260,6 +278,7 @@ ALTER TABLE devices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE file_attachments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE biometric_credentials ENABLE ROW LEVEL SECURITY;
 
 -- User profiles policies
 DROP POLICY IF EXISTS "Users manage own profile" ON user_profiles;
@@ -318,6 +337,13 @@ CREATE POLICY "Users update own vaults" ON vaults
 DROP POLICY IF EXISTS "Users delete own vaults" ON vaults;
 CREATE POLICY "Users delete own vaults" ON vaults
     FOR DELETE USING (auth.uid() = user_id);
+
+-- Biometric Policy
+DROP POLICY IF EXISTS "Users can manage their own biometric credentials" ON biometric_credentials;
+CREATE POLICY "Users can manage their own biometric credentials"
+  ON biometric_credentials
+  FOR ALL
+  USING (auth.uid() = user_id);
 
 -- Items policies (access through owned vaults)
 DROP POLICY IF EXISTS "Users view items in own vaults" ON items;
