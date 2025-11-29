@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { useData } from '../App';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useVaultStore } from '../src/stores/vaultStore';
+import { useData } from '../App';
 import { Plus, Search, Filter, Globe, CreditCard, StickyNote, Wifi, FileText, User, ArrowUpRight, Edit2, Share2, MoreVertical, Trash2, X, Landmark, RectangleHorizontal, Check, ChevronDown, Copy, Star, Files, FolderInput, Database, Server, Terminal, IdCard } from 'lucide-react';
 import { Item, ItemType, Vault, Category } from '../types';
 import VaultModal from '../components/VaultModal';
@@ -104,10 +105,16 @@ const ITEM_TYPE_OPTIONS = [
 ];
 
 const Items: React.FC = () => {
-  const { items, vaults, deleteVault, addItem, updateItem, deleteItem, settings } = useData();
+  const { items, vaults, loadItems, loadVaults, updateItem, deleteItem, isLoading } = useVaultStore();
+  const { settings } = useData();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const vaultFilter = searchParams.get('vault');
+
+  useEffect(() => {
+    loadVaults();
+    loadItems(vaultFilter || undefined);
+  }, [vaultFilter]);
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
 
   // Modal & Menu State
@@ -198,6 +205,8 @@ const Items: React.FC = () => {
       }
   };
 
+  const { deleteVault } = useVaultStore();
+
   const handleConfirmDelete = () => {
       if (!deleteTarget) return;
 
@@ -251,21 +260,28 @@ const Items: React.FC = () => {
       closeMenu();
   };
 
-  const handleDuplicate = (e: React.MouseEvent, item: Item) => {
+  const handleDuplicate = async (e: React.MouseEvent, item: Item) => {
       e.stopPropagation();
-      const newItem: Item = {
-          ...item,
-          id: window.crypto.randomUUID(),
-          name: `${item.name} (Copy)`,
-          lastUpdated: new Date().toISOString()
-      };
-      addItem(newItem);
+      const { createItem } = useVaultStore.getState();
+      try {
+          await createItem(item.vaultId, {
+              ...item,
+              name: `${item.name} (Copy)`,
+          });
+      } catch (error) {
+          console.error('Failed to duplicate item:', error);
+      }
       closeMenu();
   };
   
-  const handleToggleFavorite = (e: React.MouseEvent, item: Item) => {
+  const handleToggleFavorite = async (e: React.MouseEvent, item: Item) => {
       e.stopPropagation();
-      updateItem({ ...item, isFavorite: !item.isFavorite });
+      const { toggleFavorite } = useVaultStore.getState();
+      try {
+          await toggleFavorite(item.id);
+      } catch (error) {
+          console.error('Failed to toggle favorite:', error);
+      }
       closeMenu();
   };
 

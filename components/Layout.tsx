@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, memo, useCallback } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Shield,
@@ -19,6 +19,7 @@ import { useAuth, useData } from "../App";
 import { useAuthStore } from "../src/stores/authStore";
 import { useAutoLock } from "../src/hooks/useAutoLock";
 import { NotificationType } from "../types";
+import SyncStatus from "./SyncStatus";
 
 const HushkeyLogo = ({ size = 24 }: { size?: number }) => (
   <div
@@ -69,7 +70,7 @@ const HushkeyLogo = ({ size = 24 }: { size?: number }) => (
   </div>
 );
 
-const SidebarLink = ({
+const SidebarLink = memo(({
   to,
   icon: Icon,
   label,
@@ -80,16 +81,24 @@ const SidebarLink = ({
   label: string;
   collapsed: boolean;
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isActive = location.pathname === to;
+    
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(to);
+  }, [navigate, to]);
+  
   return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative ${
-          isActive
-            ? "bg-primary-600 text-white shadow-lg shadow-primary-900/50"
-            : "text-gray-400 hover:bg-gray-850 hover:text-gray-200"
-        } ${collapsed ? "justify-center" : ""}`
-      }
+    <button
+      onClick={handleClick}
+      className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group relative w-full text-left ${
+        isActive
+          ? "bg-primary-600 text-white shadow-lg shadow-primary-900/50"
+          : "text-gray-400 hover:bg-gray-850 hover:text-gray-200"
+      } ${collapsed ? "justify-center" : ""}`}
     >
       <Icon size={20} strokeWidth={2} className="shrink-0" />
       {!collapsed && (
@@ -100,15 +109,15 @@ const SidebarLink = ({
 
       {/* Tooltip for collapsed state */}
       {collapsed && (
-        <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
+        <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap">
           {label}
         </div>
       )}
-    </NavLink>
+    </button>
   );
-};
+});
 
-const MobileNavLink = ({
+const MobileNavLink = memo(({
   to,
   icon: Icon,
   label,
@@ -134,76 +143,14 @@ const MobileNavLink = ({
       )}
     </NavLink>
   );
-};
+});
 
-const AppLayout: React.FC = () => {
-  const { logout: oldLogout } = useAuth();
+// Desktop Sidebar Component
+const Sidebar = memo(({ collapsed, setCollapsed }: { collapsed: boolean; setCollapsed: (val: boolean) => void }) => {
   const { lock, signOut } = useAuthStore();
   const navigate = useNavigate();
-  const {
-    items,
-    notifications,
-    unreadNotificationCount,
-    markNotificationsRead,
-    clearNotifications,
-  } = useData();
   
-  useAutoLock();
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [collapsed, setCollapsed] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
-  const location = useLocation();
-
-  // Determine if header should be hidden based on current path
-  const hideHeader = ["/guardian", "/trash", "/settings"].some((path) =>
-    location.pathname.startsWith(path)
-  );
-
-  // Reset search when location changes
-  useEffect(() => {
-    setSearchOpen(false);
-    setSearchQuery("");
-  }, [location.pathname]);
-
-  // Close notifications on outside click
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        notifRef.current &&
-        !notifRef.current.contains(event.target as Node)
-      ) {
-        setShowNotifications(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleNotificationClick = () => {
-    setShowNotifications(!showNotifications);
-    if (!showNotifications) {
-      // Mark read on open or can do it on explicit action. Let's do explicit for better UX, or just badge clearing
-      // markNotificationsRead();
-    }
-  };
-
-  const getNotifIcon = (type: NotificationType) => {
-    switch (type) {
-      case NotificationType.SECURITY:
-        return <Shield size={16} className="text-red-400" />;
-      case NotificationType.ALERT:
-        return <Bell size={16} className="text-orange-400" />;
-      case NotificationType.SUCCESS:
-        return <Check size={16} className="text-green-400" />;
-      default:
-        return <Bell size={16} className="text-blue-400" />;
-    }
-  };
-
-  // Desktop Sidebar
-  const Sidebar = () => (
+  return (
     <aside
       className={`hidden md:flex flex-col h-screen bg-gray-950 border-r border-gray-850 fixed left-0 top-0 z-20 transition-all duration-300 ${
         collapsed ? "w-20" : "w-64"
@@ -227,7 +174,7 @@ const AppLayout: React.FC = () => {
         {!collapsed && (
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="text-gray-500 hover:text-white transition-colors"
+            className="text-gray-500 hover:text-white transition-colors p-1 hover:bg-gray-800 rounded"
           >
             <PanelLeft size={18} />
           </button>
@@ -238,7 +185,7 @@ const AppLayout: React.FC = () => {
       {collapsed && (
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="mx-auto mb-4 text-gray-500 hover:text-white transition-colors"
+          className="mx-auto mb-4 text-gray-500 hover:text-white transition-colors p-2 hover:bg-gray-800 rounded"
         >
           <PanelLeft size={18} />
         </button>
@@ -315,9 +262,41 @@ const AppLayout: React.FC = () => {
       </div>
     </aside>
   );
+});
 
-  // Header for Search & Context
-  const Header = () => (
+// Header Component
+const Header = memo(({
+  searchQuery,
+  setSearchQuery,
+  searchOpen,
+  setSearchOpen,
+  items,
+  notifications,
+  unreadNotificationCount,
+  markNotificationsRead,
+  clearNotifications,
+  showNotifications,
+  setShowNotifications,
+  notifRef
+}: any) => {
+  const handleNotificationClick = useCallback(() => {
+    setShowNotifications((prev: boolean) => !prev);
+  }, [setShowNotifications]);
+
+  const getNotifIcon = useCallback((type: NotificationType) => {
+    switch (type) {
+      case NotificationType.SECURITY:
+        return <Shield size={16} className="text-red-400" />;
+      case NotificationType.ALERT:
+        return <Bell size={16} className="text-orange-400" />;
+      case NotificationType.SUCCESS:
+        return <Check size={16} className="text-green-400" />;
+      default:
+        return <Bell size={16} className="text-blue-400" />;
+    }
+  }, []);
+
+  return (
     <header className="sticky top-0 z-10 bg-gray-950/80 backdrop-blur-md border-b border-gray-850 px-4 py-3 md:px-8 md:py-4 flex items-center justify-between">
       <div className="md:hidden flex items-center gap-2">
         <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
@@ -329,13 +308,13 @@ const AppLayout: React.FC = () => {
       {/* Global Search Bar */}
       <div className="flex-1 max-w-xl mx-4 relative hidden md:block">
         <Search
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
           size={18}
         />
         <input
           type="text"
           placeholder="Search your vault..."
-          className="w-full bg-gray-900 border border-gray-800 rounded-full py-2 pl-10 pr-4 text-sm text-gray-200 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all placeholder-gray-600"
+          className="w-full bg-gray-900 border border-gray-800 rounded-full py-2 pl-10 pr-4 text-sm text-gray-200 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all placeholder-gray-600 z-10"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -366,11 +345,14 @@ const AppLayout: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Sync Status */}
+        <SyncStatus />
+        
         {/* Notification Bell */}
         <div className="relative" ref={notifRef}>
           <button
             onClick={handleNotificationClick}
-            className={`p-2 rounded-full transition-colors relative ${
+            className={`p-2 rounded-full transition-colors relative z-50 ${
               showNotifications
                 ? "bg-gray-800 text-white"
                 : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -451,7 +433,7 @@ const AppLayout: React.FC = () => {
 
         {/* Mobile Search Toggle */}
         <button
-          className="md:hidden p-2 text-gray-400"
+          className="md:hidden p-2 text-gray-400 hover:text-white transition-colors"
           onClick={() => setSearchOpen(!searchOpen)}
         >
           {searchOpen ? <X size={24} /> : <Search size={24} />}
@@ -459,17 +441,74 @@ const AppLayout: React.FC = () => {
       </div>
     </header>
   );
+});
+
+const AppLayout: React.FC = () => {
+  const { lock, signOut } = useAuthStore();
+  const navigate = useNavigate();
+  const {
+    items,
+    notifications,
+    unreadNotificationCount,
+    markNotificationsRead,
+    clearNotifications,
+  } = useData();
+  
+  useAutoLock();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [collapsed, setCollapsed] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+
+  const hideHeader = ["/guardian", "/trash", "/settings"].some((path) =>
+    location.pathname.startsWith(path)
+  );
+
+  useEffect(() => {
+    setSearchOpen(false);
+    setSearchQuery("");
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        notifRef.current &&
+        !notifRef.current.contains(event.target as Node)
+      ) {
+        setShowNotifications(false);
+      }
+    };
+    if (showNotifications) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showNotifications]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 font-sans flex">
-      <Sidebar />
+      <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
 
       <main
         className={`flex-1 flex flex-col relative pb-20 md:pb-0 transition-all duration-300 ${
           collapsed ? "md:ml-20" : "md:ml-64"
         }`}
       >
-        {!hideHeader && <Header />}
+        {!hideHeader && <Header 
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          searchOpen={searchOpen}
+          setSearchOpen={setSearchOpen}
+          items={items}
+          notifications={notifications}
+          unreadNotificationCount={unreadNotificationCount}
+          markNotificationsRead={markNotificationsRead}
+          clearNotifications={clearNotifications}
+          showNotifications={showNotifications}
+          setShowNotifications={setShowNotifications}
+          notifRef={notifRef}
+        />}
 
         {/* Mobile Search Overlay */}
         {searchOpen && !hideHeader && (

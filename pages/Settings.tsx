@@ -839,6 +839,11 @@ const Settings: React.FC = () => {
   const [userSettings, setUserSettings] = useState<any>(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
+  const truncateText = (text: string, maxLength: number = 12) => {
+    if (!text) return '';
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  };
+
   useEffect(() => {
     const loadSettings = async () => {
       if (!authUser) return;
@@ -1009,9 +1014,13 @@ const Settings: React.FC = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-white group-hover:text-primary-400 transition-colors">
-              {authUser?.name || authUser?.email}
+              <span className="hidden md:inline">{authUser?.name || authUser?.email}</span>
+              <span className="md:hidden">{truncateText(authUser?.name || authUser?.email || '', 12)}</span>
             </h2>
-            <p className="text-gray-400">{authUser?.email}</p>
+            <p className="text-gray-400">
+              <span className="hidden md:inline">{authUser?.email}</span>
+              <span className="md:hidden">{truncateText(authUser?.email || '', 12)}</span>
+            </p>
             <div className="flex gap-4 mt-2 text-xs font-medium text-gray-500">
               <span className="bg-gray-800 px-2 py-0.5 rounded">
                 {items.length} Items
@@ -1128,7 +1137,7 @@ const Settings: React.FC = () => {
                 Email Notifications
               </span>
               <span className="text-[11px] text-gray-500">
-                Send alerts to {authUser?.email}.
+                Send alerts to <span className="hidden md:inline">{authUser?.email}</span><span className="md:hidden">{truncateText(authUser?.email || '', 12)}</span>.
               </span>
             </div>
             <ToggleSwitch

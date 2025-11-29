@@ -30,6 +30,7 @@ import { useAuthStore } from "./src/stores/authStore";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Items from "./pages/Items";
+import Vaults from "./pages/Vaults";
 import Guardian from "./pages/Guardian";
 import Settings from "./pages/Settings";
 import ItemDetail from "./pages/ItemDetail";
@@ -696,7 +697,7 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/" element={<AppLayout />}>
         <Route index element={<Navigate to="/vaults" replace />} />
-        <Route path="vaults" element={<Dashboard />} />
+        <Route path="vaults" element={<Vaults />} />
         <Route path="items" element={<Items />} />
         <Route path="items/:itemId" element={<ItemDetail />} />
         <Route path="items/new" element={<ItemDetail isNew />} />

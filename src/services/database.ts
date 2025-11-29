@@ -359,6 +359,105 @@ class DatabaseService {
   }
 
   /**
+   * Get all items across all vaults for a user
+   */
+  async getAllItems(userId: string, masterKey: Uint8Array): Promise<Item[]> {
+    const { data, error } = await supabase
+      .from("items")
+      .select("*, vaults!inner(user_id)")
+      .eq("vaults.user_id", userId)
+      .is("deleted_at", null);
+
+    if (error) throw error;
+
+    const items = await Promise.all(
+      data.map(async (item) => {
+        const decryptedData = await EncryptionService.decryptObject<
+          Partial<Item>
+        >(item.data_encrypted, masterKey);
+
+        return {
+          id: item.id,
+          vaultId: item.vault_id,
+          categoryId: item.category_id,
+          type: item.type,
+          isFavorite: item.is_favorite,
+          folder: item.folder,
+          lastUpdated: item.updated_at,
+          deletedAt: item.deleted_at,
+          ...decryptedData,
+        } as Item;
+      })
+    );
+
+    return items;
+  }
+
+  /**
+   * Get favorite items for quick access
+   */
+  async getFavoriteItems(userId: string, masterKey: Uint8Array, limit: number = 10): Promise<Item[]> {
+    const { data, error } = await supabase
+      .from("items")
+      .select("*, vaults!inner(user_id)")
+      .eq("vaults.user_id", userId)
+      .eq("is_favorite", true)
+      .is("deleted_at", null)
+      .order("last_accessed_at", { ascending: false, nullsFirst: false })
+      .limit(limit);
+
+    if (error) throw error;
+
+    const items = await Promise.all(
+      data.map(async (item) => {
+        const decryptedData = await EncryptionService.decryptObject<
+          Partial<Item>
+        >(item.data_encrypted, masterKey);
+
+        return {
+          id: item.id,
+          vaultId: item.vault_id,
+          categoryId: item.category_id,
+          type: item.type,
+          isFavorite: item.is_favorite,
+          folder: item.folder,
+          lastUpdated: item.updated_at,
+          deletedAt: item.deleted_at,
+          ...decryptedData,
+        } as Item;
+      })
+    );
+
+    return items;
+  }
+
+  /**
+   * Update last accessed timestamp for an item
+   */
+  async updateLastAccessed(itemId: string): Promise<void> {
+    const { error } = await supabase
+      .from("items")
+      .update({ last_accessed_at: new Date().toISOString() })
+      .eq("id", itemId);
+
+    if (error) throw error;
+  }
+
+  /**
+   * Get vault item count
+   */
+  async getVaultItemCount(vaultId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from("items")
+      .select("*", { count: "exact", head: true })
+      .eq("vault_id", vaultId)
+      .is("deleted_at", null);
+
+    if (error) throw error;
+    return count || 0;
+  }
+
+  /**
    * Update an item
    */
   async updateItem(

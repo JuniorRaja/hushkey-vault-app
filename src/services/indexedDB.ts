@@ -51,12 +51,22 @@ interface MetadataRecord {
   [key: string]: any;
 }
 
+interface SyncQueueRecord {
+  id: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE';
+  entityType: 'vault' | 'item' | 'category';
+  entityId: string;
+  data: any;
+  timestamp: string;
+}
+
 class HushkeyDB extends Dexie {
   vaults!: Table<VaultRecord>;
   items!: Table<ItemRecord>;
   categories!: Table<CategoryRecord>;
   sync!: Table<SyncRecord>;
   metadata!: Table<MetadataRecord>;
+  syncQueue!: Table<SyncQueueRecord>;
 
   constructor() {
     super('HushkeyDB');
@@ -74,6 +84,15 @@ class HushkeyDB extends Dexie {
       categories: 'id, userId, nameEncrypted',
       sync: 'id, lastSynced, pendingChanges',
       metadata: 'key'
+    });
+
+    this.version(3).stores({
+      vaults: 'id, userId, nameEncrypted, createdAt',
+      items: 'id, vaultId, dataEncrypted, type, createdAt',
+      categories: 'id, userId, nameEncrypted',
+      sync: 'id, lastSynced, pendingChanges',
+      metadata: 'key',
+      syncQueue: 'id, timestamp, entityType'
     });
   }
 }
@@ -228,6 +247,41 @@ class IndexedDBService {
   }
 
   /**
+   * Queue a change for sync when back online
+   */
+  async queueChange(action: 'CREATE' | 'UPDATE' | 'DELETE', entityType: 'vault' | 'item' | 'category', entityId: string, data: any): Promise<void> {
+    await db.syncQueue.add({
+      id: crypto.randomUUID(),
+      action,
+      entityType,
+      entityId,
+      data,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Get pending sync queue
+   */
+  async getSyncQueue(): Promise<SyncQueueRecord[]> {
+    return await db.syncQueue.orderBy('timestamp').toArray();
+  }
+
+  /**
+   * Clear sync queue item
+   */
+  async clearSyncQueueItem(id: string): Promise<void> {
+    await db.syncQueue.delete(id);
+  }
+
+  /**
+   * Get pending changes count
+   */
+  async getPendingChangesCount(): Promise<number> {
+    return await db.syncQueue.count();
+  }
+
+  /**
    * Get database instance (for advanced queries)
    */
   getDB(): HushkeyDB {
@@ -236,4 +290,4 @@ class IndexedDBService {
 }
 
 export default new IndexedDBService();
-export type { VaultRecord, ItemRecord, CategoryRecord, SyncRecord };
+export type { VaultRecord, ItemRecord, CategoryRecord, SyncRecord, SyncQueueRecord };

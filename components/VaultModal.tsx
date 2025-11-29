@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Folder, Briefcase, CreditCard, User, Shield } from 'lucide-react';
 import { Vault } from '../types';
-import { useData } from '../App';
+import { useVaultStore } from '../src/stores/vaultStore';
 
 interface VaultModalProps {
   isOpen: boolean;
@@ -18,7 +18,7 @@ const ICONS = [
 ];
 
 const VaultModal: React.FC<VaultModalProps> = ({ isOpen, onClose, vault }) => {
-  const { addVault, updateVault } = useData();
+  const { createVault, updateVault } = useVaultStore();
   
   // Form State
   const [name, setName] = useState('');
@@ -40,34 +40,20 @@ const VaultModal: React.FC<VaultModalProps> = ({ isOpen, onClose, vault }) => {
     }
   }, [isOpen, vault]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) return;
 
-    const vaultData = {
-      name,
-      description,
-      icon,
-      // Preserve existing share state if editing, default false if new
-      isShared: vault ? vault.isShared : false,
-      sharedWith: vault ? vault.sharedWith : []
-    };
-
-    if (vault) {
-      // Update existing
-      updateVault({
-        ...vault,
-        ...vaultData
-      });
-    } else {
-      // Create new
-      addVault({
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-        itemCount: 0,
-        ...vaultData
-      });
+    try {
+      if (vault) {
+        await updateVault(vault.id, { name, description, icon });
+      } else {
+        await createVault(name, icon, description);
+      }
+      onClose();
+    } catch (error) {
+      console.error('Failed to save vault:', error);
+      alert('Failed to save vault. Please try again.');
     }
-    onClose();
   };
 
   if (!isOpen) return null;
