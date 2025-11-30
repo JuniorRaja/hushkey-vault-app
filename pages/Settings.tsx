@@ -501,9 +501,10 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
       await DatabaseService.clearAllUserData(authUser.id);
       storageService.clearDataOnly();
       await storageService.clearIndexedDB();
+      await supabase.auth.signOut();
+      localStorage.clear();
       
-      alert("All data cleared successfully. Redirecting...");
-      window.location.href = "/dashboard";
+      window.location.href = "/login";
     } catch (err: any) {
       alert("Error clearing data: " + err.message);
     } finally {
