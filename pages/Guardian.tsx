@@ -2,6 +2,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../App';
 import { useNavigate } from 'react-router-dom';
+import { useItemStore } from '../src/stores/itemStore';
+import { useAuthStore } from '../src/stores/authStore';
+import { useGuardianStore } from '../src/stores/guardianStore';
+import { analyzePassword } from '../src/services/passwordAnalyzer';
 import { generatePassword, generateMemorablePassword } from '../services/passwordGenerator';
 import { 
     RefreshCw, Copy, Check, ShieldAlert, ShieldCheck, Shield, 
@@ -59,15 +63,6 @@ const KPI_INFO: Record<string, KpiInfoData> = {
             "Verify no unauthorized transactions occurred."
         ]
     },
-    expiry: {
-        title: "Expiry Reminders",
-        description: "Items like Credit Cards, Driver's Licenses, and Passports that have an expiration date approaching.",
-        bestPractices: [
-            "Renew documents 3 months before expiry.",
-            "Update the vault entry immediately after receiving the new card/ID.",
-            "Set reminders for critical business documents."
-        ]
-    },
     stale_passwords: {
         title: "Stale Passwords",
         description: "Passwords that haven't been changed in over 6 months.",
@@ -75,6 +70,15 @@ const KPI_INFO: Record<string, KpiInfoData> = {
             "Rotate critical passwords (email, banking) every 3-6 months.",
             "Use the 'Password Expiry' setting to get auto-reminders.",
             "Review old accounts to see if you still need them."
+        ]
+    },
+    expiry: {
+        title: "Expiry Reminders",
+        description: "Items like Credit Cards, Driver's Licenses, and Passports that have an expiration date approaching.",
+        bestPractices: [
+            "Renew documents 3 months before expiry.",
+            "Update the vault entry immediately after receiving the new card/ID.",
+            "Set reminders for critical business documents."
         ]
     },
     attachments: {
@@ -349,6 +353,33 @@ const KpiDetailView = ({ id, data, onBack, items }: { id: KpiId, data: any, onBa
     const renderContent = () => {
         switch(id) {
             case 'security_score':
+                return (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-red-400">{data.breakdown.weakCount}</div>
+                                <div className="text-xs text-gray-400 mt-1">Weak</div>
+                            </div>
+                            <div className="bg-yellow-900/20 border border-yellow-500/30 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-yellow-400">{data.breakdown.mediumCount}</div>
+                                <div className="text-xs text-gray-400 mt-1">Medium</div>
+                            </div>
+                            <div className="bg-green-900/20 border border-green-500/30 p-4 rounded-xl text-center">
+                                <div className="text-3xl font-bold text-green-400">{data.breakdown.strongCount}</div>
+                                <div className="text-xs text-gray-400 mt-1">Strong</div>
+                            </div>
+                        </div>
+                        <div className="bg-gray-800/50 p-4 rounded-xl">
+                            <h4 className="text-sm font-bold text-gray-400 mb-3">Score Breakdown</h4>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between"><span className="text-gray-400">Total Passwords:</span><span className="text-white font-mono">{data.breakdown.totalPasswords}</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">Average Strength:</span><span className="text-white font-mono">{data.value}</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">Weak Passwords:</span><span className="text-red-400 font-mono">{data.breakdown.weakCount}</span></div>
+                                <div className="flex justify-between"><span className="text-gray-400">Reused Passwords:</span><span className="text-orange-400 font-mono">{data.reusedCount || 0}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                );
             case 'weak_passwords':
             case 'reused_passwords':
             case 'stale_passwords':
@@ -466,23 +497,23 @@ const KpiDetailView = ({ id, data, onBack, items }: { id: KpiId, data: any, onBa
 
     return (
         <div className="animate-fade-in relative z-10">
-            <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors group">
-                <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" /> Back to Dashboard
+            <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-white mb-4 md:mb-6 transition-colors group text-sm md:text-base">
+                <ArrowLeft size={18} className="md:w-5 md:h-5 group-hover:-translate-x-1 transition-transform" /> Back to Dashboard
             </button>
             
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 md:p-8">
-                <div className="flex items-start justify-between mb-8">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 md:p-8">
+                <div className="flex items-start justify-between mb-4 md:mb-8">
                     <div>
-                        <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">{data.title}</h2>
-                        <p className="text-gray-400 max-w-2xl">{data.description}</p>
+                        <h2 className="text-xl md:text-3xl font-bold text-white mb-1 md:mb-2">{data.title}</h2>
+                        <p className="text-gray-400 max-w-2xl text-xs md:text-base">{data.description}</p>
                     </div>
-                    <div className={`text-4xl font-bold ${data.color || 'text-white'}`}>
+                    <div className={`text-2xl md:text-4xl font-bold ${data.color || 'text-white'}`}>
                         {data.value}
                     </div>
                 </div>
                 
                 <div className="bg-gray-950 rounded-xl border border-gray-800 p-1">
-                    <div className="p-4 md:p-6">
+                    <div className="p-3 md:p-6">
                          {renderContent()}
                     </div>
                 </div>
@@ -495,13 +526,25 @@ const KpiDetailView = ({ id, data, onBack, items }: { id: KpiId, data: any, onBa
 // --- Main Page Component ---
 
 const Guardian: React.FC = () => {
-  const { items } = useData();
+  const { items: contextItems } = useData();
+  const { items: storeItems, loadItems } = useItemStore();
+  const { user } = useAuthStore();
+  const { isScanning, scanProgress, lastScan, startScan, fetchLatestScan, fetchFindings } = useGuardianStore();
+  
+  // Load items on mount
+  useEffect(() => {
+    if (user) {
+      loadItems();
+    }
+  }, [user, loadItems]);
+  
+  // Use only real user items from store (IndexedDB/Supabase), not mock data from context
+  const items = storeItems.filter(item => !item.deletedAt);
+  
   const [activeTab, setActiveTab] = useState<'dashboard' | 'generator'>('dashboard');
   
   // Scanning State
   const [scanModalOpen, setScanModalOpen] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanProgress, setScanProgress] = useState(0);
   const [scanStatus, setScanStatus] = useState('');
   const [lastScanTime, setLastScanTime] = useState<string | null>(null);
 
@@ -521,7 +564,7 @@ const Guardian: React.FC = () => {
   // --- STATS CALCULATION LOGIC ---
 
   const stats = useMemo(() => {
-      const loginItems = items.filter(i => i.data.password);
+      const loginItems = items.filter(i => i.data?.password && !i.deletedAt);
       
       // 1. Password Strength
       let totalScore = 0;
@@ -531,18 +574,13 @@ const Guardian: React.FC = () => {
 
       loginItems.forEach(item => {
           const pass = item.data.password || '';
-          const len = pass.length;
-          let score = 0;
-          if (len >= 16) score = 100;
-          else if (len >= 12) score = 80;
-          else if (len >= 8) score = 50;
-          else score = 20;
+          const analysis = analyzePassword(pass);
 
-          if (score <= 50) {
+          if (analysis.strength === 'weak') {
               weakCount++;
               affectedWeak.push(item);
           }
-          totalScore += score;
+          totalScore += analysis.score;
 
           if (!passMap[pass]) passMap[pass] = [];
           passMap[pass].push(item);
@@ -610,18 +648,21 @@ const Guardian: React.FC = () => {
           }
       });
 
-      // 5. Distribution
+      // 5. Distribution - Group by item type
       const distributionRaw = items.reduce((acc: any, curr) => {
-          acc[curr.type] = (acc[curr.type] || 0) + 1;
+          const typeName = curr.type || 'Other';
+          acc[typeName] = (acc[typeName] || 0) + 1;
           return acc;
       }, {});
       
       const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500', 'bg-pink-500', 'bg-red-500', 'bg-indigo-500', 'bg-orange-500'];
-      const distData = Object.keys(distributionRaw).map((key, idx) => ({ 
-          name: key, 
-          value: distributionRaw[key],
-          color: colors[idx % colors.length]
-      }));
+      const distData = Object.keys(distributionRaw)
+          .sort((a, b) => distributionRaw[b] - distributionRaw[a]) // Sort by count descending
+          .map((key, idx) => ({ 
+              name: key, 
+              value: distributionRaw[key],
+              color: colors[idx % colors.length]
+          }));
 
       return {
           securityScore: avgScore,
@@ -653,12 +694,27 @@ const Guardian: React.FC = () => {
 
   // --- Handlers ---
 
-  const startScan = (types: string[]) => {
+  const handleStartScan = async (types: string[]) => {
       setScanModalOpen(false);
-      setIsScanning(true);
-      setScanProgress(0);
+      if (!user) return;
+      
+      try {
+          await startScan(user.id, items);
+          setLastScanTime('Just now');
+      } catch (error) {
+          console.error('Scan failed:', error);
+      }
   };
 
+  // Load latest scan on mount
+  useEffect(() => {
+      if (user) {
+          fetchLatestScan(user.id);
+          fetchFindings(user.id);
+      }
+  }, [user, fetchLatestScan, fetchFindings]);
+
+  // Update scan status based on progress
   useEffect(() => {
       if (!isScanning) return;
 
@@ -670,21 +726,9 @@ const Guardian: React.FC = () => {
           { pct: 100, text: 'Finalizing report...' }
       ];
 
-      let currentStep = 0;
-      const interval = setInterval(() => {
-          if (currentStep >= steps.length) {
-              clearInterval(interval);
-              setIsScanning(false);
-              setLastScanTime('Just now');
-              return;
-          }
-          setScanProgress(steps[currentStep].pct);
-          setScanStatus(steps[currentStep].text);
-          currentStep++;
-      }, 800);
-
-      return () => clearInterval(interval);
-  }, [isScanning]);
+      const currentStep = steps.find(s => s.pct >= scanProgress) || steps[steps.length - 1];
+      setScanStatus(currentStep.text);
+  }, [isScanning, scanProgress]);
 
   const handleGenerate = () => {
     if (genType === 'memorable') {
@@ -718,9 +762,20 @@ const Guardian: React.FC = () => {
 
   // --- Render Helpers ---
 
-  const KpiCard = ({ id, title, value, icon: Icon, color, subtext, alert, onClick }: any) => (
+  const KpiCard = ({ id, title, value, icon: Icon, color, subtext, alert }: any) => {
+    const handleCardClick = (e: React.MouseEvent) => {
+      setDetailViewId(id);
+    };
+    
+    const handleInfoClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setInfoModalId(id as KpiId);
+    };
+    
+    return (
       <div 
-        onClick={() => setDetailViewId(id)}
+        onMouseDown={handleCardClick}
         className={`bg-gray-900 border ${alert ? 'border-red-500/50 bg-red-900/10' : 'border-gray-800'} rounded-2xl p-5 flex flex-col justify-between relative group cursor-pointer hover:border-gray-700 hover:bg-gray-850 transition-all`}
       >
           <div className="flex justify-between items-start mb-4">
@@ -728,8 +783,9 @@ const Guardian: React.FC = () => {
                   <Icon size={22} />
               </div>
               <button 
-                onClick={(e) => { e.stopPropagation(); setInfoModalId(id); }}
-                className="text-gray-600 hover:text-white transition-colors p-1"
+                type="button"
+                onMouseDown={handleInfoClick}
+                className="text-gray-600 hover:text-white transition-colors p-1 z-[20] relative cursor-pointer"
                 title="View Info"
               >
                   <Info size={18} />
@@ -740,14 +796,15 @@ const Guardian: React.FC = () => {
               <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">{title}</div>
               {subtext && <div className="text-xs text-gray-600 mt-2 font-medium">{subtext}</div>}
           </div>
-          {alert && <div className="absolute top-4 right-12 px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold uppercase rounded-full animate-pulse shadow-lg shadow-red-900/50">Alert</div>}
+          {alert && <div className="absolute top-2 md:top-3 right-7 md:right-10 px-1 md:px-1.5 py-0.5 bg-red-500 text-white text-[7px] md:text-[8px] font-bold uppercase rounded-full animate-pulse shadow-lg shadow-red-900/50">Alert</div>}
           
           {/* Arrow for Drill-down */}
-          <div className="absolute bottom-4 right-4 text-gray-700 group-hover:text-primary-400 opacity-50 group-hover:opacity-100 transition-all">
-             <ChevronRight size={20} />
+          <div className="absolute bottom-1.5 md:bottom-2 right-1.5 md:right-2 text-gray-700 group-hover:text-primary-400 opacity-50 group-hover:opacity-100 transition-all">
+             <ChevronRight size={14} className="md:w-4 md:h-4" />
           </div>
       </div>
-  );
+    );
+  };
 
   // --- Main Render ---
 
@@ -758,7 +815,28 @@ const Guardian: React.FC = () => {
       let detailData: any = { title: 'Unknown', description: '', value: '' };
       switch(detailViewId) {
           case 'security_score':
-              detailData = { title: 'Security Score', value: `${stats.securityScore}/100`, description: 'A weighted score based on password complexity and uniqueness across your vault.', color: stats.securityScore > 70 ? 'text-green-500' : 'text-yellow-500', affectedItems: [] };
+              detailData = { 
+                  title: 'Security Score', 
+                  value: `${stats.securityScore}/100`, 
+                  description: 'A weighted score based on password complexity and uniqueness across your vault.', 
+                  color: stats.securityScore > 70 ? 'text-green-500' : 'text-yellow-500', 
+                  affectedItems: [],
+                  reusedCount: stats.reusedCount,
+                  breakdown: {
+                      totalPasswords: items.filter(i => i.data?.password && !i.deletedAt).length,
+                      weakCount: stats.weakCount,
+                      mediumCount: items.filter(i => i.data?.password && !i.deletedAt).length - stats.weakCount - items.filter(i => {
+                          if (!i.data?.password || i.deletedAt) return false;
+                          const analysis = analyzePassword(i.data.password);
+                          return analysis.strength === 'strong';
+                      }).length,
+                      strongCount: items.filter(i => {
+                          if (!i.data?.password || i.deletedAt) return false;
+                          const analysis = analyzePassword(i.data.password);
+                          return analysis.strength === 'strong';
+                      }).length
+                  }
+              };
               break;
           case 'weak_passwords':
               detailData = { title: 'Weak Passwords', value: stats.weakCount, description: 'Passwords that are short, simple, or lack complexity. Vulnerable to brute-force attacks.', color: 'text-red-500', affectedItems: stats.weakItems };
@@ -790,7 +868,7 @@ const Guardian: React.FC = () => {
   return (
     <div className="relative min-h-full pb-20 overflow-x-hidden">
       <GuardianWizard />
-      <ScanModal isOpen={scanModalOpen} onClose={() => setScanModalOpen(false)} onScan={startScan} />
+      <ScanModal isOpen={scanModalOpen} onClose={() => setScanModalOpen(false)} onScan={handleStartScan} />
       <InfoModal isOpen={!!infoModalId} onClose={() => setInfoModalId(null)} kpiId={infoModalId} />
 
       <div className="max-w-7xl mx-auto space-y-8 relative z-10">
@@ -890,7 +968,7 @@ const Guardian: React.FC = () => {
 
                 {/* 6. Expiry Reminders - Spans 2 cols */}
                 <div 
-                    onClick={() => setDetailViewId('expiry')}
+                    onMouseDown={() => setDetailViewId('expiry')}
                     className="bg-gray-900 border border-gray-800 rounded-2xl p-6 col-span-1 md:col-span-2 cursor-pointer hover:border-gray-700 hover:bg-gray-850 transition-colors group relative"
                 >
                     <div className="flex justify-between items-center mb-4">
@@ -898,8 +976,12 @@ const Guardian: React.FC = () => {
                              <Calendar size={16} /> Expiry Reminders
                         </h3>
                          <button 
-                            onClick={(e) => { e.stopPropagation(); setInfoModalId('expiry'); }}
-                            className="text-gray-600 hover:text-white transition-colors p-1"
+                            type="button"
+                            onMouseDown={(e) => { 
+                              e.stopPropagation(); 
+                              setInfoModalId('expiry'); 
+                            }}
+                            className="text-gray-600 hover:text-white transition-colors p-1 z-[20] relative cursor-pointer"
                          >
                              <Info size={16} />
                          </button>
@@ -936,7 +1018,9 @@ const Guardian: React.FC = () => {
 
                 {/* 8. Attachments */}
                  <div 
-                    onClick={() => setDetailViewId('attachments')}
+                    onMouseDown={() => {
+                      setDetailViewId('attachments');
+                    }}
                     className="bg-gray-900 border border-gray-800 rounded-2xl p-5 cursor-pointer hover:border-gray-700 hover:bg-gray-850 transition-colors group relative"
                 >
                      <div className="flex justify-between items-start mb-4">
@@ -944,8 +1028,12 @@ const Guardian: React.FC = () => {
                             <FileText size={22} />
                         </div>
                          <button 
-                            onClick={(e) => { e.stopPropagation(); setInfoModalId('attachments'); }}
-                            className="text-gray-600 hover:text-white transition-colors p-1"
+                            type="button"
+                            onMouseDown={(e) => { 
+                              e.stopPropagation(); 
+                              setInfoModalId('attachments'); 
+                            }}
+                            className="text-gray-600 hover:text-white transition-colors p-1 z-[20] relative cursor-pointer"
                          >
                              <Info size={18} />
                          </button>
@@ -972,7 +1060,9 @@ const Guardian: React.FC = () => {
 
                  {/* 10. Backup - Spans 1 col */}
                  <div 
-                    onClick={() => setDetailViewId('backup')}
+                    onMouseDown={() => {
+                      setDetailViewId('backup');
+                    }}
                     className="bg-gray-900 border border-gray-800 rounded-2xl p-5 cursor-pointer hover:border-gray-700 hover:bg-gray-850 transition-colors group relative"
                 >
                      <div className="flex justify-between items-start mb-4">
@@ -980,8 +1070,12 @@ const Guardian: React.FC = () => {
                             <HardDrive size={22} />
                         </div>
                         <button 
-                            onClick={(e) => { e.stopPropagation(); setInfoModalId('backup'); }}
-                            className="text-gray-600 hover:text-white transition-colors p-1"
+                            type="button"
+                            onMouseDown={(e) => { 
+                              e.stopPropagation(); 
+                              setInfoModalId('backup'); 
+                            }}
+                            className="text-gray-600 hover:text-white transition-colors p-1 z-[20] relative cursor-pointer"
                          >
                              <Info size={18} />
                          </button>

@@ -214,6 +214,34 @@ CREATE TABLE IF NOT EXISTS biometric_credentials (
   UNIQUE(user_id)
 );
 
+-- Guardian scans table
+CREATE TABLE IF NOT EXISTS guardian_scans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  scan_type VARCHAR(50) NOT NULL,
+  scan_date TIMESTAMPTZ DEFAULT NOW(),
+  total_items_scanned INTEGER NOT NULL,
+  weak_passwords_count INTEGER DEFAULT 0,
+  reused_passwords_count INTEGER DEFAULT 0,
+  compromised_passwords_count INTEGER DEFAULT 0,
+  scan_duration_ms INTEGER,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Guardian findings table
+CREATE TABLE IF NOT EXISTS guardian_findings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  scan_id UUID NOT NULL REFERENCES guardian_scans(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  finding_type VARCHAR(50) NOT NULL,
+  severity VARCHAR(20) NOT NULL,
+  details JSONB,
+  resolved BOOLEAN DEFAULT FALSE,
+  resolved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ============================================================================
 -- INDEXES FOR PERFORMANCE
 -- ============================================================================
@@ -264,6 +292,13 @@ CREATE INDEX IF NOT EXISTS idx_file_attachments_mime_type ON file_attachments(mi
 CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON user_settings(user_id);
 CREATE INDEX IF NOT EXISTS idx_biometric_credentials_user_id ON biometric_credentials(user_id);
 
+-- Guardian indexes
+CREATE INDEX idx_guardian_scans_user ON guardian_scans(user_id, scan_date DESC);
+CREATE INDEX idx_guardian_findings_scan ON guardian_findings(scan_id);
+CREATE INDEX idx_guardian_findings_user ON guardian_findings(user_id, resolved);
+CREATE INDEX idx_guardian_findings_item ON guardian_findings(item_id);
+
+
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================================================
@@ -279,6 +314,8 @@ ALTER TABLE activity_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE file_attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE biometric_credentials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE guardian_scans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE guardian_findings ENABLE ROW LEVEL SECURITY;
 
 -- User profiles policies
 DROP POLICY IF EXISTS "Users manage own profile" ON user_profiles;
@@ -426,6 +463,15 @@ CREATE POLICY "Users create own logs" ON activity_logs
 -- Notifications policies
 DROP POLICY IF EXISTS "Users manage own notifications" ON notifications;
 CREATE POLICY "Users manage own notifications" ON notifications
+    FOR ALL USING (auth.uid() = user_id);
+
+-- Guardian Policies
+DROP POLICY IF EXISTS  "Users manage own scans" ON guardian_scans;
+CREATE POLICY "Users manage own scans" ON guardian_scans 
+    FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS  "Users manage own findings" ON guardian_findings;
+CREATE POLICY "Users manage own findings" ON guardian_findings 
     FOR ALL USING (auth.uid() = user_id);
 
 -- ============================================================================
