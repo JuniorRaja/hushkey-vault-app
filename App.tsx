@@ -28,6 +28,7 @@ import { storageService } from "./services/storage";
 import { INITIAL_USER } from "./services/mockData";
 import { useAuthStore } from "./src/stores/authStore";
 import DatabaseService from "./src/services/database";
+import { requestNotificationPermission, requestClipboardPermission } from "./src/services/pwa";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Items from "./pages/Items";
@@ -715,6 +716,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     hydrate();
+    
+    // Request PWA permissions
+    requestNotificationPermission();
+    requestClipboardPermission();
   }, [hydrate]);
 
   // Auto-cleanup expired trash on app launch
