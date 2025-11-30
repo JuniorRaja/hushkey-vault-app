@@ -351,7 +351,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       navigator.clipboard.writeText(text);
       setCopiedField(fieldId);
       
-      const clearSeconds = settings.clipboardClearSeconds || 30;
+      const clearSeconds = settings?.clipboardClearSeconds || 30;
       setCopyTimer(clearSeconds);
       
       const interval = setInterval(() => {

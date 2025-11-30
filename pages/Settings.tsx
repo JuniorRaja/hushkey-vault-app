@@ -1048,6 +1048,9 @@ const Settings: React.FC = () => {
     "profile" | "logs" | "categories" | "backup" | "privacy" | "terms" | null
   >(null);
 
+  // Notification Drawer
+  const [showNotificationDrawer, setShowNotificationDrawer] = useState(false);
+
   // Sync State
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -1202,80 +1205,7 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Notifications Section */}
-      <div className="space-y-4">
-        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider px-2 flex items-center gap-2">
-          <Bell size={14} /> Notifications
-        </h3>
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden divide-y divide-gray-800">
-          <div className="px-4 py-3 bg-gray-950/50 flex justify-between items-center border-b border-gray-800">
-            <span className="text-xs font-bold text-gray-500 uppercase">
-              Alerts & Reminders
-            </span>
-          </div>
-
-          {/* Configurations */}
-          {NOTIFICATION_CONFIGS.map((item) => (
-            <div
-              key={item.key}
-              className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors"
-            >
-              <div className="flex flex-col">
-                <span className="text-gray-200 font-medium">{item.label}</span>
-                <span className="text-[11px] text-gray-500">{item.desc}</span>
-              </div>
-              <ToggleSwitch
-                checked={(settings.notifications as any)[item.key]}
-                onChange={(val) =>
-                  handleNotificationChange(item.key as any, val)
-                }
-              />
-            </div>
-          ))}
-
-          <div className="px-4 py-3 bg-gray-950/50 flex justify-between items-center border-b border-gray-800 border-t">
-            <span className="text-xs font-bold text-gray-500 uppercase">
-              Channels
-            </span>
-          </div>
-
-          <div className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors">
-            <div className="flex flex-col">
-              <span className="text-gray-200 font-medium">
-                Push Notifications
-              </span>
-              <span className="text-[11px] text-gray-500">
-                Browser/Device push alerts.
-              </span>
-            </div>
-            <ToggleSwitch
-              checked={settings.notifications.pushNotifications}
-              onChange={(val) =>
-                handleNotificationChange("pushNotifications", val)
-              }
-            />
-          </div>
-
-          <div className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors">
-            <div className="flex flex-col">
-              <span className="text-gray-200 font-medium">
-                Email Notifications
-              </span>
-              <span className="text-[11px] text-gray-500">
-                Send alerts to <span className="hidden md:inline">{authUser?.email}</span><span className="md:hidden">{truncateText(authUser?.email || '', 12)}</span>.
-              </span>
-            </div>
-            <ToggleSwitch
-              checked={settings.notifications.emailNotifications}
-              onChange={(val) =>
-                handleNotificationChange("emailNotifications", val)
-              }
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Security Section */}
+      {/* 2. Security Section */}
       <div className="space-y-4">
         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider px-2 flex items-center gap-2">
           <Shield size={14} /> Security
@@ -1515,6 +1445,57 @@ const Settings: React.FC = () => {
           <div className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
+                <Smartphone size={18} />
+              </div>
+              <div>
+                <span className="text-gray-200 font-medium block">Push Notifications</span>
+                <span className="text-[10px] text-gray-500">Browser/Device alerts</span>
+              </div>
+            </div>
+            <ToggleSwitch
+              checked={settings.notifications.pushNotifications}
+              onChange={(val) => handleNotificationChange("pushNotifications", val)}
+            />
+          </div>
+
+          <div className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
+                <Bell size={18} />
+              </div>
+              <div>
+                <span className="text-gray-200 font-medium block">Email Notifications</span>
+                <span className="text-[10px] text-gray-500">Send to <span className="hidden md:inline">{authUser?.email}</span><span className="md:hidden">{truncateText(authUser?.email || '', 12)}</span></span>
+              </div>
+            </div>
+            <ToggleSwitch
+              checked={settings.notifications.emailNotifications}
+              onChange={(val) => handleNotificationChange("emailNotifications", val)}
+            />
+          </div>
+
+          <div
+            onClick={() => setShowNotificationDrawer(true)}
+            className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
+                <Bell size={18} />
+              </div>
+              <div>
+                <span className="text-gray-200 font-medium block">More Notification Settings</span>
+                <span className="text-[10px] text-gray-500">Configure alert preferences</span>
+              </div>
+            </div>
+            <ChevronRight
+              size={18}
+              className="text-gray-600 group-hover:text-white"
+            />
+          </div>
+
+          <div className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
                 <RefreshCw
                   size={18}
                   className={isSyncing ? "animate-spin" : ""}
@@ -1584,6 +1565,57 @@ const Settings: React.FC = () => {
         <span>Version 2.5.0 (Build 2024.10.15)</span>
         <span>© 2024 Hushkey Security Inc.</span>
       </div>
+
+      {/* Notification Settings Drawer */}
+      {showNotificationDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setShowNotificationDrawer(false)}>
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div
+            className="relative w-full max-w-md bg-gray-900 border-l border-gray-800 shadow-2xl overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-gray-800 flex items-center justify-between bg-gray-950/50">
+              <div className="flex items-center gap-2">
+                <Bell size={20} className="text-primary-500" />
+                <h3 className="text-lg font-bold text-white">Notification Settings</h3>
+              </div>
+              <button
+                onClick={() => setShowNotificationDrawer(false)}
+                className="text-gray-500 hover:text-white transition-colors p-1 bg-gray-800/50 rounded-lg"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              <div className="p-5 space-y-1">
+                {NOTIFICATION_CONFIGS.map((item) => (
+                  <div
+                    key={item.key}
+                    className="p-4 flex items-center justify-between hover:bg-gray-800/50 rounded-xl transition-colors"
+                  >
+                    <div className="flex-1 pr-4">
+                      <span className="text-gray-200 font-medium text-sm block mb-1">{item.label}</span>
+                      <span className="text-[11px] text-gray-500 leading-relaxed">{item.desc}</span>
+                    </div>
+                    <ToggleSwitch
+                      checked={(settings.notifications as any)[item.key]}
+                      onChange={(val) => handleNotificationChange(item.key as any, val)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-800 bg-gray-950/50">
+              <button
+                onClick={() => setShowNotificationDrawer(false)}
+                className="w-full py-3 bg-primary-600 hover:bg-primary-500 text-white rounded-xl font-medium transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
