@@ -42,11 +42,11 @@ const ItemIcon = ({ item }: { item: Item }) => {
         const favicon = getFaviconUrl(item.data.url);
         if (favicon) {
             return (
-                <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden p-2 shrink-0">
+                <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden p-1 shrink-0">
                     <img 
                         src={favicon} 
                         alt="" 
-                        className="w-full h-full object-contain" 
+                        className="w-full h-full object-contain rounded-full" 
                         onError={(e) => {
                              e.currentTarget.style.display = 'none';
                              e.currentTarget.parentElement?.classList.remove('p-2'); // Reset padding if hiding
@@ -65,11 +65,11 @@ const ItemIcon = ({ item }: { item: Item }) => {
          const favicon = getFaviconUrl(item.data.website?.startsWith('http') ? item.data.website : `https://${item.data.website}`);
          if (favicon) {
             return (
-                <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden p-2 shrink-0">
+                <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden p-1 shrink-0">
                     <img 
                         src={favicon} 
                         alt="" 
-                        className="w-full h-full object-contain" 
+                        className="w-full h-full object-contain rounded-full" 
                         onError={(e) => {
                              e.currentTarget.style.display = 'none';
                              e.currentTarget.parentElement?.classList.remove('p-2'); 
@@ -335,7 +335,7 @@ const Items: React.FC = () => {
       <div 
         key={item.id} 
         onClick={() => navigate(`/items/${item.id}`)}
-        className={`p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer transition-colors group relative ${idx !== total - 1 ? 'border-b border-gray-800/50' : ''}`}
+        className="p-4 flex items-center justify-between hover:bg-gray-800/50 cursor-pointer transition-colors group relative border-b border-gray-800/50"
         >
         <div className="flex items-center gap-4">
             <ItemIcon item={item} />
