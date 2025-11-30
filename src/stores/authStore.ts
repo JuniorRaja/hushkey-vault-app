@@ -162,7 +162,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const { error } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
-            redirectTo: window.location.origin,
+            redirectTo: import.meta.env.VITE_APP_URL || window.location.origin,
           },
         });
 
