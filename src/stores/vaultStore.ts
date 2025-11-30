@@ -83,7 +83,6 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       }));
       
       await IndexedDBService.bulkSaveVaults(vaultRecords as any);
-      console.log('loadVaults: Loaded', vaultsWithCounts.length, 'vaults with counts');
       set({ vaults: vaultsWithCounts, isLoading: false });
     } catch (error) {
       console.error('Failed to load vaults:', error);

@@ -14,8 +14,12 @@ import {
     CreditCard, Calendar, FileWarning, Activity, Lock, Users,
     Globe, Database, Wifi, Server, Key, ArrowLeft, Scan, X,
     FileText, Image as ImageIcon, Film, Music, Box, Loader2,
-    ChevronRight, ExternalLink, Lightbulb
+    ChevronRight, ExternalLink, Lightbulb, TrendingDown, TrendingUp,
+    CheckCircle, XCircle, Clock, Eye, Settings
 } from 'lucide-react';
+import ConfirmationModal from '../components/ConfirmationModal';
+import { FindingsManager } from '../src/components/FindingsManager';
+import { ScanHistory } from '../src/components/ScanHistory';
 
 // --- Types & Interfaces ---
 
@@ -280,7 +284,7 @@ const ScanModal = ({ isOpen, onClose, onScan }: { isOpen: boolean, onClose: () =
 
     const options: ScanOption[] = [
         { id: 'security', label: 'Password Security Analysis', icon: Shield, color: 'text-blue-400' },
-        { id: 'darkweb', label: 'Dark Web Leak Check', icon: Globe, color: 'text-purple-400' },
+        { id: 'darkweb', label: 'Breach Detection (HIBP)', icon: Globe, color: 'text-red-400' },
         { id: 'storage', label: 'Storage & File Cleanup', icon: HardDrive, color: 'text-green-400' },
         { id: 'activity', label: 'Unusual Activity Scan', icon: Activity, color: 'text-orange-400' },
     ];
@@ -299,7 +303,7 @@ const ScanModal = ({ isOpen, onClose, onScan }: { isOpen: boolean, onClose: () =
                     <button onClick={onClose}><X size={20} className="text-gray-500 hover:text-white" /></button>
                 </div>
                 <div className="p-5 space-y-4">
-                    <p className="text-sm text-gray-400">Select modules to scan. This mock process calculates your latest security scores.</p>
+                    <p className="text-sm text-gray-400">Select security modules to scan. Breach detection requires internet connection and may take longer.</p>
                     <div className="space-y-2">
                         {options.map(opt => (
                             <button 
@@ -347,7 +351,11 @@ const ScanningOverlay = ({ progress, status }: { progress: number, status: strin
     </div>
 );
 
-// 6. KPI Detail View
+
+
+
+
+// 8. KPI Detail View
 const KpiDetailView = ({ id, data, onBack, items }: { id: KpiId, data: any, onBack: () => void, items: any[] }) => {
     const navigate = useNavigate();
 
@@ -384,6 +392,7 @@ const KpiDetailView = ({ id, data, onBack, items }: { id: KpiId, data: any, onBa
             case 'weak_passwords':
             case 'reused_passwords':
             case 'stale_passwords':
+            case 'compromised':
                 return (
                     <div className="space-y-4">
                         {data.affectedItems && data.affectedItems.length > 0 ? (
@@ -539,7 +548,7 @@ const Guardian: React.FC = () => {
   const { items: contextItems } = useData();
   const { items: storeItems, loadItems } = useItemStore();
   const { user } = useAuthStore();
-  const { isScanning, scanProgress, lastScan, startScan, fetchLatestScan, fetchFindings } = useGuardianStore();
+  const { isScanning, scanProgress, lastScan, findings, compromisedCount: storeCompromisedCount, startScan, startBreachCheck, fetchLatestScan, fetchFindings } = useGuardianStore();
   
   // Load items on mount
   useEffect(() => {
@@ -556,13 +565,35 @@ const Guardian: React.FC = () => {
   // Scanning State
   const [scanModalOpen, setScanModalOpen] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
-  const [lastScanTime, setLastScanTime] = useState<string | null>(null);
+  
+  // Calculate relative time from lastScan
+  const getRelativeTime = (date: string | undefined) => {
+    if (!date) return 'Never';
+    const now = Date.now();
+    const scanTime = new Date(date).getTime();
+    const diff = now - scanTime;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+  };
+  
+  const lastScanTime = getRelativeTime(lastScan?.scanDate);
 
   // Detail View State
   const [detailViewId, setDetailViewId] = useState<KpiId | null>(null);
   
   // Info Modal State
   const [infoModalId, setInfoModalId] = useState<KpiId | null>(null);
+  
+  // Phase 2 State
+  const [showHistory, setShowHistory] = useState(false);
+  const [showFindings, setShowFindings] = useState(false);
+  const [currentScanId, setCurrentScanId] = useState<string | null>(null);
 
   // Generator State
   const [genType, setGenType] = useState<'random' | 'memorable'>('random');
@@ -793,9 +824,12 @@ const Guardian: React.FC = () => {
     }
   };
 
+  // Use compromised count from store
+  const compromisedCount = storeCompromisedCount;
+  
   // Mock External Data
   const mockData = {
-      compromisedCount: 0,
+      compromisedCount,
       sessions: activeSessions,
       backup: { score: 98, last: '15m ago', status: 'Secure' }
   };
@@ -807,8 +841,12 @@ const Guardian: React.FC = () => {
       if (!user) return;
       
       try {
-          await startScan(user.id, items);
-          setLastScanTime('Just now');
+          if (types.includes('darkweb')) {
+              await startBreachCheck(user.id, items);
+          } else {
+              await startScan(user.id, items);
+          }
+          // lastScanTime is now computed from lastScan
       } catch (error) {
           console.error('Scan failed:', error);
       }
@@ -821,6 +859,13 @@ const Guardian: React.FC = () => {
           fetchFindings(user.id);
       }
   }, [user, fetchLatestScan, fetchFindings]);
+  
+  // Set current scan ID when lastScan changes
+  useEffect(() => {
+      if (lastScan?.scanId) {
+          setCurrentScanId(lastScan.scanId);
+      }
+  }, [lastScan]);
 
   // Update scan status based on progress
   useEffect(() => {
@@ -955,6 +1000,20 @@ const Guardian: React.FC = () => {
           case 'stale_passwords':
               detailData = { title: 'Stale Passwords', value: stats.staleCount, description: 'Passwords not updated in over 6 months. Regular rotation reduces risk.', color: 'text-gray-300', affectedItems: stats.staleItems };
               break;
+          case 'compromised':
+              const compromisedItems = findings.filter(f => f.findingType === 'compromised' && !f.resolved);
+              detailData = { 
+                  title: 'Compromised Passwords', 
+                  value: compromisedItems.length, 
+                  description: 'Passwords found in known data breaches. Change these immediately.', 
+                  color: 'text-red-500', 
+                  affectedItems: compromisedItems.map(f => ({
+                      id: f.itemId,
+                      name: items.find(i => i.id === f.itemId)?.name || `Item ${f.itemId.slice(0, 8)}...`,
+                      breachCount: f.details?.breach_count || 1
+                  }))
+              };
+              break;
           case 'expiry':
               detailData = { title: 'Expiring Items', value: stats.expiringItems.length, description: 'Cards and IDs expiring within the next 90 days.', color: 'text-yellow-500', expiringItems: stats.expiringItems };
               break;
@@ -982,38 +1041,72 @@ const Guardian: React.FC = () => {
       <div className="max-w-7xl mx-auto space-y-8 relative z-10">
         
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-6">
-            <div>
-                 <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-                    <ShieldCheck className="text-primary-500" size={32} />
-                    Guardian Center
-                </h2>
-                <p className="text-gray-400 mt-1 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                    System Online • Last scan: {lastScanTime || 'Never'}
-                </p>
+        <div className="space-y-6">
+            {/* Title & Status */}
+            <div className="flex items-start justify-between">
+                <div>
+                    <h2 className="text-3xl md:text-4xl font-bold text-white flex items-center gap-3">
+                        <ShieldCheck className="text-primary-500" size={36} />
+                        Guardian Center
+                    </h2>
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+                        <div className="flex items-center gap-2 text-gray-400">
+                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-lg shadow-green-500/50"></span>
+                            <span className="font-medium">System Online</span>
+                        </div>
+                        <span className="text-gray-600">•</span>
+                        <span className="text-gray-400">Last scan: <span className="text-white font-medium">{lastScanTime || 'Never'}</span></span>
+                        <button 
+                            onClick={() => setShowHistory(true)}
+                            className="flex items-center gap-1.5 text-primary-400 hover:text-primary-300 transition-colors"
+                        >
+                            <History size={14} />
+                            <span className="text-xs font-medium">View History</span>
+                        </button>
+                    </div>
+                </div>
+                
+                {/* Scan Button */}
+                <button 
+                    onClick={() => setScanModalOpen(true)}
+                    className="group relative px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white rounded-xl font-bold transition-all shadow-lg shadow-primary-900/30 hover:shadow-primary-900/50 active:scale-95 overflow-hidden text-sm md:text-base"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                    <div className="relative flex items-center gap-2">
+                        <Scan size={16} className="md:w-[18px] md:h-[18px] animate-pulse" />
+                        <span className="hidden sm:inline">Scan Vault</span>
+                        <span className="sm:hidden">Scan</span>
+                    </div>
+                </button>
             </div>
             
-            <div className="flex items-center gap-3 bg-gray-900/50 p-1.5 rounded-xl border border-gray-800 overflow-x-auto max-w-full">
-                <button 
-                    onClick={() => setActiveTab('dashboard')}
-                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
-                >
-                    Overview
-                </button>
-                <button 
-                    onClick={() => setActiveTab('generator')}
-                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'generator' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
-                >
-                    Generator
-                </button>
-                <div className="w-px h-6 bg-gray-800 mx-1 shrink-0"></div>
-                 <button 
-                    onClick={() => setScanModalOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-primary-900/20 active:scale-95 whitespace-nowrap"
-                >
-                    <Scan size={16} /> Scan Now
-                </button>
+            {/* Tabs & Actions */}
+            <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 bg-gray-900/50 p-1.5 rounded-xl border border-gray-800">
+                    <button 
+                        onClick={() => setActiveTab('dashboard')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'dashboard' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        Overview
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('generator')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'generator' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        Generator
+                    </button>
+                    {findings.length > 0 && (
+                        <button 
+                            onClick={() => setShowFindings(true)}
+                            className="relative px-4 py-2 rounded-lg text-sm font-bold bg-orange-600/20 text-orange-400 hover:bg-orange-600/30 transition-all"
+                        >
+                            Findings
+                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold animate-pulse">
+                                {findings.length}
+                            </span>
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
 
@@ -1052,15 +1145,15 @@ const Guardian: React.FC = () => {
                     subtext={`${stats.reusedItems.length} accounts at risk`}
                 />
 
-                {/* 4. Compromised (Mock) */}
+                {/* 4. Compromised */}
                 <KpiCard 
                     id="compromised"
                     title="Compromised"
-                    value={mockData.compromisedCount}
+                    value={compromisedCount}
                     icon={AlertTriangle}
                     color="text-red-500"
-                    alert={mockData.compromisedCount > 0}
-                    subtext="Dark web leaks"
+                    alert={compromisedCount > 0}
+                    subtext={compromisedCount > 0 ? "Immediate action required" : "No breaches detected"}
                 />
 
                 {/* 5. Vault Distribution - Spans 2 cols */}
@@ -1293,6 +1386,22 @@ const Guardian: React.FC = () => {
       )}
 
       </div>
+      
+      {/* Phase 2 Modals */}
+      {showHistory && (
+        <ScanHistory 
+          userId={user?.id || ''}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
+      
+      {showFindings && (
+        <FindingsManager 
+          userId={user?.id || ''}
+          scanId={currentScanId || undefined}
+          onClose={() => setShowFindings(false)}
+        />
+      )}
     </div>
   );
 };

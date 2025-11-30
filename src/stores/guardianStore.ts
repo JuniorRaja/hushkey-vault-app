@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import { supabase } from '../supabaseClient';
-import { runSecurityScan, ScanResult } from '../services/guardianScanner';
+import { runSecurityScan, runBreachCheck, ScanResult } from '../services/guardianScanner';
 import type { Item } from '../../types';
 
 interface GuardianFinding {
@@ -24,13 +24,15 @@ interface GuardianFinding {
 interface GuardianState {
   isScanning: boolean;
   scanProgress: number;
-  lastScan: ScanResult | null;
+  lastScan: (ScanResult & { scanDate?: string }) | null;
   findings: GuardianFinding[];
+  compromisedCount: number;
   error: string | null;
 }
 
 interface GuardianActions {
   startScan: (userId: string, items: Item[]) => Promise<void>;
+  startBreachCheck: (userId: string, items: Item[]) => Promise<void>;
   fetchLatestScan: (userId: string) => Promise<void>;
   fetchFindings: (userId: string) => Promise<void>;
   resolveFindings: (findingIds: string[]) => Promise<void>;
@@ -41,6 +43,7 @@ export const useGuardianStore = create<GuardianState & GuardianActions>((set, ge
   scanProgress: 0,
   lastScan: null,
   findings: [],
+  compromisedCount: 0,
   error: null,
 
   async startScan(userId: string, items: Item[]) {
@@ -78,6 +81,31 @@ export const useGuardianStore = create<GuardianState & GuardianActions>((set, ge
     }
   },
 
+  async startBreachCheck(userId: string, items: Item[]) {
+    set({ isScanning: true, scanProgress: 0, error: null });
+    
+    try {
+      const result = await runBreachCheck(userId, items, (current, total) => {
+        set({ scanProgress: Math.round((current / total) * 100) });
+      });
+      
+      set({ isScanning: false, scanProgress: 100 });
+      
+      // Fetch updated findings and scan
+      await get().fetchFindings(userId);
+      await get().fetchLatestScan(userId);
+      
+      setTimeout(() => set({ scanProgress: 0 }), 1000);
+    } catch (error) {
+      console.error('Failed to run breach check:', error);
+      set({ 
+        isScanning: false, 
+        scanProgress: 0, 
+        error: 'Failed to complete breach check' 
+      });
+    }
+  },
+
   async fetchLatestScan(userId: string) {
     try {
       const { data, error } = await supabase
@@ -97,10 +125,13 @@ export const useGuardianStore = create<GuardianState & GuardianActions>((set, ge
             totalItems: data.total_items_scanned,
             weakCount: data.weak_passwords_count,
             reusedCount: data.reused_passwords_count,
-            securityScore: 0, // Will be calculated from findings
+            compromisedCount: data.compromised_passwords_count || 0,
+            securityScore: 0,
             weakItems: [],
             reusedItems: [],
-            duration: data.scan_duration_ms
+            compromisedItems: [],
+            duration: data.scan_duration_ms,
+            scanDate: data.scan_date
           }
         });
       }
@@ -133,7 +164,8 @@ export const useGuardianStore = create<GuardianState & GuardianActions>((set, ge
         createdAt: f.created_at
       }));
       
-      set({ findings });
+      const compromisedCount = findings.filter(f => f.findingType === 'compromised').length;
+      set({ findings, compromisedCount });
     } catch (error) {
       console.error('Failed to fetch findings:', error);
     }

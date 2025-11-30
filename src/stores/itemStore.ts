@@ -58,18 +58,13 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      console.log('loadItems: Loading items for', vaultId ? `vault ${vaultId}` : 'all vaults');
       const allItems = vaultId 
         ? await DatabaseService.getItems(vaultId, masterKey)
         : await DatabaseService.getAllItems(user.id, masterKey);
-      
-      console.log('loadItems: Raw items from DB:', allItems);
-      
+            
       // Filter out deleted items
       const items = allItems.filter(i => !i.deletedAt);
-      
-      console.log('loadItems: Loaded', items.length, 'active items', items);
-      
+          
       // Cache in IndexedDB
       await IndexedDBService.bulkSaveItems(items.map(i => ({
         id: i.id,
@@ -261,7 +256,6 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
         }))
       );
       
-      console.log('loadVaults: Loaded', vaultsWithCounts.length, 'vaults with counts');
       set({ vaults: vaultsWithCounts, isLoading: false });
     } catch (error) {
       console.error('Failed to load vaults:', error);

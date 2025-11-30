@@ -63,11 +63,6 @@ class DatabaseService {
         "No active session - user must be authenticated to create profile"
       );
     }
-
-    console.log("Creating user profile for:", userId);
-    console.log("Session user:", session.user.id);
-    console.log("Match:", session.user.id === userId);
-
     const { data, error } = await supabase
       .from("user_profiles")
       .insert({
@@ -83,7 +78,6 @@ class DatabaseService {
       throw error;
     }
 
-    console.log("Profile created successfully:", data);
   }
 
   /**

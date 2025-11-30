@@ -149,7 +149,6 @@ class SecurityTesterService {
    * Run all security tests
    */
   async runAllTests(): Promise<{ passed: number; failed: number; results: any[] }> {
-    console.log('🔒 Running Security Tests...\n');
     
     const tests = [
       { name: 'Secure Memory Wipe', fn: () => this.testSecureWipe() },

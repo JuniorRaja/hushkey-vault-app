@@ -6,17 +6,63 @@
 import { supabase } from '../supabaseClient';
 import { analyzePassword } from './passwordAnalyzer';
 import { detectReusedPasswords } from './reuseDetector';
+import { checkMultiplePasswords } from './breachChecker';
 import type { Item } from '../../types';
+
+export async function resolveFinding(findingId: string, resolution?: string) {
+  const { error } = await supabase
+    .from('guardian_findings')
+    .update({
+      resolved: true,
+      resolved_at: new Date().toISOString()
+    })
+    .eq('id', findingId);
+  
+  if (error) throw error;
+}
 
 export interface ScanResult {
   scanId: string;
   totalItems: number;
   weakCount: number;
   reusedCount: number;
+  compromisedCount: number;
   securityScore: number;
   weakItems: Item[];
   reusedItems: Item[];
+  compromisedItems: Item[];
   duration: number;
+}
+
+export async function fetchScanHistory(userId: string, limit: number = 10) {
+  const { data, error } = await supabase
+    .from('guardian_scans')
+    .select('*')
+    .eq('user_id', userId)
+    .order('scan_date', { ascending: false })
+    .limit(limit);
+  
+  if (error) throw error;
+  return data || [];
+}
+
+export async function fetchFindings(userId: string, scanId?: string) {
+  let query = supabase
+    .from('guardian_findings')
+    .select(`
+      *,
+      items!inner(id, data_encrypted)
+    `)
+    .eq('user_id', userId);
+  
+  if (scanId) {
+    query = query.eq('scan_id', scanId);
+  }
+  
+  const { data, error } = await query.order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data || [];
 }
 
 export async function runSecurityScan(userId: string, items: Item[]): Promise<ScanResult> {
@@ -108,25 +154,89 @@ export async function runSecurityScan(userId: string, items: Item[]): Promise<Sc
   }
   
   if (findings.length > 0) {
-    console.log("inserting finds")
-    const { error: findingsError } = await supabase
+    const { data: insertedFindings, error: findingsError } = await supabase
       .from('guardian_findings')
-      .insert(findings);
+      .insert(findings)
+      .select();
     
     if (findingsError) {
       console.error('Findings insert error:', findingsError);
       throw findingsError;
     }
-  }
+  } 
   
   return {
     scanId: scan.id,
     totalItems: loginItems.length,
     weakCount: weakItems.length,
     reusedCount: reuseGroups.length,
+    compromisedCount: 0,
     securityScore: avgScore,
     weakItems,
     reusedItems,
+    compromisedItems: [],
     duration
   };
+}
+
+export async function runBreachCheck(
+  userId: string,
+  items: Item[],
+  onProgress?: (current: number, total: number) => void
+): Promise<{ compromisedItems: any[], scanId: string }> {
+  const startTime = Date.now();
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const loginItems = items.filter(i => i.data?.password && uuidRegex.test(i.id));
+  const passwords = loginItems.map(i => i.data.password!);
+  
+  const breachResults = await checkMultiplePasswords(passwords, onProgress);
+  
+  const compromisedItems: any[] = [];
+  const findings: any[] = [];
+  
+  for (const item of loginItems) {
+    const result = breachResults.get(item.data.password!);
+    if (result?.compromised) {
+      compromisedItems.push({ ...item, breachCount: result.breachCount });
+    }
+  }
+  
+  const duration = Date.now() - startTime;
+  
+  // Create new scan record for breach check
+  const { data: scan, error: scanError } = await supabase
+    .from('guardian_scans')
+    .insert({
+      user_id: userId,
+      scan_type: 'breach_check',
+      total_items_scanned: loginItems.length,
+      weak_passwords_count: 0,
+      reused_passwords_count: 0,
+      compromised_passwords_count: compromisedItems.length,
+      scan_duration_ms: duration
+    })
+    .select('*')
+    .single();
+  
+  if (scanError || !scan) {
+    throw new Error('Failed to create breach scan record');
+  }
+  
+  // Store compromised findings
+  for (const item of compromisedItems) {
+    findings.push({
+      scan_id: scan.id,
+      user_id: userId,
+      item_id: item.id,
+      finding_type: 'compromised',
+      severity: 'critical',
+      details: { breach_count: item.breachCount }
+    });
+  }
+  
+  if (findings.length > 0) {
+    await supabase.from('guardian_findings').insert(findings);
+  }
+  
+  return { compromisedItems, scanId: scan.id };
 }
