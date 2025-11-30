@@ -793,8 +793,32 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
 };
 
 const LogsModal = ({ onClose }: { onClose: () => void }) => {
-  const { logs } = useData();
+  const { user: authUser } = useAuthStore();
+  const [logs, setLogs] = useState<any[]>([]);
+  const [displayedLogs, setDisplayedLogs] = useState<any[]>([]);
   const [search, setSearch] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const logsContainerRef = useRef<HTMLDivElement>(null);
+  const ITEMS_PER_PAGE = 50;
+
+  useEffect(() => {
+    const loadLogs = async () => {
+      if (!authUser) return;
+      setIsLoading(true);
+      try {
+        const data = await DatabaseService.getActivityLogs(authUser.id, 1000);
+        setLogs(data);
+        setDisplayedLogs(data.slice(0, ITEMS_PER_PAGE));
+        setPage(1);
+      } catch (err) {
+        console.error("Error loading logs:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadLogs();
+  }, [authUser]);
 
   const filteredLogs = logs.filter(
     (l) =>
@@ -802,16 +826,39 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
       l.action.toLowerCase().includes(search.toLowerCase())
   );
 
+  useEffect(() => {
+    setDisplayedLogs(filteredLogs.slice(0, page * ITEMS_PER_PAGE));
+  }, [search, page, filteredLogs.length]);
+
+  const handleScroll = () => {
+    if (!logsContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = logsContainerRef.current;
+    if (scrollHeight - scrollTop <= clientHeight + 100) {
+      if (displayedLogs.length < filteredLogs.length) {
+        setPage((prev) => prev + 1);
+      }
+    }
+  };
+
   const handleDownload = () => {
-    const content = JSON.stringify(logs, null, 2);
-    const blob = new Blob([content], { type: "application/json" });
+    const csvContent = [
+      ['Timestamp', 'Action', 'Details'],
+      ...logs.map(log => [
+        new Date(log.created_at).toISOString(),
+        log.action,
+        log.details
+      ])
+    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sentinel_logs_${new Date().toISOString()}.json`;
+    a.download = `hushkey_activity_logs_${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -833,54 +880,72 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
           </div>
           <button
             onClick={handleDownload}
-            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors border border-gray-700"
+            disabled={logs.length === 0}
+            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Download size={16} /> Export
+            <FileDown size={16} /> Export
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {filteredLogs.map((log) => (
-            <div
-              key={log.id}
-              className="p-3 hover:bg-gray-800/50 rounded-lg flex justify-between items-start group transition-colors"
-            >
-              <div className="flex items-start gap-3">
+        <div 
+          ref={logsContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar"
+        >
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="animate-spin text-primary-500" size={32} />
+            </div>
+          ) : (
+            <>
+              {displayedLogs.map((log) => (
                 <div
-                  className={`mt-0.5 p-1.5 rounded bg-gray-800 text-[10px] font-bold uppercase tracking-wider min-w-[60px] text-center ${
-                    log.action === "DELETE"
-                      ? "text-red-400"
-                      : log.action === "CREATE"
-                      ? "text-green-400"
-                      : log.action === "LOGIN"
-                      ? "text-blue-400"
-                      : "text-gray-400"
-                  }`}
+                  key={log.id}
+                  className="p-3 hover:bg-gray-800/50 rounded-lg flex justify-between items-start group transition-colors"
                 >
-                  {log.action}
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`mt-0.5 p-1.5 rounded bg-gray-800 text-[10px] font-bold uppercase tracking-wider min-w-[60px] text-center ${
+                        log.action === "DELETE"
+                          ? "text-red-400"
+                          : log.action === "CREATE"
+                          ? "text-green-400"
+                          : log.action === "LOGIN"
+                          ? "text-blue-400"
+                          : "text-gray-400"
+                      }`}
+                    >
+                      {log.action}
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-300 font-medium">
+                        {log.details}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-0.5 font-mono">
+                        {new Date(log.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    className="text-gray-600 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() =>
+                      navigator.clipboard.writeText(JSON.stringify(log))
+                    }
+                  >
+                    <Copy size={14} />
+                  </button>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-300 font-medium">
-                    {log.details}
-                  </p>
-                  <p className="text-xs text-gray-600 mt-0.5 font-mono">
-                    {new Date(log.timestamp).toLocaleString()}
-                  </p>
+              ))}
+              {displayedLogs.length === 0 && !isLoading && (
+                <div className="text-center py-10 text-gray-500 text-sm">
+                  {search ? "No logs found matching search." : "No activity logs yet."}
                 </div>
-              </div>
-              <button
-                className="text-gray-600 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() =>
-                  navigator.clipboard.writeText(JSON.stringify(log))
-                }
-              >
-                <Copy size={14} />
-              </button>
-            </div>
-          ))}
-          {filteredLogs.length === 0 && (
-            <div className="text-center py-10 text-gray-500 text-sm">
-              No logs found matching search.
-            </div>
+              )}
+              {displayedLogs.length < filteredLogs.length && (
+                <div className="text-center py-4 text-gray-500 text-xs">
+                  Showing {displayedLogs.length} of {filteredLogs.length} logs
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
