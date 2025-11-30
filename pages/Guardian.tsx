@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { supabase } from '../src/supabaseClient';
 import { useData } from '../App';
 import { useNavigate } from 'react-router-dom';
 import { useItemStore } from '../src/stores/itemStore';
@@ -65,36 +66,36 @@ const KPI_INFO: Record<string, KpiInfoData> = {
     },
     stale_passwords: {
         title: "Stale Passwords",
-        description: "Passwords that haven't been changed in over 6 months.",
+        description: "Passwords that haven't been changed in over 3-6 months. Regular rotation reduces risk of compromise.",
         bestPractices: [
-            "Rotate critical passwords (email, banking) every 3-6 months.",
-            "Use the 'Password Expiry' setting to get auto-reminders.",
+            "Rotate critical passwords (email, banking) every 3 months.",
+            "Change less critical passwords every 6 months.",
             "Review old accounts to see if you still need them."
         ]
     },
     expiry: {
         title: "Expiry Reminders",
-        description: "Items like Credit Cards, Driver's Licenses, and Passports that have an expiration date approaching.",
+        description: "Tracks expiration dates for passwords, credit cards, licenses, and ID cards. Get notified 90 days before expiry.",
         bestPractices: [
             "Renew documents 3 months before expiry.",
             "Update the vault entry immediately after receiving the new card/ID.",
-            "Set reminders for critical business documents."
+            "Set password expiry intervals for critical accounts."
         ]
     },
     attachments: {
         title: "Vault Attachments",
-        description: "Analysis of files stored within your secure vault.",
+        description: "Analysis of files stored within your secure vault. Shows total size, file count, types, and identifies old/unused files.",
         bestPractices: [
             "Delete files you no longer need to save space.",
-            "Ensure sensitive documents (tax returns, IDs) are stored here, not in unsecured folders.",
-            "Periodically download and verify file integrity."
+            "Review files older than 1 year for relevance.",
+            "Keep file sizes reasonable for faster sync."
         ]
     },
     sessions: {
         title: "Active Sessions",
-        description: "Devices currently logged into your Sentinel Vault account.",
+        description: "Devices currently logged into your HushKey Vault account. Monitor and terminate suspicious sessions.",
         bestPractices: [
-            "Log out of devices you don't recognize.",
+            "Terminate sessions from devices you don't recognize.",
             "Log out of public or shared computers immediately after use.",
             "Set a shorter 'Auto-lock' timer in settings."
         ]
@@ -394,7 +395,9 @@ const KpiDetailView = ({ id, data, onBack, items }: { id: KpiId, data: any, onBa
                                         </div>
                                         <div>
                                             <h4 className="font-bold text-white">{item.name}</h4>
-                                            <p className="text-xs text-gray-400">{item.data.username || 'No username'}</p>
+                                            <p className="text-xs text-gray-400">
+                                                {id === 'stale_passwords' && item.monthsOld ? `${item.monthsOld} months old` : item.data.username || 'No username'}
+                                            </p>
                                         </div>
                                     </div>
                                     <button 
@@ -425,7 +428,11 @@ const KpiDetailView = ({ id, data, onBack, items }: { id: KpiId, data: any, onBa
                                         </div>
                                         <div>
                                             <h4 className="font-bold text-white">{item.name}</h4>
-                                            <p className="text-xs text-red-400 font-bold">{item.daysLeft} days remaining</p>
+                                            <p className="text-xs font-bold">
+                                                <span className={item.isExpired ? 'text-red-500' : 'text-red-400'}>
+                                                    {item.expiryType}: {item.isExpired ? `Expired ${Math.abs(item.daysLeft)} days ago` : `${item.daysLeft} days remaining`}
+                                                </span>
+                                            </p>
                                         </div>
                                     </div>
                                     <button 
@@ -483,7 +490,10 @@ const KpiDetailView = ({ id, data, onBack, items }: { id: KpiId, data: any, onBa
                                          <div className="text-xs text-gray-400">{s.location} • {s.status}</div>
                                      </div>
                                  </div>
-                                 <button className="text-red-400 hover:text-red-300 text-xs font-bold uppercase border border-red-500/30 px-3 py-1 rounded-lg">
+                                 <button 
+                                     onClick={() => data.onTerminate?.(s.id)}
+                                     className="text-red-400 hover:text-red-300 text-xs font-bold uppercase border border-red-500/30 px-3 py-1 rounded-lg transition-colors"
+                                 >
                                      Revoke
                                  </button>
                              </div>
@@ -564,20 +574,18 @@ const Guardian: React.FC = () => {
   // --- STATS CALCULATION LOGIC ---
 
   const stats = useMemo(() => {
-      const loginItems = items.filter(i => i.data?.password && !i.deletedAt);
+      const passwordItems = items.filter(i => i.data?.password && !i.deletedAt);
       
       // 1. Password Strength
       let totalScore = 0;
-      let weakCount = 0;
       const affectedWeak: any[] = [];
       const passMap: Record<string, any[]> = {};
 
-      loginItems.forEach(item => {
+      passwordItems.forEach(item => {
           const pass = item.data.password || '';
           const analysis = analyzePassword(pass);
 
           if (analysis.strength === 'weak') {
-              weakCount++;
               affectedWeak.push(item);
           }
           totalScore += analysis.score;
@@ -586,67 +594,70 @@ const Guardian: React.FC = () => {
           passMap[pass].push(item);
       });
 
-      const avgScore = loginItems.length ? Math.round(totalScore / loginItems.length) : 100;
+      const avgScore = passwordItems.length ? Math.round(totalScore / passwordItems.length) : 100;
       const reusedGroups = Object.values(passMap).filter(g => g.length > 1);
       const reusedCount = reusedGroups.length;
       const reusedItems = reusedGroups.flat();
 
-      // 2. Age Analysis
+      // 2. Age Analysis (Stale Passwords)
       const now = new Date();
+      const threeMonthsAgo = new Date(); threeMonthsAgo.setMonth(now.getMonth() - 3);
       const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(now.getMonth() - 6);
       
       const staleItems: any[] = [];
       items.forEach(i => {
-          if (i.lastUpdated) {
-              const d = new Date(i.lastUpdated);
-              if (d < sixMonthsAgo) staleItems.push(i);
-          }
-      });
-
-      // 3. Expiry Reminders
-      const expiringItems: any[] = [];
-      items.forEach(i => {
-          let expiryDate: Date | null = null;
-          if (i.data.expiry) {
-              const [m, y] = i.data.expiry.split('/');
-              if (m && y) expiryDate = new Date(2000 + parseInt(y), parseInt(m) - 1);
-          }
-          if (i.data.validTill || i.data.expiryDate) {
-              const dStr = i.data.validTill || i.data.expiryDate;
-              if (dStr && !isNaN(Date.parse(dStr))) expiryDate = new Date(dStr);
-          }
-          if (expiryDate) {
-              const diffTime = expiryDate.getTime() - now.getTime();
-              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-              if (diffDays > 0 && diffDays < 90) {
-                  expiringItems.push({ ...i, daysLeft: diffDays });
+          if (i.data?.password) {
+              const lastModified = i.data.passwordLastModified ? new Date(i.data.passwordLastModified) : new Date(i.lastUpdated);
+              if (lastModified < threeMonthsAgo) {
+                  staleItems.push({ ...i, monthsOld: Math.floor((now.getTime() - lastModified.getTime()) / (1000 * 60 * 60 * 24 * 30)) });
               }
           }
       });
 
-      // 4. Attachments Logic
-      let totalAttachSize = 0;
-      let totalAttachments = 0;
-      const fileTypeMap: Record<string, number> = {};
-      const oldFiles: any[] = [];
-      const oneYearAgo = new Date(); oneYearAgo.setFullYear(now.getFullYear() - 1);
-
+      // 3. Expiry Reminders (Passwords, Cards, License, ID Card)
+      const expiringItems: any[] = [];
       items.forEach(i => {
-          if (i.data.attachments) {
-              totalAttachments += i.data.attachments.length;
-              i.data.attachments.forEach((a: any) => {
-                  totalAttachSize += a.size;
-                  // Type analysis
-                  const ext = a.name.split('.').pop()?.toUpperCase() || 'UNKNOWN';
-                  fileTypeMap[ext] = (fileTypeMap[ext] || 0) + 1;
-                  
-                  // Mock age check (using item updated time for demo)
-                  if (new Date(i.lastUpdated) < oneYearAgo) {
-                      oldFiles.push({ id: a.id, name: a.name, parentItemName: i.name });
-                  }
-              });
+          let expiryDate: Date | null = null;
+          let expiryType = '';
+          
+          if (i.data?.password && i.data.passwordExpiryInterval && i.data.passwordExpiryInterval > 0) {
+              const lastModified = i.data.passwordLastModified ? new Date(i.data.passwordLastModified) : new Date(i.lastUpdated);
+              expiryDate = new Date(lastModified.getTime() + i.data.passwordExpiryInterval * 24 * 60 * 60 * 1000);
+              expiryType = 'Password';
+          }
+          
+          if (i.type === 'CARD' && i.data.expiry) {
+              const [m, y] = i.data.expiry.split('/');
+              if (m && y) {
+                  expiryDate = new Date(2000 + parseInt(y), parseInt(m) - 1);
+                  expiryType = 'Card';
+              }
+          }
+          
+          if (i.type === 'LICENSE' && i.data.expiryDate) {
+              if (!isNaN(Date.parse(i.data.expiryDate))) {
+                  expiryDate = new Date(i.data.expiryDate);
+                  expiryType = 'License';
+              }
+          }
+          
+          if (i.type === 'ID_CARD' && i.data.validTill) {
+              if (!isNaN(Date.parse(i.data.validTill))) {
+                  expiryDate = new Date(i.data.validTill);
+                  expiryType = 'ID Card';
+              }
+          }
+          
+          if (expiryDate) {
+              const diffTime = expiryDate.getTime() - now.getTime();
+              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+              if (diffDays < 90) {
+                  expiringItems.push({ ...i, daysLeft: diffDays, expiryType, isExpired: diffDays < 0 });
+              }
           }
       });
+
+
 
       // 5. Distribution - Group by item type
       const distributionRaw = items.reduce((acc: any, curr) => {
@@ -666,29 +677,126 @@ const Guardian: React.FC = () => {
 
       return {
           securityScore: avgScore,
-          weakCount,
+          weakCount: affectedWeak.length,
           weakItems: affectedWeak,
           reusedCount,
           reusedItems,
           staleItems,
           staleCount: staleItems.length,
           expiringItems,
-          totalAttachments,
-          totalAttachSize: (totalAttachSize / (1024 * 1024)).toFixed(2), // MB
-          fileTypeMap,
-          oldFiles,
           distribution: distData,
-          totalItems: items.length
+          totalItems: items.length,
+          totalPasswordItems: passwordItems.length
       };
   }, [items]);
+
+  const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const [attachmentStats, setAttachmentStats] = useState<any>({
+    totalAttachments: 0,
+    totalAttachSize: 0,
+    fileTypeMap: {},
+    oldFiles: []
+  });
+
+  useEffect(() => {
+    const fetchSessions = async () => {
+      if (!user) return;
+      try {
+        const { data, error } = await supabase
+          .from('devices')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('last_seen', { ascending: false });
+        
+        if (error) throw error;
+        
+        const sessions = (data || []).map(d => ({
+          id: d.id,
+          device: d.device_name || 'Unknown Device',
+          location: d.location || 'Unknown',
+          status: getSessionStatus(d.last_seen),
+          lastActive: new Date(d.last_seen)
+        }));
+        
+        setActiveSessions(sessions);
+      } catch (error) {
+        console.error('Failed to fetch sessions:', error);
+      }
+    };
+    
+    fetchSessions();
+  }, [user]);
+
+  useEffect(() => {
+    const fetchAttachments = async () => {
+      if (!user || items.length === 0) return;
+      try {
+        const { data, error } = await supabase
+          .from('file_attachments')
+          .select('id, name_encrypted, size_bytes, mime_type, created_at, item_id')
+          .in('item_id', items.map(i => i.id));
+        
+        if (error) throw error;
+        
+        const attachments = data || [];
+        const totalSize = attachments.reduce((sum, a) => sum + a.size_bytes, 0);
+        const typeMap: Record<string, number> = {};
+        const oneYearAgo = new Date(); oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        const old: any[] = [];
+        
+        attachments.forEach(a => {
+          const type = a.mime_type.split('/')[0].toUpperCase() || 'OTHER';
+          typeMap[type] = (typeMap[type] || 0) + 1;
+          
+          if (new Date(a.created_at) < oneYearAgo) {
+            const item = items.find(i => i.id === a.item_id);
+            old.push({ id: a.id, name: a.name_encrypted, parentItemName: item?.name || 'Unknown' });
+          }
+        });
+        
+        setAttachmentStats({
+          totalAttachments: attachments.length,
+          totalAttachSize: (totalSize / (1024 * 1024)).toFixed(2),
+          fileTypeMap: typeMap,
+          oldFiles: old
+        });
+      } catch (error) {
+        console.error('Failed to fetch attachments:', error);
+      }
+    };
+    
+    if (items.length > 0) fetchAttachments();
+  }, [user]);
+
+  const getSessionStatus = (lastSeen: string) => {
+    const diff = Date.now() - new Date(lastSeen).getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 5) return 'Active Now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
+
+  const handleTerminateSession = async (sessionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('devices')
+        .delete()
+        .eq('id', sessionId);
+      
+      if (error) throw error;
+      
+      setActiveSessions(prev => prev.filter(s => s.id !== sessionId));
+    } catch (error) {
+      console.error('Failed to terminate session:', error);
+    }
+  };
 
   // Mock External Data
   const mockData = {
       compromisedCount: 0,
-      sessions: [
-        { id: 1, device: 'iPhone 15 Pro', location: 'San Francisco, US', status: 'Active Now' },
-        { id: 2, device: 'MacBook Air M2', location: 'Seattle, US', status: '2h ago' },
-      ],
+      sessions: activeSessions,
       backup: { score: 98, last: '15m ago', status: 'Secure' }
   };
 
@@ -823,9 +931,9 @@ const Guardian: React.FC = () => {
                   affectedItems: [],
                   reusedCount: stats.reusedCount,
                   breakdown: {
-                      totalPasswords: items.filter(i => i.data?.password && !i.deletedAt).length,
+                      totalPasswords: stats.totalPasswordItems,
                       weakCount: stats.weakCount,
-                      mediumCount: items.filter(i => i.data?.password && !i.deletedAt).length - stats.weakCount - items.filter(i => {
+                      mediumCount: stats.totalPasswordItems - stats.weakCount - items.filter(i => {
                           if (!i.data?.password || i.deletedAt) return false;
                           const analysis = analyzePassword(i.data.password);
                           return analysis.strength === 'strong';
@@ -851,10 +959,10 @@ const Guardian: React.FC = () => {
               detailData = { title: 'Expiring Items', value: stats.expiringItems.length, description: 'Cards and IDs expiring within the next 90 days.', color: 'text-yellow-500', expiringItems: stats.expiringItems };
               break;
           case 'attachments':
-              detailData = { title: 'Vault Attachments', value: stats.totalAttachments, description: 'Overview of stored files and document health.', color: 'text-blue-500', fileTypeMap: stats.fileTypeMap, oldFiles: stats.oldFiles };
+              detailData = { title: 'Vault Attachments', value: attachmentStats.totalAttachments, description: 'Overview of stored files and document health.', color: 'text-blue-500', fileTypeMap: attachmentStats.fileTypeMap, oldFiles: attachmentStats.oldFiles };
               break;
           case 'sessions':
-              detailData = { title: 'Active Sessions', value: mockData.sessions.length, description: 'Devices currently authorized to access your vault.', color: 'text-green-500', sessions: mockData.sessions };
+              detailData = { title: 'Active Sessions', value: mockData.sessions.length, description: 'Devices currently authorized to access your vault.', color: 'text-green-500', sessions: mockData.sessions, onTerminate: handleTerminateSession };
               break;
            case 'backup':
               detailData = { title: 'Backup Health', value: 'Secure', description: 'Status of your encrypted cloud synchronization.', color: 'text-green-500', affectedItems: [] };
@@ -990,9 +1098,11 @@ const Guardian: React.FC = () => {
                          {stats.expiringItems.length > 0 ? (
                              stats.expiringItems.map(item => (
                                  <div key={item.id} className="min-w-[160px] bg-gray-800/50 p-3 rounded-xl border border-gray-800">
-                                     <div className="text-xs text-orange-400 font-bold mb-1">{item.daysLeft} days left</div>
+                                     <div className={`text-xs font-bold mb-1 ${item.isExpired ? 'text-red-500' : 'text-orange-400'}`}>
+                                         {item.isExpired ? `Expired ${Math.abs(item.daysLeft)}d ago` : `${item.daysLeft} days left`}
+                                     </div>
                                      <div className="font-bold text-white text-sm truncate">{item.name}</div>
-                                     <div className="text-[10px] text-gray-500 mt-1">{item.type}</div>
+                                     <div className="text-[10px] text-gray-500 mt-1">{item.expiryType}</div>
                                  </div>
                              ))
                          ) : (
@@ -1039,9 +1149,9 @@ const Guardian: React.FC = () => {
                          </button>
                     </div>
                     <div>
-                        <div className="text-3xl font-bold text-white mb-1">{stats.totalAttachSize} <span className="text-lg text-gray-500 font-medium">MB</span></div>
+                        <div className="text-3xl font-bold text-white mb-1">{attachmentStats.totalAttachSize} <span className="text-lg text-gray-500 font-medium">MB</span></div>
                         <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Attachments</div>
-                        <div className="text-xs text-gray-600 mt-2 font-medium">{stats.totalAttachments} Files Stored</div>
+                        <div className="text-xs text-gray-600 mt-2 font-medium">{attachmentStats.totalAttachments} Files Stored</div>
                     </div>
                     <div className="absolute bottom-4 right-4 text-gray-700 group-hover:text-primary-400 opacity-50 group-hover:opacity-100 transition-all">
                         <ChevronRight size={20} />
