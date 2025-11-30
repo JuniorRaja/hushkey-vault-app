@@ -128,21 +128,17 @@ export const useTrashStore = create<TrashState & TrashActions>((set, get) => ({
       await DatabaseService.restoreVault(vaultId);
 
       if (restoreItems) {
-        // Restore all items that were deleted at the same time as the vault
-        const itemsToRestore = get().deletedItems.filter(
-          i => i.vaultId === vaultId && i.deletedAt === vault.deletedAt
-        );
-
-        await Promise.all(
-          itemsToRestore.map(item => DatabaseService.restoreItem(item.id))
-        );
+        // Restore all items in this vault
+        await supabase
+          .from('items')
+          .update({ is_deleted: false, deleted_at: null })
+          .eq('vault_id', vaultId)
+          .eq('is_deleted', true);
 
         // Update local state
         set(state => ({
           deletedVaults: state.deletedVaults.filter(v => v.id !== vaultId),
-          deletedItems: state.deletedItems.filter(
-            i => !(i.vaultId === vaultId && i.deletedAt === vault.deletedAt)
-          )
+          deletedItems: state.deletedItems.filter(i => i.vaultId !== vaultId)
         }));
       } else {
         set(state => ({

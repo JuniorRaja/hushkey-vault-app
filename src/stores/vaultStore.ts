@@ -172,11 +172,15 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     try {
       await DatabaseService.restoreVault(vaultId);
       
-      // Update local state
-      const vaults = get().vaults.map(v => 
-        v.id === vaultId ? { ...v, deletedAt: undefined } : v
-      );
-      set({ vaults });
+      // Restore all items in this vault
+      await supabase
+        .from('items')
+        .update({ is_deleted: false, deleted_at: null })
+        .eq('vault_id', vaultId);
+      
+      // Reload vaults and items
+      await get().loadVaults();
+      await get().loadItems();
     } catch (error) {
       console.error('Failed to restore vault:', error);
       throw error;
