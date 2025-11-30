@@ -509,6 +509,9 @@ class DatabaseService {
       updated_at: new Date().toISOString(),
     };
 
+    if (updates.vaultId !== undefined) {
+      updateData.vault_id = updates.vaultId;
+    }
     if (updates.categoryId !== undefined) {
       updateData.category_id = updates.categoryId || null;
     }

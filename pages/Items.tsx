@@ -8,6 +8,7 @@ import { Item, ItemType, Vault, Category } from '../types';
 import VaultModal from '../components/VaultModal';
 import ShareModal from '../components/ShareModal';
 import ConfirmationModal from '../components/ConfirmationModal';
+import MoveToVaultModal from '../components/MoveToVaultModal';
 
 const getFaviconUrl = (url?: string) => {
     if (!url) return null;
@@ -128,6 +129,10 @@ const Items: React.FC = () => {
   // Sharing
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareTarget, setShareTarget] = useState<{ item: Item | Vault | null, type: 'item' | 'vault' }>({ item: null, type: 'item' });
+
+  // Move to Vault
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  const [moveItemId, setMoveItemId] = useState<string | null>(null);
 
   // Delete Confirmations
   const [deleteTarget, setDeleteTarget] = useState<{ id: string, type: 'item' | 'vault' } | null>(null);
@@ -331,6 +336,26 @@ const Items: React.FC = () => {
       closeMenu();
   }
 
+  const handleMoveItem = (e: React.MouseEvent, itemId: string) => {
+      e.stopPropagation();
+      setMoveItemId(itemId);
+      setIsMoveModalOpen(true);
+      closeMenu();
+  }
+
+  const handleMoveToVault = async (newVaultId: string) => {
+      if (!moveItemId) return;
+      try {
+          await updateItem(moveItemId, { vaultId: newVaultId });
+          await loadItems(vaultFilter || undefined);
+          setIsMoveModalOpen(false);
+          setMoveItemId(null);
+      } catch (error) {
+          console.error('Failed to move item:', error);
+          alert('Failed to move item. Please try again.');
+      }
+  }
+
   const renderItemRow = (item: Item, idx: number, total: number) => (
       <div 
         key={item.id} 
@@ -435,6 +460,14 @@ const Items: React.FC = () => {
         type="warning"
       />
 
+      <MoveToVaultModal
+        isOpen={isMoveModalOpen}
+        onClose={() => { setIsMoveModalOpen(false); setMoveItemId(null); }}
+        onMove={handleMoveToVault}
+        currentVaultId={moveItemId ? items.find(i => i.id === moveItemId)?.vaultId || '' : ''}
+        vaults={vaults.filter(v => !v.deletedAt)}
+      />
+
       {/* New Item Type Selection Modal - List View */}
       {isTypeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setIsTypeModalOpen(false)}>
@@ -496,7 +529,7 @@ const Items: React.FC = () => {
                 <button onClick={(e) => handleToggleFavorite(e, activeMenuItem)} className="w-full text-left px-4 py-3 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 flex items-center gap-3">
                     <Star size={14} className={activeMenuItem.isFavorite ? 'fill-current text-yellow-500' : ''} /> {activeMenuItem.isFavorite ? 'Remove Favorite' : 'Add to Favorites'}
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); alert('Move feature coming soon'); closeMenu(); }} className="w-full text-left px-4 py-3 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 flex items-center gap-3">
+                <button onClick={(e) => handleMoveItem(e, activeMenuItem.id)} className="w-full text-left px-4 py-3 text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 flex items-center gap-3">
                     <FolderInput size={14} /> Move to...
                 </button>
                 <div className="h-px bg-gray-700 my-1"></div>

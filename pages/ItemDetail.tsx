@@ -9,6 +9,7 @@ import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X
 import { generatePassword, generateTOTP } from '../services/passwordGenerator';
 import ShareModal from '../components/ShareModal';
 import ConfirmationModal from '../components/ConfirmationModal';
+import MoveToVaultModal from '../components/MoveToVaultModal';
 
 interface ItemDetailProps {
   isNew?: boolean;
@@ -159,6 +160,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const [showPin, setShowPin] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [copyTimer, setCopyTimer] = useState<number>(0);
@@ -356,6 +358,17 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
 
   const handleShare = () => {
       setIsShareModalOpen(true);
+  };
+
+  const handleMoveToVault = async (newVaultId: string) => {
+    try {
+      await updateItem(itemId!, { vaultId: newVaultId });
+      setIsMoveModalOpen(false);
+      navigate('/items');
+    } catch (error) {
+      console.error('Failed to move item:', error);
+      alert('Failed to move item. Please try again.');
+    }
   };
 
   const handleDuplicate = () => {
@@ -1732,6 +1745,14 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         type="warning"
       />
 
+      <MoveToVaultModal
+        isOpen={isMoveModalOpen}
+        onClose={() => setIsMoveModalOpen(false)}
+        onMove={handleMoveToVault}
+        currentVaultId={formData.vaultId || ''}
+        vaults={vaults}
+      />
+
       {/* Header Actions */}
       <div className="flex items-center justify-between mb-6">
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors group">
@@ -1742,6 +1763,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         <div className="flex items-center gap-2">
             {!isEditing ? (
                 <>
+                    <button onClick={() => setIsMoveModalOpen(true)} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors" title="Move to">
+                        <Layers size={20} />
+                    </button>
                     <button onClick={handleDuplicate} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors" title="Duplicate">
                         <CopyIcon size={20} />
                     </button>
