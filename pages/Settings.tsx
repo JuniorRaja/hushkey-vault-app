@@ -181,19 +181,21 @@ const CategoriesModal = ({ onClose }: { onClose: () => void }) => {
   const { items } = useData();
   const { categories, isLoading, loadCategories, addCategory, deleteCategory } = useCategoryStore();
   const [newCatName, setNewCatName] = useState("");
-  const [newCatColor, setNewCatColor] = useState("bg-gray-500");
+  const [newCatColor, setNewCatColor] = useState("bg-purple-500");
   const [deleteConfirm, setDeleteConfirm] = useState<{ category: Category; linkedItemsCount: number } | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
 
   const COLORS = [
-    "bg-blue-500",
-    "bg-green-500",
-    "bg-red-500",
-    "bg-yellow-500",
-    "bg-purple-500",
-    "bg-pink-500",
-    "bg-indigo-500",
-    "bg-orange-500",
-    "bg-gray-500",
+    { name: "Purple", class: "bg-purple-500" },
+    { name: "Blue", class: "bg-blue-500" },
+    { name: "Green", class: "bg-green-500" },
+    { name: "Red", class: "bg-red-500" },
+    { name: "Yellow", class: "bg-yellow-500" },
+    { name: "Pink", class: "bg-pink-500" },
+    { name: "Indigo", class: "bg-indigo-500" },
+    { name: "Orange", class: "bg-orange-500" },
+    { name: "Teal", class: "bg-teal-500" },
+    { name: "Cyan", class: "bg-cyan-500" },
   ];
 
   useEffect(() => {
@@ -202,11 +204,15 @@ const CategoriesModal = ({ onClose }: { onClose: () => void }) => {
 
   const handleAdd = async () => {
     if (!newCatName.trim()) return;
+    setIsAdding(true);
     try {
       await addCategory(newCatName.trim(), newCatColor);
       setNewCatName("");
+      setNewCatColor("bg-purple-500");
     } catch (err: any) {
       alert("Error creating category: " + err.message);
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -228,98 +234,131 @@ const CategoriesModal = ({ onClose }: { onClose: () => void }) => {
   return (
     <>
     <ModalLayout
-      title="Manage Categories"
+      title="Categories"
       onClose={onClose}
-      maxWidth="max-w-md"
+      maxWidth="max-w-lg"
     >
-      <div className="p-5 space-y-6">
-        {/* Add New */}
-        <div className="bg-gray-950/50 border border-gray-800 p-4 rounded-xl space-y-3">
-          <label className="text-xs font-bold text-gray-500 uppercase">
-            Create New Category
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Category Name"
-              value={newCatName}
-              onChange={(e) => setNewCatName(e.target.value)}
-              className="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:border-primary-500 outline-none"
-            />
-            <button
-              onClick={handleAdd}
-              disabled={!newCatName}
-              className="bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white p-2 rounded-lg transition-colors"
-            >
-              <Plus size={20} />
-            </button>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {COLORS.map((color) => (
-              <button
-                key={color}
-                onClick={() => setNewCatColor(color)}
-                className={`w-6 h-6 rounded-full ${color} shrink-0 transition-transform ${
-                  newCatColor === color
-                    ? "scale-125 ring-2 ring-white ring-offset-1 ring-offset-gray-900"
-                    : "opacity-70 hover:opacity-100"
-                }`}
+      <div className="p-6 space-y-6">
+        {/* Add New Category Section */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-primary-900/20 to-purple-900/10 border border-primary-800/30 rounded-2xl p-6 space-y-4">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/5 rounded-full blur-3xl"></div>
+          <div className="relative">
+            <label className="text-xs font-bold text-primary-400 uppercase tracking-wider flex items-center gap-2">
+              <Plus size={14} /> New Category
+            </label>
+            <div className="mt-3 space-y-3">
+              <input
+                type="text"
+                placeholder="Enter category name..."
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAdd()}
+                className="w-full bg-gray-950/50 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all placeholder-gray-600"
               />
-            ))}
+              <div className="flex flex-wrap gap-2">
+                {COLORS.map((color) => (
+                  <button
+                    key={color.class}
+                    onClick={() => setNewCatColor(color.class)}
+                    title={color.name}
+                    className={`w-8 h-8 rounded-lg ${color.class} transition-all ${
+                      newCatColor === color.class
+                        ? "scale-110 ring-2 ring-white shadow-lg"
+                        : "opacity-60 hover:opacity-100 hover:scale-105"
+                    }`}
+                  />
+                ))}
+              </div>
+              <button
+                onClick={handleAdd}
+                disabled={!newCatName.trim() || isAdding}
+                className="w-full bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-primary-900/30"
+              >
+                {isAdding ? (
+                  <><Loader2 size={16} className="animate-spin" /> Creating...</>
+                ) : (
+                  <><Plus size={16} /> Create Category</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* List */}
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-gray-500 uppercase">
-            Existing Categories ({categories.length})
-          </label>
-          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+        {/* Categories List */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Your Categories
+            </label>
+            <span className="text-xs font-bold text-gray-600 bg-gray-800 px-2 py-1 rounded">
+              {categories.length}
+            </span>
+          </div>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-1">
             {isLoading ? (
-              <div className="text-center py-4"><Loader2 className="animate-spin mx-auto text-primary-500" size={20} /></div>
+              <div className="text-center py-12">
+                <Loader2 className="animate-spin mx-auto text-primary-500" size={24} />
+                <p className="text-gray-500 text-sm mt-2">Loading categories...</p>
+              </div>
+            ) : categories.length === 0 ? (
+              <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-dashed border-gray-800">
+                <Layers size={32} className="mx-auto text-gray-700 mb-3" />
+                <p className="text-gray-500 text-sm">No categories yet</p>
+                <p className="text-gray-600 text-xs mt-1">Create your first category above</p>
+              </div>
             ) : (
-              categories.map((cat) => {
+              categories.map((cat, idx) => {
                 const linkedItemsCount = items.filter(item => item.categoryId === cat.id).length;
                 return (
-                  <div key={cat.id} className="flex items-center justify-between p-3 bg-gray-900 border border-gray-800 rounded-lg group hover:border-gray-700 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${cat.color}`} />
+                  <div 
+                    key={cat.id} 
+                    className="flex items-center justify-between p-4 bg-gray-900/80 border border-gray-800 rounded-xl group hover:border-gray-700 hover:bg-gray-900 transition-all animate-fade-in"
+                    style={{ animationDelay: `${idx * 50}ms` }}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-lg ${cat.color} flex items-center justify-center shadow-lg`}>
+                        <Layers size={18} className="text-white" />
+                      </div>
                       <div>
-                        <span className="text-sm font-medium text-gray-200">{cat.name}</span>
-                        {linkedItemsCount > 0 && <div className="text-xs text-gray-500">{linkedItemsCount} item{linkedItemsCount !== 1 ? 's' : ''}</div>}
+                        <span className="text-sm font-semibold text-gray-200 block">{cat.name}</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-gray-500">
+                            {linkedItemsCount} {linkedItemsCount === 1 ? 'item' : 'items'}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <button onClick={() => handleDeleteClick(cat)} className="text-gray-600 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Trash2 size={16} />
+                    <button 
+                      onClick={() => handleDeleteClick(cat)} 
+                      className="text-gray-600 hover:text-red-400 hover:bg-red-500/10 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Trash2 size={18} />
                     </button>
                   </div>
                 );
               })
-            )}
-            {!isLoading && categories.length === 0 && (
-              <div className="text-center text-gray-600 text-sm py-4">No categories created.</div>
             )}
           </div>
         </div>
       </div>
     </ModalLayout>
     {deleteConfirm && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)}>
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in" onClick={() => setDeleteConfirm(null)}>
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-6 space-y-4 animate-scale-in" onClick={(e) => e.stopPropagation()}>
           <div className="text-center">
-            <div className="w-12 h-12 rounded-full bg-red-900/30 flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle size={24} className="text-red-500" />
+            <div className="w-14 h-14 rounded-full bg-red-900/30 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={28} className="text-red-500" />
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">Delete Category</h3>
-            <p className="text-gray-400 text-sm mb-6">
+            <h3 className="text-lg font-bold text-white mb-2">Delete Category?</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
               {deleteConfirm.linkedItemsCount > 0
-                ? `This category has ${deleteConfirm.linkedItemsCount} linked item${deleteConfirm.linkedItemsCount !== 1 ? 's' : ''}. Items will become uncategorized.`
-                : `Delete "${deleteConfirm.category.name}"?`}
+                ? `This category has ${deleteConfirm.linkedItemsCount} linked ${deleteConfirm.linkedItemsCount === 1 ? 'item' : 'items'}. They will become uncategorized.`
+                : `Are you sure you want to delete "${deleteConfirm.category.name}"?`}
             </p>
           </div>
-          <div className="flex gap-3">
-            <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors">Cancel</button>
-            <button onClick={handleDeleteConfirm} className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-medium transition-colors">Delete</button>
+          <div className="flex gap-3 pt-2">
+            <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-semibold transition-all active:scale-95">Cancel</button>
+            <button onClick={handleDeleteConfirm} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-semibold transition-all active:scale-95 shadow-lg shadow-red-900/30">Delete</button>
           </div>
         </div>
       </div>
@@ -893,10 +932,21 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
   const [logs, setLogs] = useState<any[]>([]);
   const [displayedLogs, setDisplayedLogs] = useState<any[]>([]);
   const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState<string>("ALL");
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const ITEMS_PER_PAGE = 50;
+
+  const LOG_TYPES = [
+    { label: "All", value: "ALL", icon: Activity, color: "text-gray-400" },
+    { label: "Login", value: "LOGIN", icon: User, color: "text-blue-400" },
+    { label: "Create", value: "CREATE", icon: Plus, color: "text-green-400" },
+    { label: "Update", value: "UPDATE", icon: Edit2, color: "text-yellow-400" },
+    { label: "Delete", value: "DELETE", icon: Trash2, color: "text-red-400" },
+    { label: "Export", value: "EXPORT", icon: Download, color: "text-purple-400" },
+    { label: "Sync", value: "SYNC", icon: RefreshCw, color: "text-cyan-400" },
+  ];
 
   useEffect(() => {
     const loadLogs = async () => {
@@ -905,8 +955,6 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
       try {
         const data = await DatabaseService.getActivityLogs(authUser.id, 1000);
         setLogs(data);
-        setDisplayedLogs(data.slice(0, ITEMS_PER_PAGE));
-        setPage(1);
       } catch (err) {
         console.error("Error loading logs:", err);
       } finally {
@@ -916,15 +964,20 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
     loadLogs();
   }, [authUser]);
 
-  const filteredLogs = logs.filter(
-    (l) =>
-      l.details.toLowerCase().includes(search.toLowerCase()) ||
-      l.action.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredLogs = logs.filter((l) => {
+    const matchesSearch = l.details.toLowerCase().includes(search.toLowerCase()) ||
+      l.action.toLowerCase().includes(search.toLowerCase());
+    const matchesType = filterType === "ALL" || l.action === filterType;
+    return matchesSearch && matchesType;
+  });
 
   useEffect(() => {
     setDisplayedLogs(filteredLogs.slice(0, page * ITEMS_PER_PAGE));
-  }, [search, page, filteredLogs.length]);
+  }, [search, filterType, page, filteredLogs.length]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterType]);
 
   const handleScroll = () => {
     if (!logsContainerRef.current) return;
@@ -939,7 +992,7 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
   const handleDownload = () => {
     const csvContent = [
       ['Timestamp', 'Action', 'Details'],
-      ...logs.map(log => [
+      ...filteredLogs.map(log => [
         new Date(log.created_at).toISOString(),
         log.action,
         log.details
@@ -950,99 +1003,179 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `hushkey_activity_logs_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `hushkey_audit_logs_${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
+  const getLogIcon = (action: string) => {
+    const type = LOG_TYPES.find(t => t.value === action);
+    return type ? type.icon : Activity;
+  };
+
+  const getLogColor = (action: string) => {
+    const type = LOG_TYPES.find(t => t.value === action);
+    return type ? type.color : "text-gray-400";
+  };
+
   return (
-    <ModalLayout title="Activity Logs" onClose={onClose} maxWidth="max-w-2xl">
-      <div className="flex flex-col h-[600px] max-h-[80vh]">
-        <div className="p-4 border-b border-gray-800 flex gap-3 bg-gray-950/30">
-          <div className="flex-1 relative">
-            <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
-              size={16}
-            />
-            <input
-              type="text"
-              placeholder="Search logs..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-800 rounded-lg py-2 pl-9 pr-4 text-sm text-white focus:border-primary-500 outline-none placeholder-gray-600"
-            />
+    <ModalLayout title="Audit Logs" onClose={onClose} maxWidth="max-w-4xl">
+      <div className="flex flex-col h-[700px] max-h-[85vh]">
+        {/* Header with Search and Filters */}
+        <div className="p-4 border-b border-gray-800 space-y-3 bg-gray-950/50">
+          <div className="flex gap-3">
+            <div className="flex-1 relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+                size={18}
+              />
+              <input
+                type="text"
+                placeholder="Search logs by action or details..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-gray-900 border border-gray-800 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none placeholder-gray-600 transition-all"
+              />
+            </div>
+            <button
+              onClick={handleDownload}
+              disabled={filteredLogs.length === 0}
+              className="px-4 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-xl flex items-center gap-2 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary-900/30 active:scale-95"
+            >
+              <FileDown size={18} /> Export CSV
+            </button>
           </div>
-          <button
-            onClick={handleDownload}
-            disabled={logs.length === 0}
-            className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <FileDown size={16} /> Export
-          </button>
+          
+          {/* Filter Chips */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {LOG_TYPES.map((type) => {
+              const Icon = type.icon;
+              const count = type.value === "ALL" ? logs.length : logs.filter(l => l.action === type.value).length;
+              return (
+                <button
+                  key={type.value}
+                  onClick={() => setFilterType(type.value)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+                    filterType === type.value
+                      ? "bg-primary-600 text-white shadow-lg shadow-primary-900/30"
+                      : "bg-gray-800 text-gray-400 hover:bg-gray-750 hover:text-gray-300"
+                  }`}
+                >
+                  <Icon size={14} />
+                  {type.label}
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    filterType === type.value ? "bg-white/20" : "bg-gray-900"
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Logs List */}
         <div 
           ref={logsContainerRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar"
+          className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar"
         >
           {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="animate-spin text-primary-500" size={32} />
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader2 className="animate-spin text-primary-500 mb-4" size={40} />
+              <p className="text-gray-500 text-sm">Loading audit logs...</p>
+            </div>
+          ) : displayedLogs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-gray-900/50 rounded-xl border border-dashed border-gray-800">
+              <Activity size={48} className="text-gray-700 mb-4" />
+              <p className="text-gray-500 text-sm">
+                {search || filterType !== "ALL" ? "No logs match your filters" : "No activity logs yet"}
+              </p>
+              {(search || filterType !== "ALL") && (
+                <button
+                  onClick={() => { setSearch(""); setFilterType("ALL"); }}
+                  className="mt-3 text-xs text-primary-400 hover:text-primary-300 underline"
+                >
+                  Clear filters
+                </button>
+              )}
             </div>
           ) : (
             <>
-              {displayedLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="p-3 hover:bg-gray-800/50 rounded-lg flex justify-between items-start group transition-colors"
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`mt-0.5 p-1.5 rounded bg-gray-800 text-[10px] font-bold uppercase tracking-wider min-w-[60px] text-center ${
-                        log.action === "DELETE"
-                          ? "text-red-400"
-                          : log.action === "CREATE"
-                          ? "text-green-400"
-                          : log.action === "LOGIN"
-                          ? "text-blue-400"
-                          : "text-gray-400"
-                      }`}
-                    >
-                      {log.action}
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-300 font-medium">
-                        {log.details}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-0.5 font-mono">
-                        {new Date(log.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    className="text-gray-600 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() =>
-                      navigator.clipboard.writeText(JSON.stringify(log))
-                    }
+              {displayedLogs.map((log, idx) => {
+                const LogIcon = getLogIcon(log.action);
+                const logColor = getLogColor(log.action);
+                return (
+                  <div
+                    key={log.id}
+                    className="p-4 bg-gray-900/80 hover:bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-xl flex items-start justify-between group transition-all animate-fade-in"
+                    style={{ animationDelay: `${idx * 30}ms` }}
                   >
-                    <Copy size={14} />
-                  </button>
-                </div>
-              ))}
-              {displayedLogs.length === 0 && !isLoading && (
-                <div className="text-center py-10 text-gray-500 text-sm">
-                  {search ? "No logs found matching search." : "No activity logs yet."}
-                </div>
-              )}
+                    <div className="flex items-start gap-4 flex-1">
+                      <div className={`p-2.5 rounded-lg bg-gray-800 ${logColor}`}>
+                        <LogIcon size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${logColor} bg-gray-800`}>
+                            {log.action}
+                          </span>
+                          <span className="text-xs text-gray-600 font-mono">
+                            {new Date(log.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-300 font-medium leading-relaxed">
+                          {log.details}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      className="text-gray-600 hover:text-white hover:bg-gray-800 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                      onClick={() => {
+                        navigator.clipboard.writeText(JSON.stringify(log, null, 2));
+                        alert("Log copied to clipboard");
+                      }}
+                      title="Copy log details"
+                    >
+                      <Copy size={16} />
+                    </button>
+                  </div>
+                );
+              })}
               {displayedLogs.length < filteredLogs.length && (
-                <div className="text-center py-4 text-gray-500 text-xs">
-                  Showing {displayedLogs.length} of {filteredLogs.length} logs
+                <div className="text-center py-4">
+                  <p className="text-gray-500 text-xs mb-2">
+                    Showing {displayedLogs.length} of {filteredLogs.length} logs
+                  </p>
+                  <button
+                    onClick={() => setPage(prev => prev + 1)}
+                    className="text-primary-400 hover:text-primary-300 text-xs font-semibold underline"
+                  >
+                    Load more
+                  </button>
                 </div>
               )}
             </>
           )}
+        </div>
+
+        {/* Footer Stats */}
+        <div className="p-4 border-t border-gray-800 bg-gray-950/50 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-4 text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <Activity size={12} />
+              Total: <span className="font-bold text-gray-400">{logs.length}</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Search size={12} />
+              Filtered: <span className="font-bold text-gray-400">{filteredLogs.length}</span>
+            </span>
+          </div>
+          <span className="text-gray-600 font-mono">
+            Last updated: {logs.length > 0 ? new Date(logs[0].created_at).toLocaleTimeString() : 'N/A'}
+          </span>
         </div>
       </div>
     </ModalLayout>
@@ -1502,7 +1635,7 @@ const Settings: React.FC = () => {
           </div>
 
           <div
-            onClick={() => setActiveModal("categories")}
+            onClick={() => navigate("/settings/categories")}
             className={`p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group ${
               !(userSettings?.group_items_by_category ?? settings.groupItemsByCategory)
                 ? "opacity-50 cursor-not-allowed pointer-events-none"
@@ -1573,7 +1706,7 @@ const Settings: React.FC = () => {
           </div>
 
           <div
-            onClick={() => setActiveModal("logs")}
+            onClick={() => navigate("/settings/audit-logs")}
             className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group"
           >
             <div className="flex items-center gap-3">
