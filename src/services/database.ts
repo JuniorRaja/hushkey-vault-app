@@ -12,6 +12,7 @@ interface UserProfile {
   salt: string;
   public_key?: string;
   private_key_encrypted?: string;
+  recovery_email_encrypted?: string;
   created_at: string;
   updated_at: string;
 }
@@ -339,6 +340,7 @@ class DatabaseService {
       .from("items")
       .select("*")
       .eq("vault_id", vaultId)
+      .eq("is_deleted", false)
       .is("deleted_at", null);
 
     if (error) throw error;
@@ -375,6 +377,7 @@ class DatabaseService {
       .from("items")
       .select("*, vaults!inner(user_id)")
       .eq("vaults.user_id", userId)
+      .eq("is_deleted", false)
       .is("deleted_at", null);
 
     if (error) throw error;
@@ -411,6 +414,7 @@ class DatabaseService {
       .select("*, vaults!inner(user_id)")
       .eq("vaults.user_id", userId)
       .eq("is_favorite", true)
+      .eq("is_deleted", false)
       .is("deleted_at", null)
       .order("last_accessed_at", { ascending: false, nullsFirst: false })
       .limit(limit);
@@ -460,6 +464,7 @@ class DatabaseService {
       .from("items")
       .select("id", { count: "exact", head: true })
       .eq("vault_id", vaultId)
+      .eq("is_deleted", false)
       .is("deleted_at", null);
 
     if (error) throw error;

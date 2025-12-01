@@ -293,6 +293,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         
         // Check and register device
         await get().checkNewDevice();
+        
+        // Load items after successful unlock
+        const { useItemStore } = await import('./itemStore');
+        useItemStore.getState().loadItems();
       },
 
       async unlockWithPin(pin: string) {
@@ -351,6 +355,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           
           // Check and update device
           await get().checkNewDevice();
+          
+          // Load items after successful unlock
+          const { useItemStore } = await import('./itemStore');
+          useItemStore.getState().loadItems();
         } catch (error) {
           // Record failed attempt
           RateLimiterService.recordFailedAttempt(user.id);
@@ -399,6 +407,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         await DatabaseService.logActivity(user.id, "LOGIN", "Vault unlocked via biometrics");
         await IndexedDBService.logActivity(user.id, "LOGIN", "Vault unlocked via biometrics");
         await get().checkNewDevice();
+        
+        // Load items after successful unlock
+        const { useItemStore } = await import('./itemStore');
+        useItemStore.getState().loadItems();
       },
 
 

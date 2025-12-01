@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useAuth, useData } from "../App";
 import { useAuthStore } from "../src/stores/authStore";
 import { useCategoryStore } from "../src/stores/categoryStore";
+import { useVaultStore } from "../src/stores/vaultStore";
+import { useItemStore } from "../src/stores/itemStore";
 import DatabaseService from "../src/services/database";
+import EncryptionService from "../src/services/encryption";
 import { supabase } from "../src/supabaseClient";
 import { LogEntry, AppSettings, Category, AccentColor } from "../types";
 import { storageService } from "../services/storage";
@@ -475,8 +478,12 @@ const BackupModal = ({ onClose }: { onClose: () => void }) => {
 const ProfileModal = ({ onClose }: { onClose: () => void }) => {
   const { user: authUser } = useAuthStore();
   const { items, vaults } = useData();
+  const { items: storeItems } = useItemStore();
+  const { vaults: storeVaults } = useVaultStore();
   const [name, setName] = useState(authUser?.name || authUser?.email || "");
+  const [recoveryEmail, setRecoveryEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -487,6 +494,33 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
   const [showPinModal, setShowPinModal] = useState(false);
   const [showClearDataModal, setShowClearDataModal] = useState(false);
   const [clearDataConfirmText, setClearDataConfirmText] = useState("");
+  const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
+  const [emailError, setEmailError] = useState("");
+
+  useEffect(() => {
+    const loadRecoveryEmail = async () => {
+      if (!authUser) return;
+      try {
+        const profile = await DatabaseService.getUserProfile(authUser.id);
+        if (profile?.recovery_email_encrypted) {
+          const masterKey = useAuthStore.getState().masterKey;
+          if (masterKey) {
+            const decryptedEmail = await EncryptionService.decrypt(profile.recovery_email_encrypted, masterKey);
+            setRecoveryEmail(decryptedEmail);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load recovery email:', err);
+      }
+    };
+    loadRecoveryEmail();
+  }, [authUser]);
+
+  const validateEmail = (email: string): boolean => {
+    if (!email) return true;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleClearData = async () => {
     if (clearDataConfirmText !== "yes, delete") {
@@ -514,6 +548,13 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
 
   const handleSave = async () => {
     if (!authUser) return;
+    
+    if (recoveryEmail && !validateEmail(recoveryEmail)) {
+      setEmailError("Please enter a valid email address");
+      return;
+    }
+    setEmailError("");
+    
     const masterKey = useAuthStore.getState().masterKey;
     if (!masterKey) {
       alert("Master key not available");
@@ -522,9 +563,23 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
     setIsLoading(true);
     try {
       await DatabaseService.updateUserProfileName(authUser.id, name, masterKey);
+      
+      const recoveryEmailEncrypted = recoveryEmail 
+        ? await EncryptionService.encrypt(recoveryEmail, masterKey)
+        : null;
+      
+      const { error } = await supabase.from("user_profiles").update({
+        recovery_email_encrypted: recoveryEmailEncrypted,
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", authUser.id);
+      
+      if (error) throw error;
+      
       useAuthStore.getState().updateUserProfile({ name });
-      alert("Profile updated successfully");
-      onClose();
+      setSaveSuccess(true);
+      setTimeout(() => {
+        onClose();
+      }, 1500);
     } catch (err: any) {
       alert("Error updating profile: " + err.message);
     } finally {
@@ -594,10 +649,10 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
             <p className="text-gray-400 text-sm">{authUser?.email}</p>
             <div className="flex gap-4 mt-2 text-xs font-medium text-gray-500">
               <span className="px-2 py-0.5 bg-gray-800 rounded">
-                {items.length} Items
+                {storeItems.length} Items
               </span>
               <span className="px-2 py-0.5 bg-gray-800 rounded">
-                {vaults.length} Vaults
+                {storeVaults.length} Vaults
               </span>
             </div>
           </div>
@@ -624,6 +679,22 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
               disabled
               className="w-full bg-gray-900 border border-gray-800 rounded-lg p-3 text-gray-500 cursor-not-allowed"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+              Recovery Email
+            </label>
+            <input
+              type="email"
+              value={recoveryEmail}
+              onChange={(e) => {
+                setRecoveryEmail(e.target.value);
+                setEmailError("");
+              }}
+              placeholder="recovery@example.com"
+              className={`w-full bg-gray-950 border rounded-lg p-3 text-white focus:border-primary-500 outline-none transition-colors ${emailError ? 'border-red-500' : 'border-gray-800'}`}
+            />
+            {emailError && <p className="text-red-400 text-xs mt-1">{emailError}</p>}
           </div>
         </div>
 
@@ -735,57 +806,81 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
         )}
 
         <div className="pt-6 border-t border-gray-800">
-          <h5 className="text-red-400 font-bold text-sm mb-3 flex items-center gap-2">
-            <AlertTriangle size={16} /> Danger Zone
-          </h5>
-          <div className="space-y-3">
-            <button
-              onClick={() => setShowClearDataModal(true)}
-              className="w-full py-3 bg-red-900/10 hover:bg-red-900/20 border border-red-900/30 text-red-400 rounded-xl text-sm font-bold transition-colors"
-            >
-              Clear All Data
-            </button>
-            <p className="text-[10px] text-gray-600 text-center">
-              Deletes vaults, items, categories, file attachments, devices, and preferences. Auth and profile preserved.
-            </p>
-            <button
-              onClick={async () => {
-                if (
-                  window.confirm(
-                    "CRITICAL WARNING: This will permanently delete your account and ALL data from the server. This cannot be undone. Are you absolutely sure?"
-                  )
-                ) {
-                  if (window.confirm("Final confirmation: Delete account permanently?")) {
-                    try {
-                      const userId = useAuthStore.getState().user?.id;
-                      if (userId) {
-                        await DatabaseService.deleteUserAccount(userId);
-                        await useAuthStore.getState().signOut();
-                        window.location.href = "/login";
+          <button
+            onClick={() => setIsDangerZoneOpen(!isDangerZoneOpen)}
+            className="w-full flex items-center justify-between text-red-400 font-bold text-sm mb-3 hover:text-red-300 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <AlertTriangle size={16} /> Danger Zone
+            </span>
+            <ChevronDown size={16} className={`transition-transform ${isDangerZoneOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {isDangerZoneOpen && (
+            <div className="space-y-3">
+              <button
+                onClick={() => setShowClearDataModal(true)}
+                className="w-full py-3 bg-red-900/10 hover:bg-red-900/20 border border-red-900/30 text-red-400 rounded-xl text-sm font-bold transition-colors"
+              >
+                Clear All Data
+              </button>
+              <p className="text-[10px] text-gray-600 text-center">
+                Deletes vaults, items, categories, file attachments, devices, and preferences. Auth and profile preserved.
+              </p>
+              <button
+                onClick={async () => {
+                  if (
+                    window.confirm(
+                      "CRITICAL WARNING: This will permanently delete your account and ALL data from the server. This cannot be undone. Are you absolutely sure?"
+                    )
+                  ) {
+                    if (window.confirm("Final confirmation: Delete account permanently?")) {
+                      try {
+                        const userId = useAuthStore.getState().user?.id;
+                        if (userId) {
+                          await DatabaseService.deleteUserAccount(userId);
+                          await useAuthStore.getState().signOut();
+                          window.location.href = "/login";
+                        }
+                      } catch (err: any) {
+                        alert("Error deleting account: " + err.message);
                       }
-                    } catch (err: any) {
-                      alert("Error deleting account: " + err.message);
                     }
                   }
-                }
-              }}
-              className="w-full py-3 bg-red-600 hover:bg-red-700 border border-red-500 text-white rounded-xl text-sm font-bold transition-colors"
-            >
-              Delete Account Permanently
-            </button>
-            <p className="text-[10px] text-gray-600 text-center">
-              Deletes your account and all data from the server. Cannot be recovered.
-            </p>
-          </div>
+                }}
+                className="w-full py-3 bg-red-600 hover:bg-red-700 border border-red-500 text-white rounded-xl text-sm font-bold transition-colors"
+              >
+                Delete Account Permanently
+              </button>
+              <p className="text-[10px] text-gray-600 text-center">
+                Deletes your account and all data from the server. Cannot be recovered.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="pt-2">
           <button
             onClick={handleSave}
-            disabled={isLoading}
-            className="w-full py-3 bg-primary-600 hover:bg-primary-500 text-white rounded-xl font-medium shadow-lg shadow-primary-900/20 transition-all active:scale-95 disabled:opacity-50"
+            disabled={isLoading || saveSuccess}
+            className={`w-full py-3 rounded-xl font-medium shadow-lg transition-all active:scale-95 disabled:opacity-50 ${
+              saveSuccess 
+                ? "bg-green-600 text-white" 
+                : "bg-primary-600 hover:bg-primary-500 text-white shadow-primary-900/20"
+            }`}
           >
-            {isLoading ? "Saving..." : "Save Changes"}
+            {isLoading ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="animate-spin" size={16} />
+                Saving...
+              </span>
+            ) : saveSuccess ? (
+              <span className="flex items-center justify-center gap-2">
+                <Check size={16} />
+                Changes Saved
+              </span>
+            ) : (
+              "Save Changes"
+            )}
           </button>
         </div>
       </div>
@@ -986,6 +1081,8 @@ const Settings: React.FC = () => {
   const { user: authUser, lock, signOut: authSignOut, setUnlockMethod, unlockMethod: authUnlockMethod, autoLockMinutes } = useAuthStore();
   const navigate = useNavigate();
   const { items, vaults, logs, settings, updateSettings, addLog } = useData();
+  const { items: storeItems } = useItemStore();
+  const { vaults: storeVaults } = useVaultStore();
   const [userSettings, setUserSettings] = useState<any>(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
@@ -1193,10 +1290,10 @@ const Settings: React.FC = () => {
             </p>
             <div className="flex gap-4 mt-2 text-xs font-medium text-gray-500">
               <span className="bg-gray-800 px-2 py-0.5 rounded">
-                {items.length} Items
+                {storeItems.length} Items
               </span>
               <span className="bg-gray-800 px-2 py-0.5 rounded">
-                {vaults.length} Vaults
+                {storeVaults.length} Vaults
               </span>
             </div>
           </div>
