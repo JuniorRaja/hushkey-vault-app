@@ -536,7 +536,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   };
 
   // --- Field Components based on Type ---
-  const autoCompleteProps = { autoComplete: 'off', 'data-form-type': 'other', 'data-lpignore': 'true', 'data-1p-ignore': 'true' };
+  const autoCompleteProps = { autoComplete: 'off', 'data-form-type': 'other', 'data-lpignore': 'true', 'data-1p-ignore': 'true', name: `field_${Math.random().toString(36)}` };
+  const passwordAutoCompleteProps = { autoComplete: 'new-password', 'data-form-type': 'other', 'data-lpignore': 'true', 'data-1p-ignore': 'true', name: `pass_${Math.random().toString(36)}` };
 
   const renderFields = () => {
     // Styles change based on mode
@@ -809,6 +810,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                  <div className="space-y-1">
                     <label className={labelClass}>Title</label>
                     <input 
+                        {...autoCompleteProps}
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.cardTitle || ''}
@@ -819,6 +821,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                 <div className="space-y-1">
                     <label className={labelClass}>ID Name</label>
                     <input 
+                        {...autoCompleteProps}
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.idName || ''}
@@ -829,6 +832,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                  <div className="space-y-1">
                     <label className={labelClass}>Full Name</label>
                     <input 
+                        {...autoCompleteProps}
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.fullName || ''}
@@ -840,6 +844,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     <label className={labelClass}>Valid Till</label>
                     <input 
                         type={isEditing ? "date" : "text"}
+                        {...autoCompleteProps}
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.validTill || ''}
@@ -850,6 +855,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                 <div className="space-y-1">
                     <label className={labelClass}>Father/Husband Name</label>
                     <input 
+                        {...autoCompleteProps}
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.relationName || ''}
@@ -878,6 +884,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                  <div className="space-y-1">
                     <label className={labelClass}>File Name</label>
                     <input 
+                        {...autoCompleteProps}
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.fileName || ''}
@@ -957,6 +964,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                 <div className="space-y-1">
                     <label className={labelClass}>Bank Name</label>
                     <input 
+                        {...autoCompleteProps}
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.bankName || ''}
@@ -968,6 +976,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     <label className={labelClass}>Bank Website (for logo)</label>
                     <div className="relative flex items-center">
                         <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={inputBaseClass}
                             value={formData.data?.website || ''}
@@ -985,6 +994,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                      <div className="space-y-1">
                         <label className={labelClass}>Branch</label>
                         <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={inputBaseClass}
                             value={formData.data?.branch || ''}
@@ -1019,6 +1029,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     <label className={labelClass}>Account Number</label>
                     <div className="flex items-center">
                          <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={`${inputBaseClass} font-mono`}
                             value={formData.data?.accountNumber || ''}
@@ -1037,6 +1048,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         <label className={labelClass}>IFSC / IBAN</label>
                         <div className="flex items-center">
                              <input 
+                                {...autoCompleteProps}
                                 readOnly={!isEditing}
                                 className={inputBaseClass}
                                 value={formData.data?.ifsc || ''}
@@ -1053,6 +1065,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         <label className={labelClass}>SWIFT / BIC</label>
                         <div className="flex items-center">
                              <input 
+                                {...autoCompleteProps}
                                 readOnly={!isEditing}
                                 className={inputBaseClass}
                                 value={formData.data?.swift || ''}
@@ -1069,6 +1082,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                  <div className="space-y-1">
                     <label className={labelClass}>Account Holder</label>
                     <input 
+                        {...autoCompleteProps}
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.holderName || ''}
@@ -1108,6 +1122,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         <label className={labelClass}>Host</label>
                         <div className="flex items-center">
                             <input 
+                                {...autoCompleteProps}
                                 readOnly={!isEditing}
                                 className={`${inputBaseClass} font-mono`}
                                 value={formData.data?.host || ''}
@@ -1124,6 +1139,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                      <div className="space-y-1">
                         <label className={labelClass}>Port</label>
                         <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={`${inputBaseClass} font-mono`}
                             value={formData.data?.port || ''}
@@ -1136,6 +1152,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                  <div className="space-y-1">
                     <label className={labelClass}>Database Name</label>
                     <input 
+                        {...autoCompleteProps}
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.databaseName || ''}
@@ -1148,6 +1165,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     <label className={labelClass}>Username</label>
                     <div className="flex items-center">
                          <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={inputBaseClass}
                             value={formData.data?.username || ''}
@@ -1167,6 +1185,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     <div className="relative flex items-center">
                          <input 
                             type={showPassword || isEditing ? "text" : "password"} 
+                            {...passwordAutoCompleteProps}
                             readOnly={!isEditing}
                             className={`${inputBaseClass} font-mono`}
                             value={formData.data?.password || ''}
@@ -1195,6 +1214,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         <label className={labelClass}>IP Address</label>
                         <div className="flex items-center">
                              <input 
+                                {...autoCompleteProps}
                                 readOnly={!isEditing}
                                 className={`${inputBaseClass} font-mono`}
                                 value={formData.data?.ip || ''}
@@ -1211,6 +1231,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                      <div className="space-y-1">
                         <label className={labelClass}>OS / Distro</label>
                         <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={inputBaseClass}
                             value={formData.data?.os || ''}
@@ -1224,6 +1245,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     <label className={labelClass}>Hostname</label>
                     <div className="flex items-center">
                          <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={inputBaseClass}
                             value={formData.data?.hostname || ''}
@@ -1241,6 +1263,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                  <div className="space-y-1">
                     <label className={labelClass}>Hosting Provider</label>
                     <input 
+                        {...autoCompleteProps}
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.hostingProvider || ''}
@@ -1254,6 +1277,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         <label className={labelClass}>Username</label>
                         <div className="flex items-center">
                              <input 
+                                {...autoCompleteProps}
                                 readOnly={!isEditing}
                                 className={inputBaseClass}
                                 value={formData.data?.username || ''}
@@ -1272,6 +1296,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                          <div className="relative flex items-center">
                             <input 
                                 type={showPassword || isEditing ? "text" : "password"} 
+                                {...passwordAutoCompleteProps}
                                 readOnly={!isEditing}
                                 className={`${inputBaseClass} font-mono`}
                                 value={formData.data?.password || ''}
@@ -1300,6 +1325,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     <label className={labelClass}>Host</label>
                     <div className="flex items-center">
                          <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={`${inputBaseClass} font-mono`}
                             value={formData.data?.host || ''}
@@ -1317,6 +1343,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     <label className={labelClass}>Username</label>
                     <div className="flex items-center">
                          <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={inputBaseClass}
                             value={formData.data?.username || ''}
@@ -1335,6 +1362,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     <div className="relative flex items-center">
                         <input 
                             type={showPassword || isEditing ? "text" : "password"} 
+                            {...passwordAutoCompleteProps}
                             readOnly={!isEditing}
                             className={`${inputBaseClass} font-mono`}
                             value={formData.data?.passphrase || ''}
@@ -1384,6 +1412,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     <label className={labelClass}>SSID (Network Name)</label>
                     <div className="flex items-center">
                          <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={inputBaseClass}
                             value={formData.data?.ssid || ''}
@@ -1402,6 +1431,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                      <div className="relative flex items-center">
                         <input 
                             type={showPassword || isEditing ? "text" : "password"} 
+                            {...passwordAutoCompleteProps}
                             readOnly={!isEditing}
                             className={`${inputBaseClass} font-mono`}
                             value={formData.data?.password || ''}
@@ -1456,6 +1486,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     <label className={labelClass}>License Number</label>
                     <div className="flex items-center">
                          <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={`${inputBaseClass} font-mono`}
                             value={formData.data?.licenseNumber || ''}
@@ -1472,6 +1503,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                      <div className="space-y-1">
                         <label className={labelClass}>State / Country</label>
                         <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={inputBaseClass}
                             value={formData.data?.state || ''}
@@ -1483,6 +1515,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         <label className={labelClass}>Expiry Date</label>
                         <input 
                             type={isEditing ? "date" : "text"}
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={inputBaseClass}
                             value={formData.data?.expiryDate || ''}
@@ -1498,6 +1531,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                 <div className="space-y-1">
                     <label className={labelClass}>Cardholder Name</label>
                      <input 
+                        {...autoCompleteProps}
                         readOnly={!isEditing}
                         className={`${inputBaseClass} uppercase`}
                         value={formData.data?.holderName || ''}
@@ -1509,6 +1543,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     <label className={labelClass}>Card Number</label>
                     <div className="flex items-center">
                          <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={`${inputBaseClass} font-mono text-lg tracking-widest`}
                             value={formData.data?.number || ''}
@@ -1526,6 +1561,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                      <div className="space-y-1">
                         <label className={labelClass}>Expiry</label>
                         <input 
+                            {...autoCompleteProps}
                             readOnly={!isEditing}
                             className={`${inputBaseClass} font-mono`}
                             value={formData.data?.expiry || ''}
@@ -1538,6 +1574,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                          <div className="relative flex items-center">
                             <input 
                                 type={showPassword || isEditing ? "text" : "password"}
+                                {...passwordAutoCompleteProps}
                                 readOnly={!isEditing}
                                 className={`${inputBaseClass} font-mono`}
                                 value={formData.data?.cvv || ''}
@@ -1556,6 +1593,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                          <div className="relative flex items-center">
                             <input 
                                 type={showPin || isEditing ? "text" : "password"}
+                                {...passwordAutoCompleteProps}
                                 readOnly={!isEditing}
                                 className={`${inputBaseClass} font-mono`}
                                 value={formData.data?.pin || ''}
@@ -1619,25 +1657,25 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         <div className="grid grid-cols-3 gap-4">
                              <div className="col-span-1 space-y-1">
                                 <label className={labelClass}>Title</label>
-                                <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.title || ''} onChange={(e) => updateDataField('title', e.target.value)} placeholder="Mr/Ms" />
+                                <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.title || ''} onChange={(e) => updateDataField('title', e.target.value)} placeholder="Mr/Ms" />
                              </div>
                              <div className="col-span-1 space-y-1">
                                 <label className={labelClass}>First Name</label>
-                                <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.firstName || ''} onChange={(e) => updateDataField('firstName', e.target.value)} />
+                                <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.firstName || ''} onChange={(e) => updateDataField('firstName', e.target.value)} />
                              </div>
                               <div className="col-span-1 space-y-1">
                                 <label className={labelClass}>Last Name</label>
-                                <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.lastName || ''} onChange={(e) => updateDataField('lastName', e.target.value)} />
+                                <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.lastName || ''} onChange={(e) => updateDataField('lastName', e.target.value)} />
                              </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <label className={labelClass}>Date of Birth</label>
-                                <input type={isEditing ? "date" : "text"} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.dob || ''} onChange={(e) => updateDataField('dob', e.target.value)} />
+                                <input type={isEditing ? "date" : "text"} {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.dob || ''} onChange={(e) => updateDataField('dob', e.target.value)} />
                             </div>
                              <div className="space-y-1">
                                 <label className={labelClass}>Gender</label>
-                                <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.gender || ''} onChange={(e) => updateDataField('gender', e.target.value)} />
+                                <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.gender || ''} onChange={(e) => updateDataField('gender', e.target.value)} />
                             </div>
                         </div>
                   </FormSection>
@@ -1645,30 +1683,30 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                   <FormSection title="Address" isOpen={identitySections.address} onToggle={() => toggleIdentitySection('address')}>
                         <div className="space-y-1">
                             <label className={labelClass}>Address Line 1</label>
-                            <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.address1 || ''} onChange={(e) => updateDataField('address1', e.target.value)} />
+                            <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.address1 || ''} onChange={(e) => updateDataField('address1', e.target.value)} />
                         </div>
                          <div className="space-y-1">
                             <label className={labelClass}>Address Line 2</label>
-                            <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.address2 || ''} onChange={(e) => updateDataField('address2', e.target.value)} />
+                            <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.address2 || ''} onChange={(e) => updateDataField('address2', e.target.value)} />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div className="space-y-1">
                                 <label className={labelClass}>City</label>
-                                <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.city || ''} onChange={(e) => updateDataField('city', e.target.value)} />
+                                <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.city || ''} onChange={(e) => updateDataField('city', e.target.value)} />
                             </div>
                             <div className="space-y-1">
                                 <label className={labelClass}>State</label>
-                                <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.state || ''} onChange={(e) => updateDataField('state', e.target.value)} />
+                                <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.state || ''} onChange={(e) => updateDataField('state', e.target.value)} />
                             </div>
                         </div>
                          <div className="grid grid-cols-2 gap-4">
                              <div className="space-y-1">
                                 <label className={labelClass}>Postal Code</label>
-                                <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.postalCode || ''} onChange={(e) => updateDataField('postalCode', e.target.value)} />
+                                <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.postalCode || ''} onChange={(e) => updateDataField('postalCode', e.target.value)} />
                             </div>
                             <div className="space-y-1">
                                 <label className={labelClass}>Country</label>
-                                <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.country || ''} onChange={(e) => updateDataField('country', e.target.value)} />
+                                <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.country || ''} onChange={(e) => updateDataField('country', e.target.value)} />
                             </div>
                         </div>
                   </FormSection>
@@ -1676,22 +1714,22 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                   <FormSection title="Contact" isOpen={identitySections.contact} onToggle={() => toggleIdentitySection('contact')}>
                         <div className="space-y-1">
                             <label className={labelClass}>Email</label>
-                            <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.email || ''} onChange={(e) => updateDataField('email', e.target.value)} />
+                            <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.email || ''} onChange={(e) => updateDataField('email', e.target.value)} />
                         </div>
                         <div className="space-y-1">
                             <label className={labelClass}>Phone</label>
-                            <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.phone || ''} onChange={(e) => updateDataField('phone', e.target.value)} />
+                            <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.phone || ''} onChange={(e) => updateDataField('phone', e.target.value)} />
                         </div>
                   </FormSection>
 
                   <FormSection title="IDs" isOpen={identitySections.additional} onToggle={() => toggleIdentitySection('additional')}>
                        <div className="space-y-1">
                             <label className={labelClass}>Passport Number</label>
-                            <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.passportNumber || ''} onChange={(e) => updateDataField('passportNumber', e.target.value)} />
+                            <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.passportNumber || ''} onChange={(e) => updateDataField('passportNumber', e.target.value)} />
                         </div>
                         <div className="space-y-1">
                             <label className={labelClass}>Driver License</label>
-                            <input readOnly={!isEditing} className={inputBaseClass} value={formData.data?.licenseNumber || ''} onChange={(e) => updateDataField('licenseNumber', e.target.value)} />
+                            <input {...autoCompleteProps} readOnly={!isEditing} className={inputBaseClass} value={formData.data?.licenseNumber || ''} onChange={(e) => updateDataField('licenseNumber', e.target.value)} />
                         </div>
                   </FormSection>
               </div>
@@ -1894,9 +1932,13 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                        )}
 
                        {/* Dynamic Fields */}
-                       <div className="space-y-6">
-                           {renderFields()}
-                       </div>
+                       <form autoComplete="off" onSubmit={(e) => e.preventDefault()}>
+                           <input type="text" name="fakeusername" autoComplete="off" style={{position: 'absolute', left: '-9999px'}} tabIndex={-1} />
+                           <input type="password" name="fakepassword" autoComplete="new-password" style={{position: 'absolute', left: '-9999px'}} tabIndex={-1} />
+                           <div className="space-y-6">
+                               {renderFields()}
+                           </div>
+                       </form>
 
                        {/* Notes Section (Common) */}
                        {formData.type !== ItemType.NOTE && (
