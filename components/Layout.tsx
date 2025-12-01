@@ -446,6 +446,12 @@ const AppLayout: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+  
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isLocking, setIsLocking] = useState(false);
+  const startY = useRef(0);
+  const lockThreshold = 120;
 
   const hideHeader = ["/guardian", "/trash", "/settings"].some((path) =>
     location.pathname.startsWith(path)
@@ -519,21 +525,155 @@ const AppLayout: React.FC = () => {
         </div>
       </main>
 
-      {/* Mobile Lock Pull Tab Indicator */}
-      <div className="md:hidden fixed bottom-[60px] left-0 right-0 z-20 flex justify-center pb-1 pointer-events-none">
-        <button
-          onClick={() => {
-            lock();
-            navigate("/login");
+      {/* Mobile Lock Pull Tab */}
+      <div className="md:hidden fixed bottom-[70px] left-0 right-0 z-20 flex justify-center pointer-events-none">
+        <div 
+          className="pointer-events-auto relative"
+          style={{
+            transform: `translateY(-${pullDistance}px)`,
+            transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
-          className="pointer-events-auto bg-gray-900/90 backdrop-blur border border-gray-800 border-b-0 rounded-t-xl px-8 py-1.5 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)] flex flex-col items-center gap-1 group active:translate-y-1 transition-transform"
         >
-          <div className="w-8 h-1 bg-gray-700 rounded-full mb-0.5 group-hover:bg-primary-500 transition-colors" />
-          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400 group-hover:text-amber-400">
-            <Lock size={10} />
-            <span>Lock</span>
+          {/* Lock tab */}
+          <div
+            onTouchStart={(e) => {
+              e.preventDefault();
+              startY.current = e.touches[0].clientY;
+              setIsDragging(true);
+            }}
+            onTouchMove={(e) => {
+              e.preventDefault();
+              if (!isDragging) return;
+              const currentY = e.touches[0].clientY;
+              const distance = Math.max(0, startY.current - currentY);
+              setPullDistance(Math.min(distance, lockThreshold + 50));
+            }}
+            onTouchEnd={() => {
+              setIsDragging(false);
+              if (pullDistance >= lockThreshold) {
+                setIsLocking(true);
+                setTimeout(() => {
+                  lock();
+                  navigate("/login");
+                }, 800);
+              } else {
+                setPullDistance(0);
+              }
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              startY.current = e.clientY;
+              setIsDragging(true);
+            }}
+            onMouseMove={(e) => {
+              e.preventDefault();
+              if (!isDragging) return;
+              const distance = Math.max(0, startY.current - e.clientY);
+              setPullDistance(Math.min(distance, lockThreshold + 50));
+            }}
+            onMouseUp={() => {
+              setIsDragging(false);
+              if (pullDistance >= lockThreshold) {
+                setIsLocking(true);
+                setTimeout(() => {
+                  lock();
+                  navigate("/login");
+                }, 800);
+              } else {
+                setPullDistance(0);
+              }
+            }}
+            onMouseLeave={() => {
+              if (isDragging) {
+                setIsDragging(false);
+                setPullDistance(0);
+              }
+            }}
+            className="bg-gray-900/90 backdrop-blur border border-gray-800 border-b-0 rounded-t-xl px-8 py-1.5 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.3)] flex flex-col items-center gap-1 cursor-grab active:cursor-grabbing select-none relative overflow-hidden z-10"
+          >
+            {isLocking && (
+              <div className="absolute inset-0 bg-gradient-to-t from-amber-500/20 to-amber-600/20 animate-pulse" />
+            )}
+            
+            {pullDistance > 0 && (
+              <div 
+                className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-primary-500 via-amber-500 to-amber-600 transition-opacity"
+                style={{
+                  opacity: Math.min(pullDistance / lockThreshold, 1),
+                  boxShadow: pullDistance >= lockThreshold ? '0 0 20px rgba(251, 191, 36, 0.8)' : 'none',
+                }}
+              />
+            )}
+            
+            <div 
+              className="w-8 h-1 rounded-full mb-0.5 transition-all duration-200"
+              style={{
+                backgroundColor: isLocking 
+                  ? '#f59e0b' 
+                  : pullDistance >= lockThreshold 
+                    ? '#10b981' 
+                    : pullDistance > 0 
+                      ? `rgb(${Math.min(255, 100 + pullDistance * 1.5)}, ${Math.max(100, 200 - pullDistance)}, 100)` 
+                      : '#374151',
+                boxShadow: pullDistance >= lockThreshold ? '0 0 10px rgba(16, 185, 129, 0.8)' : 'none',
+                transform: `scaleX(${1 + pullDistance / 100})`,
+              }}
+            />
+            
+            <div 
+              className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest transition-all duration-200 relative z-10"
+              style={{
+                color: isLocking 
+                  ? '#f59e0b' 
+                  : pullDistance >= lockThreshold 
+                    ? '#10b981' 
+                    : pullDistance > 0 
+                      ? '#fbbf24' 
+                      : '#9ca3af',
+                transform: `scale(${1 + pullDistance / 200})`,
+              }}
+            >
+              <Lock size={10} />
+              <span>
+                {pullDistance >= lockThreshold ? 'Release!' : 'Lock'}
+              </span>
+            </div>
           </div>
-        </button>
+          
+          {/* Hidden expandable section */}
+          <div 
+            className="bg-gray-900/95 backdrop-blur border border-gray-800 border-t-0 rounded-b-xl shadow-[0_8px_16px_-4px_rgba(0,0,0,0.4)] overflow-hidden"
+            style={{
+              height: `${Math.max(0, pullDistance)}px`,
+              opacity: pullDistance > 10 ? 1 : 0,
+              transition: isDragging ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          >
+            <div className="px-8 py-4 flex flex-col items-center justify-start h-full relative">
+              {pullDistance > 20 && (
+                <div className="flex flex-col items-center space-y-1 mb-2">
+                  <div className="text-xs text-gray-500 animate-bounce" style={{ animationDelay: '0.1s' }}>⌃</div>
+                  <div className="text-xs text-gray-500 animate-bounce">⌃</div>
+                </div>
+              )}
+              {pullDistance > 40 && (
+                <div className="text-center space-y-2 animate-fade-in">
+                  <Lock 
+                    size={24} 
+                    className={isLocking ? 'animate-bounce text-amber-400' : 'text-gray-400'}
+                    style={{
+                      transform: isLocking ? 'rotate(0deg)' : `rotate(${pullDistance * 2}deg)`,
+                      transition: 'transform 0.2s',
+                    }}
+                  />
+                  <div className="text-xs text-gray-400">
+                    {isLocking ? 'Locking...' : pullDistance >= lockThreshold ? 'Ready to lock' : 'Keep pulling...'}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Mobile Bottom Nav */}
