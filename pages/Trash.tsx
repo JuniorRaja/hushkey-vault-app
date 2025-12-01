@@ -4,6 +4,7 @@ import { useTrashStore } from '../src/stores/trashStore';
 import { useAuthStore } from '../src/stores/authStore';
 import DatabaseService from '../src/services/database';
 import ConfirmationModal from '../components/ConfirmationModal';
+import TrashSkeleton from '../components/TrashSkeleton';
 
 const Trash: React.FC = () => {
   const { deletedItems, deletedVaults, loadTrash, restoreItem, restoreVault, permanentDeleteItem, permanentDeleteVault, emptyTrash, isLoading } = useTrashStore();
@@ -79,13 +80,7 @@ const Trash: React.FC = () => {
     setDeleteTarget({ id, type });
   };
 
-  if (isLoading) {
-    return (
-      <div className="max-w-4xl mx-auto flex items-center justify-center py-20">
-        <div className="text-gray-400">Loading trash...</div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -157,7 +152,9 @@ const Trash: React.FC = () => {
       </div>
 
       <div className="bg-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden min-h-[300px]">
-        {activeTab === 'items' ? (
+        {isLoading ? (
+          <TrashSkeleton />
+        ) : activeTab === 'items' ? (
           deletedItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-gray-500">
               <Trash2 size={48} className="mb-4 opacity-50" />
