@@ -143,7 +143,7 @@ const Items: React.FC = () => {
   const [copyTimer, setCopyTimer] = useState<number>(0);
 
   const filteredItems = useMemo(() => {
-    let res = items;
+    let res = items.filter(i => !i.deletedAt); // Ensure no deleted items
     if (vaultFilter) {
       res = res.filter(i => i.vaultId === vaultFilter);
     }

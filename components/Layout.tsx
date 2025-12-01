@@ -17,9 +17,11 @@ import {
 } from "lucide-react";
 import { useAuth, useData } from "../App";
 import { useAuthStore } from "../src/stores/authStore";
+import { useItemStore } from "../src/stores/itemStore";
 import { useAutoLock } from "../src/hooks/useAutoLock";
 import { NotificationType } from "../types";
 import SyncStatus from "./SyncStatus";
+import SearchOverlay from "./SearchOverlay";
 
 const HushkeyLogo = ({ size = 24 }: { size?: number }) => (
   <div
@@ -266,11 +268,10 @@ const Sidebar = memo(({ collapsed, setCollapsed }: { collapsed: boolean; setColl
 
 // Header Component
 const Header = memo(({
-  searchQuery,
-  setSearchQuery,
   searchOpen,
   setSearchOpen,
   items,
+  vaults,
   notifications,
   unreadNotificationCount,
   markNotificationsRead,
@@ -307,41 +308,20 @@ const Header = memo(({
 
       {/* Global Search Bar */}
       <div className="flex-1 max-w-xl mx-4 relative hidden md:block">
-        <Search
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
-          size={18}
-        />
-        <input
-          type="text"
-          placeholder="Search your vault..."
-          className="w-full bg-gray-900 border border-gray-800 rounded-full py-2 pl-10 pr-4 text-sm text-gray-200 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all placeholder-gray-600 z-10"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        {searchQuery && (
-          <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl p-2 max-h-60 overflow-y-auto z-50">
-            {items
-              .filter((i) =>
-                i.name.toLowerCase().includes(searchQuery.toLowerCase())
-              )
-              .map((i) => (
-                <NavLink
-                  to={`/items/${i.id}`}
-                  key={i.id}
-                  className="block p-2 hover:bg-gray-800 rounded-lg"
-                  onClick={() => setSearchQuery("")}
-                >
-                  <div className="font-medium text-gray-200">{i.name}</div>
-                  <div className="text-xs text-gray-500">{i.type}</div>
-                </NavLink>
-              ))}
-            {items.filter((i) =>
-              i.name.toLowerCase().includes(searchQuery.toLowerCase())
-            ).length === 0 && (
-              <div className="p-2 text-gray-500 text-sm">No results found</div>
-            )}
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="w-full bg-gray-900 border border-gray-800 rounded-full py-2 pl-10 pr-4 text-sm text-gray-500 hover:text-gray-300 hover:border-gray-700 transition-all text-left flex items-center gap-3"
+        >
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
+            size={18}
+          />
+          <span>Search your vault...</span>
+          <div className="ml-auto flex items-center gap-1 text-xs">
+            <kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] font-mono">⌘</kbd>
+            <kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-[10px] font-mono">K</kbd>
           </div>
-        )}
+        </button>
       </div>
 
       <div className="flex items-center gap-2">
@@ -434,9 +414,9 @@ const Header = memo(({
         {/* Mobile Search Toggle */}
         <button
           className="md:hidden p-2 text-gray-400 hover:text-white transition-colors"
-          onClick={() => setSearchOpen(!searchOpen)}
+          onClick={() => setSearchOpen(true)}
         >
-          {searchOpen ? <X size={24} /> : <Search size={24} />}
+          <Search size={24} />
         </button>
       </div>
     </header>
@@ -447,16 +427,21 @@ const AppLayout: React.FC = () => {
   const { lock, signOut } = useAuthStore();
   const navigate = useNavigate();
   const {
-    items,
+    items: dataItems,
+    vaults: dataVaults,
     notifications,
     unreadNotificationCount,
     markNotificationsRead,
     clearNotifications,
   } = useData();
+  const { items: storeItems, vaults: storeVaults } = useItemStore();
+  
+  // Use store data if available, fallback to context data
+  const items = storeItems.length > 0 ? storeItems : dataItems;
+  const vaults = storeVaults.length > 0 ? storeVaults : dataVaults;
   
   useAutoLock();
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -468,8 +453,20 @@ const AppLayout: React.FC = () => {
 
   useEffect(() => {
     setSearchOpen(false);
-    setSearchQuery("");
   }, [location.pathname]);
+
+  // Global keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -496,11 +493,10 @@ const AppLayout: React.FC = () => {
         }`}
       >
         {!hideHeader && <Header 
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
           searchOpen={searchOpen}
           setSearchOpen={setSearchOpen}
           items={items}
+          vaults={vaults}
           notifications={notifications}
           unreadNotificationCount={unreadNotificationCount}
           markNotificationsRead={markNotificationsRead}
@@ -510,44 +506,13 @@ const AppLayout: React.FC = () => {
           notifRef={notifRef}
         />}
 
-        {/* Mobile Search Overlay */}
-        {searchOpen && !hideHeader && (
-          <div className="md:hidden px-4 pb-4 bg-gray-950 border-b border-gray-850">
-            <input
-              type="text"
-              placeholder="Search..."
-              autoFocus
-              className="w-full bg-gray-900 border border-gray-800 rounded-lg py-2 px-4 text-sm text-gray-200 focus:outline-none focus:border-primary-500"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <div className="mt-2 space-y-1">
-                {items
-                  .filter((i) =>
-                    i.name.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .slice(0, 5)
-                  .map((i) => (
-                    <NavLink
-                      to={`/items/${i.id}`}
-                      key={i.id}
-                      className="flex items-center justify-between p-3 bg-gray-900 rounded-lg"
-                      onClick={() => {
-                        setSearchOpen(false);
-                        setSearchQuery("");
-                      }}
-                    >
-                      <span className="font-medium">{i.name}</span>
-                      <span className="text-xs text-gray-500 px-2 py-1 bg-gray-800 rounded">
-                        {i.type}
-                      </span>
-                    </NavLink>
-                  ))}
-              </div>
-            )}
-          </div>
-        )}
+        {/* Search Overlay */}
+        <SearchOverlay
+          isOpen={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          items={items}
+          vaults={vaults}
+        />
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <Outlet />

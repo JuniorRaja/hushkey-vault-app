@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Vault as VaultIcon, MoreVertical, Edit2, Trash2, Share2, Star, Globe, CreditCard, StickyNote, Wifi, User, Landmark, RectangleHorizontal, Database, Server, Terminal, IdCard, FileText, Folder, Briefcase, Shield } from 'lucide-react';
 import { useVaultStore } from '../src/stores/vaultStore';
@@ -52,7 +52,7 @@ const Vaults: React.FC = () => {
     loadFavoriteItems();
   }, []);
 
-  const activeVaults = vaults.filter(v => !v.deletedAt);
+  const activeVaults = useMemo(() => vaults.filter(v => !v.deletedAt), [vaults]);
 
   const handleCreateVault = () => {
     setEditingVault(null);
