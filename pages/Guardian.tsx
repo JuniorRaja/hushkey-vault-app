@@ -405,7 +405,7 @@ const KpiDetailView = ({ id, data, onBack, items }: { id: KpiId, data: any, onBa
                                         <div>
                                             <h4 className="font-bold text-white">{item.name}</h4>
                                             <p className="text-xs text-gray-400">
-                                                {id === 'stale_passwords' && item.monthsOld ? `${item.monthsOld} months old` : item.data.username || 'No username'}
+                                                {id === 'stale_passwords' && item.monthsOld ? `${item.monthsOld} months old` : item.data?.username || 'No username'}
                                             </p>
                                         </div>
                                     </div>

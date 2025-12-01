@@ -666,7 +666,7 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={authUser?.email}
+              placeholder={authUser?.name || authUser?.email}
               className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-white focus:border-primary-500 outline-none transition-colors"
             />
           </div>
@@ -1432,30 +1432,6 @@ const Settings: React.FC = () => {
           <Smartphone size={14} /> Application
         </h3>
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden divide-y divide-gray-800">
-          {/* Backup & Import Trigger - Moved to Top */}
-          <div
-            onClick={() => setActiveModal("backup")}
-            className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
-                <HardDrive size={18} />
-              </div>
-              <div>
-                <span className="text-gray-200 font-medium block">
-                  Backup & Import
-                </span>
-                <span className="text-[10px] text-gray-500">
-                  Last backup: Never
-                </span>
-              </div>
-            </div>
-            <ChevronRight
-              size={18}
-              className="text-gray-600 group-hover:text-white"
-            />
-          </div>
-
           <div className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
@@ -1484,6 +1460,25 @@ const Settings: React.FC = () => {
             </div>
           </div>
 
+          <div
+            onClick={() => navigate("/settings/notifications")}
+            className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
+                <Bell size={18} />
+              </div>
+              <div>
+                <span className="text-gray-200 font-medium block">Notifications</span>
+                <span className="text-[10px] text-gray-500">Configure alert preferences</span>
+              </div>
+            </div>
+            <ChevronRight
+              size={18}
+              className="text-gray-600 group-hover:text-white"
+            />
+          </div>
+
           <div className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
@@ -1508,7 +1503,11 @@ const Settings: React.FC = () => {
 
           <div
             onClick={() => setActiveModal("categories")}
-            className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group"
+            className={`p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group ${
+              !(userSettings?.group_items_by_category ?? settings.groupItemsByCategory)
+                ? "opacity-50 cursor-not-allowed pointer-events-none"
+                : ""
+            }`}
           >
             <div className="flex items-center gap-3">
               <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
@@ -1517,73 +1516,6 @@ const Settings: React.FC = () => {
               <span className="text-gray-200 font-medium">
                 Manage Categories
               </span>
-            </div>
-            <ChevronRight
-              size={18}
-              className="text-gray-600 group-hover:text-white"
-            />
-          </div>
-
-          <div
-            onClick={() => setActiveModal("logs")}
-            className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
-                <Activity size={18} />
-              </div>
-              <span className="text-gray-200 font-medium">Audit Logs</span>
-            </div>
-            <ChevronRight
-              size={18}
-              className="text-gray-600 group-hover:text-white"
-            />
-          </div>
-
-          <div className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
-                <Smartphone size={18} />
-              </div>
-              <div>
-                <span className="text-gray-200 font-medium block">Push Notifications</span>
-                <span className="text-[10px] text-gray-500">Browser/Device alerts</span>
-              </div>
-            </div>
-            <ToggleSwitch
-              checked={settings.notifications.pushNotifications}
-              onChange={(val) => handleNotificationChange("pushNotifications", val)}
-            />
-          </div>
-
-          <div className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
-                <Bell size={18} />
-              </div>
-              <div>
-                <span className="text-gray-200 font-medium block">Email Notifications</span>
-                <span className="text-[10px] text-gray-500">Send to <span className="hidden md:inline">{authUser?.email}</span><span className="md:hidden">{truncateText(authUser?.email || '', 12)}</span></span>
-              </div>
-            </div>
-            <ToggleSwitch
-              checked={settings.notifications.emailNotifications}
-              onChange={(val) => handleNotificationChange("emailNotifications", val)}
-            />
-          </div>
-
-          <div
-            onClick={() => setShowNotificationDrawer(true)}
-            className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
-                <Bell size={18} />
-              </div>
-              <div>
-                <span className="text-gray-200 font-medium block">More Notification Settings</span>
-                <span className="text-[10px] text-gray-500">Configure alert preferences</span>
-              </div>
             </div>
             <ChevronRight
               size={18}
@@ -1615,6 +1547,45 @@ const Settings: React.FC = () => {
             >
               {isSyncing ? "Syncing..." : "Force Sync"}
             </button>
+          </div>
+
+          <div
+            onClick={() => setActiveModal("backup")}
+            className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
+                <HardDrive size={18} />
+              </div>
+              <div>
+                <span className="text-gray-200 font-medium block">
+                  Backup & Import
+                </span>
+                <span className="text-[10px] text-gray-500">
+                  Last backup: Never
+                </span>
+              </div>
+            </div>
+            <ChevronRight
+              size={18}
+              className="text-gray-600 group-hover:text-white"
+            />
+          </div>
+
+          <div
+            onClick={() => setActiveModal("logs")}
+            className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gray-800 rounded-lg text-gray-400">
+                <Activity size={18} />
+              </div>
+              <span className="text-gray-200 font-medium">Audit Logs</span>
+            </div>
+            <ChevronRight
+              size={18}
+              className="text-gray-600 group-hover:text-white"
+            />
           </div>
 
           <div className="p-4 flex items-center gap-4">
@@ -1664,56 +1635,7 @@ const Settings: React.FC = () => {
         <span>© 2024 Hushkey Security Inc.</span>
       </div>
 
-      {/* Notification Settings Drawer */}
-      {showNotificationDrawer && (
-        <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setShowNotificationDrawer(false)}>
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-          <div
-            className="relative w-full max-w-md bg-gray-900 border-l border-gray-800 shadow-2xl overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-5 border-b border-gray-800 flex items-center justify-between bg-gray-950/50">
-              <div className="flex items-center gap-2">
-                <Bell size={20} className="text-primary-500" />
-                <h3 className="text-lg font-bold text-white">Notification Settings</h3>
-              </div>
-              <button
-                onClick={() => setShowNotificationDrawer(false)}
-                className="text-gray-500 hover:text-white transition-colors p-1 bg-gray-800/50 rounded-lg"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
-              <div className="p-5 space-y-1">
-                {NOTIFICATION_CONFIGS.map((item) => (
-                  <div
-                    key={item.key}
-                    className="p-4 flex items-center justify-between hover:bg-gray-800/50 rounded-xl transition-colors"
-                  >
-                    <div className="flex-1 pr-4">
-                      <span className="text-gray-200 font-medium text-sm block mb-1">{item.label}</span>
-                      <span className="text-[11px] text-gray-500 leading-relaxed">{item.desc}</span>
-                    </div>
-                    <ToggleSwitch
-                      checked={(settings.notifications as any)[item.key]}
-                      onChange={(val) => handleNotificationChange(item.key as any, val)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="p-4 border-t border-gray-800 bg-gray-950/50">
-              <button
-                onClick={() => setShowNotificationDrawer(false)}
-                className="w-full py-3 bg-primary-600 hover:bg-primary-500 text-white rounded-xl font-medium transition-colors"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };

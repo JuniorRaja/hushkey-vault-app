@@ -35,6 +35,7 @@ import Items from "./pages/Items";
 import Vaults from "./pages/Vaults";
 import Guardian from "./pages/Guardian";
 import Settings from "./pages/Settings";
+import NotificationsSettings from "./pages/NotificationsSettings";
 import ItemDetail from "./pages/ItemDetail";
 import Trash from "./pages/Trash";
 import AppLayout from "./components/Layout";
@@ -705,6 +706,7 @@ const AppRoutes = () => {
         <Route path="items/new" element={<ItemDetail isNew />} />
         <Route path="guardian" element={<Guardian />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="settings/notifications" element={<NotificationsSettings />} />
         <Route path="trash" element={<Trash />} />
       </Route>
     </Routes>
