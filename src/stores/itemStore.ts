@@ -8,6 +8,7 @@ import { supabase } from '../supabaseClient';
 import DatabaseService from '../services/database';
 import IndexedDBService from '../services/indexedDB';
 import { useAuthStore } from './authStore';
+import { SoundService } from '../services/soundService';
 import type { Item, Vault, Category } from '../../types';
 
 interface ItemState {
@@ -210,6 +211,9 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
     
     try {
       await DatabaseService.deleteItem(itemId);
+      
+      // Play trash sound
+      SoundService.playTrash();
       
       // Log activity
       if (user) {

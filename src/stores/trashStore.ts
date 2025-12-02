@@ -9,6 +9,7 @@ import DatabaseService from '../services/database';
 import EncryptionService from '../services/encryption';
 import IndexedDBService from '../services/indexedDB';
 import { useAuthStore } from './authStore';
+import { SoundService } from '../services/soundService';
 import type { Vault, Item } from '../../types';
 
 interface TrashState {
@@ -167,6 +168,9 @@ export const useTrashStore = create<TrashState & TrashActions>((set, get) => ({
       await DatabaseService.permanentlyDeleteItem(itemId);
       await IndexedDBService.deleteItem(itemId);
 
+      // Play trash sound
+      SoundService.playTrash();
+
       set(state => ({
         deletedItems: state.deletedItems.filter(i => i.id !== itemId)
       }));
@@ -186,6 +190,9 @@ export const useTrashStore = create<TrashState & TrashActions>((set, get) => ({
     try {
       await DatabaseService.permanentlyDeleteVault(vaultId);
       await IndexedDBService.deleteVault(vaultId);
+
+      // Play trash sound
+      SoundService.playTrash();
 
       set(state => ({
         deletedVaults: state.deletedVaults.filter(v => v.id !== vaultId),
@@ -219,6 +226,9 @@ export const useTrashStore = create<TrashState & TrashActions>((set, get) => ({
       await Promise.all(
         deletedVaults.map(vault => DatabaseService.permanentlyDeleteVault(vault.id))
       );
+
+      // Play trash sound
+      SoundService.playTrash();
 
       set({ deletedItems: [], deletedVaults: [] });
 
