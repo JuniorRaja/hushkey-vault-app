@@ -5,11 +5,13 @@ import { useAuthStore } from '../src/stores/authStore';
 import { useData } from '../App';
 import FileStorageService from '../src/services/fileStorage';
 import { Item, ItemType, FileAttachment } from '../types';
-import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers, Lock, Check, Copy as CopyIcon } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers, Lock, Check, Copy as CopyIcon, Key, Trash } from 'lucide-react';
 import { generatePassword, generateTOTP } from '../services/passwordGenerator';
+import { checkUrlSupports2FA } from '../services/twoFactorChecker';
 import ShareModal from '../components/ShareModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import MoveToVaultModal from '../components/MoveToVaultModal';
+import TotpSetupModal from '../components/TotpSetupModal';
 
 interface ItemDetailProps {
   isNew?: boolean;
@@ -169,7 +171,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const [urlError, setUrlError] = useState('');
   
   // TOTP State
-  const [totpInputMode, setTotpInputMode] = useState<'MANUAL' | 'QR'>('MANUAL');
+  const [isTotpSetupOpen, setIsTotpSetupOpen] = useState(false);
   const [totpCode, setTotpCode] = useState('');
   const [totpTimer, setTotpTimer] = useState(30);
 
@@ -243,7 +245,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   useEffect(() => {
     let interval: any;
     const hasTotp = formData.data?.totp;
-    if (!isEditing && (formData.type === ItemType.LOGIN || formData.type === ItemType.SSH_KEY) && hasTotp) {
+    const supportsTOTP = formData.type === ItemType.LOGIN || formData.type === ItemType.SSH_KEY;
+    if (supportsTOTP && hasTotp) {
         const updateTotp = async () => {
              const code = await generateTOTP(hasTotp);
              setTotpCode(code);
@@ -256,7 +259,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         setTotpCode('');
     }
     return () => clearInterval(interval);
-  }, [isEditing, formData.data?.totp, formData.type]);
+  }, [formData.data?.totp, formData.type]);
 
   const validateUrl = (url: string) => {
       if (!url) {
@@ -423,12 +426,12 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       }, 1000);
   };
   
-  const simulateQrScan = () => {
-      // Mock scan result
-      const mockKey = "JBSWY3DPEHPK3PXP";
-      updateDataField('totp', mockKey);
-      setTotpInputMode('MANUAL'); // Switch back to manual to show the key
-      alert(`QR Code Scanned! Key: ${mockKey}`);
+  const handleTotpSave = (secret: string) => {
+      updateDataField('totp', secret);
+  };
+
+  const handleTotpRemove = () => {
+      updateDataField('totp', '');
   };
 
   const getPasswordStrength = (pass: string) => {
@@ -579,6 +582,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         </div>
     );
 
+    // Check if current type supports TOTP
+    const supportsTOTP = formData.type === ItemType.LOGIN || formData.type === ItemType.SSH_KEY;
+
     switch (formData.type) {
       case ItemType.LOGIN:
         const strength = getPasswordStrength(formData.data?.password || '');
@@ -691,91 +697,6 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
             </div>}
 
             {hasValue(formData.data?.passwordExpiryInterval) && renderExpiryDropdown()}
-            
-            {hasValue(formData.data?.totp) && <div className={`space-y-1 group pt-2 mt-2 ${!isEditing && formData.data?.totp && 'border-t border-gray-800/50'}`}>
-                 <label className={labelClass}>{isEditing ? "TOTP Secret" : "One-Time Password (TOTP)"}</label>
-                 
-                 {isEditing ? (
-                     <div className="bg-gray-900 border border-gray-800 rounded-lg p-3">
-                         <div className="flex gap-2 mb-3">
-                            <button 
-                                onClick={() => setTotpInputMode('MANUAL')}
-                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded transition-colors ${totpInputMode === 'MANUAL' ? 'bg-primary-900/30 text-primary-300 border border-primary-500/20' : 'bg-gray-800 text-gray-500 hover:text-gray-300 border border-transparent'}`}
-                            >
-                                Enter Key
-                            </button>
-                            <button 
-                                onClick={() => setTotpInputMode('QR')}
-                                className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded transition-colors ${totpInputMode === 'QR' ? 'bg-primary-900/30 text-primary-300 border border-primary-500/20' : 'bg-gray-800 text-gray-500 hover:text-gray-300 border border-transparent'}`}
-                            >
-                                Scan QR
-                            </button>
-                         </div>
-                         
-                         {totpInputMode === 'MANUAL' ? (
-                            <div className="relative flex items-center">
-                                <input 
-                                    type={showTotpSecret ? "text" : "password"}
-                                    {...autoCompleteProps}
-                                    className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-white focus:border-primary-500 outline-none transition-colors font-mono text-sm"
-                                    value={formData.data?.totp || ''}
-                                    onChange={(e) => updateDataField('totp', e.target.value)}
-                                    placeholder="JBSW Y3DP EHPK 3PXP"
-                                />
-                                <div className="absolute right-3 flex items-center">
-                                     <button className="text-gray-500 hover:text-white" onClick={() => setShowTotpSecret(!showTotpSecret)}>
-                                        {showTotpSecret ? <EyeOff size={18}/> : <Eye size={18}/>}
-                                    </button>
-                                </div>
-                            </div>
-                         ) : (
-                             <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-700 rounded-lg bg-gray-950">
-                                 <QrCode size={32} className="text-gray-600 mb-2" />
-                                 <p className="text-xs text-gray-500 mb-3 text-center">Camera access required to scan QR codes.</p>
-                                 <button onClick={simulateQrScan} className="bg-primary-600 hover:bg-primary-500 text-white px-3 py-1.5 rounded text-xs font-medium">
-                                     Simulate Scan
-                                 </button>
-                             </div>
-                         )}
-                     </div>
-                 ) : (
-                     formData.data?.totp ? (
-                        <div className="flex items-center justify-between bg-gray-900/50 border border-gray-800 rounded-xl p-4">
-                            <div>
-                                <div className="text-3xl font-mono font-bold text-primary-400 tracking-widest">
-                                    {totpCode ? `${totpCode.slice(0,3)} ${totpCode.slice(3)}` : 'Loading...'}
-                                </div>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <div className="w-20 h-1 bg-gray-800 rounded-full overflow-hidden">
-                                        <div 
-                                            className={`h-full rounded-full transition-all duration-1000 ease-linear ${totpTimer < 5 ? 'bg-red-500' : 'bg-primary-500'}`}
-                                            style={{ width: `${(totpTimer / 30) * 100}%` }}
-                                        />
-                                    </div>
-                                    <span className={`text-xs font-medium ${totpTimer < 5 ? 'text-red-500' : 'text-gray-500'}`}>{totpTimer}s</span>
-                                </div>
-                            </div>
-                            <button 
-                                onClick={() => copyToClipboard(totpCode, 'totp')}
-                                className="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors flex items-center gap-2"
-                                title="Copy OTP"
-                            >
-                                {copiedField === 'totp' ? (
-                                    <div className="relative w-10 h-10 flex items-center justify-center">
-                                        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 40 40">
-                                            <circle cx="20" cy="20" r="18" fill="none" stroke="#1f2937" strokeWidth="2"/>
-                                            <circle cx="20" cy="20" r="18" fill="none" stroke="#22c55e" strokeWidth="2" strokeDasharray="113.1" strokeDashoffset={113.1 * (1 - copyTimer / (settings.clipboardClearSeconds || 30))} className="transition-all duration-1000 linear"/>
-                                        </svg>
-                                        <span className="text-xs font-bold text-green-500">{copyTimer}</span>
-                                    </div>
-                                ) : (
-                                    <Copy size={20} />
-                                )}
-                            </button>
-                        </div>
-                     ) : null
-                 )}
-            </div>}
 
             {hasValue(formData.data?.url) && <div className="space-y-1 group mt-2">
               <label className={labelClass}>Website URL</label>
@@ -1773,6 +1694,13 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         type="item"
       />
 
+      <TotpSetupModal
+        isOpen={isTotpSetupOpen}
+        onClose={() => setIsTotpSetupOpen(false)}
+        onSave={handleTotpSave}
+        currentSecret={formData.data?.totp}
+      />
+
       <ConfirmationModal
         isOpen={deleteConfirmationOpen}
         onClose={() => setDeleteConfirmationOpen(false)}
@@ -1937,6 +1865,81 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                            <input type="password" name="fakepassword" autoComplete="new-password" style={{position: 'absolute', left: '-9999px'}} tabIndex={-1} />
                            <div className="space-y-6">
                                {renderFields()}
+                               
+                               {/* TOTP Section - for LOGIN and SSH_KEY types */}
+                               {(formData.type === ItemType.LOGIN || formData.type === ItemType.SSH_KEY) && (formData.data?.totp || isEditing) && (
+                                   <div className={`space-y-3 pt-4 mt-4 border-t border-gray-800/50`}>
+                                       <label className="text-xs text-gray-400 font-medium ml-1 uppercase tracking-wider">Two-Factor Authentication (2FA)</label>
+                                       
+                                       {formData.data?.totp && (
+                                           <div className="flex items-center justify-between bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+                                               <div className="text-3xl font-mono font-bold text-primary-400 tracking-widest">
+                                                   {totpCode ? `${totpCode.slice(0,3)} ${totpCode.slice(3)}` : 'Loading...'}
+                                               </div>
+                                               <div className="flex items-center gap-2">
+                                                   <div className="relative w-12 h-12 flex items-center justify-center">
+                                                       <svg className="absolute inset-0 -rotate-90" viewBox="0 0 48 48">
+                                                           <circle cx="24" cy="24" r="20" fill="none" stroke="#1f2937" strokeWidth="3"/>
+                                                           <circle cx="24" cy="24" r="20" fill="none" stroke={totpTimer < 10 ? '#ef4444' : '#22c55e'} strokeWidth="3" strokeDasharray="125.6" strokeDashoffset={125.6 * (1 - totpTimer / 30)} className="transition-all duration-1000 linear"/>
+                                                       </svg>
+                                                       <span className={`text-sm font-bold ${totpTimer < 10 ? 'text-red-500' : 'text-green-500'}`}>{totpTimer}</span>
+                                                   </div>
+                                                   <button 
+                                                       onClick={() => copyToClipboard(totpCode, 'totp')}
+                                                       className="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors"
+                                                       title="Copy OTP"
+                                                   >
+                                                       {copiedField === 'totp' ? (
+                                                           <Check size={20} className="text-green-500" />
+                                                       ) : (
+                                                           <Copy size={20} />
+                                                       )}
+                                                   </button>
+                                               </div>
+                                           </div>
+                                       )}
+                                       
+                                       {isEditing && (
+                                           <div className="flex gap-2">
+                                               {formData.data?.totp ? (
+                                                   <>
+                                                       <button 
+                                                           onClick={() => setIsTotpSetupOpen(true)}
+                                                           className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-gray-300 font-medium flex items-center justify-center gap-2 transition-colors"
+                                                       >
+                                                           <Key size={16} /> Update 2FA
+                                                       </button>
+                                                       <button 
+                                                           onClick={handleTotpRemove}
+                                                           className="px-4 py-2.5 bg-red-900/20 hover:bg-red-900/30 border border-red-900/30 rounded-lg text-red-400 font-medium flex items-center justify-center gap-2 transition-colors"
+                                                           title="Remove 2FA"
+                                                       >
+                                                           <Trash size={16} />
+                                                       </button>
+                                                   </>
+                                               ) : (
+                                                   <button 
+                                                       onClick={() => setIsTotpSetupOpen(true)}
+                                                       className="w-full py-3 bg-primary-600 hover:bg-primary-500 rounded-lg text-white font-medium flex items-center justify-center gap-2 transition-colors"
+                                                   >
+                                                       <Key size={16} /> Setup 2FA
+                                                   </button>
+                                               )}
+                                           </div>
+                                       )}
+                                   </div>
+                               )}
+
+                               {/* Missing 2FA Warning - only for LOGIN type */}
+                               {formData.type === ItemType.LOGIN && !isEditing && formData.data?.url && checkUrlSupports2FA(formData.data.url) && !formData.data?.totp && (
+                                   <div className="mt-3 p-3 bg-orange-900/20 border border-orange-900/30 rounded-lg flex items-start gap-3">
+                                       <AlertCircle size={16} className="text-orange-400 mt-0.5 shrink-0" />
+                                       <div className="flex-1">
+                                           <p className="text-sm font-medium text-orange-400">Missing 2FA Setup</p>
+                                           <p className="text-xs text-orange-400/70 mt-0.5">This service supports two-factor authentication. Enable it for better security.</p>
+                                       </div>
+                                   </div>
+                               )}
                            </div>
                        </form>
 
