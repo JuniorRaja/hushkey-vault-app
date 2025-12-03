@@ -414,7 +414,7 @@ const Items: React.FC = () => {
                     </button>
                 )}
                 <button 
-                    className={`p-2 hover:bg-gray-700 rounded-lg transition-colors ${item.isFavorite ? 'text-yellow-500 hover:text-yellow-400' : 'text-gray-500 hover:text-white'}`}
+                    className={`hidden md:block p-2 hover:bg-gray-700 rounded-lg transition-colors ${item.isFavorite ? 'text-yellow-500 hover:text-yellow-400' : 'text-gray-500 hover:text-white'}`}
                     onClick={(e) => handleToggleFavorite(e, item)}
                     title={item.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
                 >
@@ -647,7 +647,7 @@ const Items: React.FC = () => {
                          </div>
                          <div className="flex items-center gap-2">
                              <div className="w-8 h-8 bg-gray-800 rounded-lg"></div>
-                             <div className="w-8 h-8 bg-gray-800 rounded-lg"></div>
+                             <div className="w-8 h-8 bg-gray-800 rounded-lg hidden md:block"></div>
                              <div className="w-8 h-8 bg-gray-800 rounded-lg"></div>
                          </div>
                      </div>

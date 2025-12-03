@@ -20,17 +20,35 @@ interface ItemDetailProps {
 const getFaviconUrl = (url?: string) => {
     if (!url) return null;
     try {
-        const domain = new URL(url).hostname;
+        const urlToCheck = url.startsWith('http') ? url : `https://${url}`;
+        const domain = new URL(urlToCheck).hostname;
         return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
     } catch (e) {
         return null;
     }
 }
 
-const FaviconImage = ({ url }: { url?: string }) => {
+const getInitials = (text?: string) => {
+    if (!text) return '?';
+    const words = text.trim().split(/\s+/);
+    if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+    return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+const FaviconImage = ({ url, fallbackText }: { url?: string; fallbackText?: string }) => {
+    const [imgError, setImgError] = React.useState(false);
     const faviconUrl = getFaviconUrl(url);
-    if (!faviconUrl) return null;
-    return <img src={faviconUrl} alt="" className="w-full h-full object-cover rounded-full" />;
+    
+    if (!faviconUrl || imgError) {
+        const initials = getInitials(fallbackText);
+        return (
+            <div className="w-full h-full rounded-full bg-primary-900/30 flex items-center justify-center text-primary-400 font-bold text-sm">
+                {initials}
+            </div>
+        );
+    }
+    
+    return <img src={faviconUrl} alt="" className="w-full h-full object-cover rounded-full" onError={() => setImgError(true)} />;
 }
 
 const formatBytes = (bytes: number, decimals = 2) => {
@@ -169,6 +187,13 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   
   // Validation State
   const [urlError, setUrlError] = useState('');
+  const [descriptionError, setDescriptionError] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [urlInputValue, setUrlInputValue] = useState('');
+  const [showDomainSuggestions, setShowDomainSuggestions] = useState(false);
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
+  const faviconTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // TOTP State
   const [isTotpSetupOpen, setIsTotpSetupOpen] = useState(false);
@@ -203,6 +228,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
             ...duplicateData,
             vaultId: duplicateData.vaultId || initialVaultId
           });
+          const url = duplicateData.data?.url || '';
+          setUrlInputValue(url.replace(/^https?:\/\//, ''));
         } else {
           setFormData({
             type: typeParam || ItemType.LOGIN,
@@ -216,6 +243,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         const existing = await getItem(itemId);
         if (existing) {
           setFormData(JSON.parse(JSON.stringify(existing)));
+          const url = existing.data?.url || '';
+          setUrlInputValue(url.replace(/^https?:\/\//, ''));
           
           // Load file attachments if available
           if (masterKey) {
@@ -267,7 +296,6 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
           return true;
       }
       try {
-          // Prepend https if missing
           const urlToCheck = url.startsWith('http') ? url : `https://${url}`;
           new URL(urlToCheck);
           setUrlError('');
@@ -278,14 +306,100 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       }
   };
 
+  const handleUrlChange = (value: string) => {
+      setUrlInputValue(value);
+      const fullUrl = value ? `https://${value}` : '';
+      updateDataField('url', fullUrl);
+      validateUrl(fullUrl);
+      setShowDomainSuggestions(value.length > 0 && !value.includes('.'));
+      
+      // Clear previous timeout
+      if (faviconTimeoutRef.current) {
+          clearTimeout(faviconTimeoutRef.current);
+      }
+      
+      // Set new timeout for favicon fetch
+      if (value && validateUrl(fullUrl)) {
+          faviconTimeoutRef.current = setTimeout(() => {
+              const favicon = getFaviconUrl(fullUrl);
+              setFaviconUrl(favicon);
+          }, 3000);
+      }
+  };
+
+  const applySuggestion = (domain: string) => {
+      const baseUrl = urlInputValue.split('.')[0];
+      const newValue = `${baseUrl}.${domain}`;
+      setUrlInputValue(newValue);
+      updateDataField('url', `https://${newValue}`);
+      setShowDomainSuggestions(false);
+      validateUrl(`https://${newValue}`);
+  };
+
+  const validateDescription = (desc: string) => {
+      if (!desc) {
+          setDescriptionError('');
+          return true;
+      }
+      if (desc.length > 100) {
+          setDescriptionError('Description must be 100 characters or less');
+          return false;
+      }
+      setDescriptionError('');
+      return true;
+  };
+
+  const validateUsername = (username: string) => {
+      const needsUsernameValidation = [ItemType.LOGIN, ItemType.DATABASE, ItemType.SERVER, ItemType.SSH_KEY].includes(formData.type!);
+      if (!needsUsernameValidation) {
+          setUsernameError('');
+          return true;
+      }
+      if (!username || username.trim() === '') {
+          setUsernameError('Username is required');
+          return false;
+      }
+      setUsernameError('');
+      return true;
+  };
+
+  const validatePassword = (password: string) => {
+      const needsPasswordValidation = [ItemType.LOGIN, ItemType.DATABASE, ItemType.SERVER, ItemType.WIFI].includes(formData.type!);
+      if (!needsPasswordValidation) {
+          setPasswordError('');
+          return true;
+      }
+      if (!password || password.trim() === '') {
+          setPasswordError('Password is required');
+          return false;
+      }
+      setPasswordError('');
+      return true;
+  };
+
   const handleSave = async () => {
     if (!formData.name || !formData.vaultId) {
         alert("Please enter a name and select a vault.");
         return;
     }
 
+    if (!validateDescription(formData.name)) {
+        alert("Please fix the description error before saving.");
+        return;
+    }
+
     if (formData.type === ItemType.LOGIN && formData.data?.url && !validateUrl(formData.data.url)) {
         alert("Please fix the URL error before saving.");
+        return;
+    }
+
+    if (!validateUsername(formData.data?.username || '')) {
+        alert("Please enter a username.");
+        return;
+    }
+
+    if (!validatePassword(formData.data?.password || '')) {
+        alert("Please enter a password.");
         return;
     }
 
@@ -340,6 +454,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         }
         setIsEditing(false);
         setUrlError('');
+        setDescriptionError('');
+        setUsernameError('');
+        setPasswordError('');
     }
   };
 
@@ -550,37 +667,44 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
     
     const labelClass = "text-xs text-gray-400 font-medium ml-1 uppercase tracking-wider";
     const hasValue = (...values: any[]) => isEditing || values.some(v => v !== undefined && v !== null && v !== '');
+    
+
 
     // Expiry Dropdown Component
-    const renderExpiryDropdown = () => (
-        <div className="space-y-1 group pt-2 mt-2 border-t border-gray-800/50">
-            <label className={labelClass}>Password Expiry</label>
-            {isEditing ? (
-                 <select 
-                    className={inputBaseClass}
-                    value={formData.data?.passwordExpiryInterval || 0}
-                    onChange={(e) => updateDataField('passwordExpiryInterval', parseInt(e.target.value))}
-                >
-                    <option value={0}>Never (Default)</option>
-                    <option value={30}>1 Month (30 Days)</option>
-                    <option value={90}>3 Months (90 Days)</option>
-                    <option value={180}>6 Months (180 Days)</option>
-                </select>
-            ) : (
-                <div className="flex items-center gap-2 text-gray-300 py-2">
-                     <Clock size={16} className="text-gray-500" />
-                     {(() => {
-                         const val = formData.data?.passwordExpiryInterval;
-                         if (!val) return 'Never';
-                         if (val === 30) return 'Every 1 Month';
-                         if (val === 90) return 'Every 3 Months';
-                         if (val === 180) return 'Every 6 Months';
-                         return `Every ${val} Days`;
-                     })()}
-                </div>
-            )}
-        </div>
-    );
+    const renderExpiryDropdown = () => {
+        if (!isEditing && (!formData.data?.passwordExpiryInterval || formData.data.passwordExpiryInterval === 0)) {
+            return null;
+        }
+        return (
+            <div className="space-y-1 group pt-2 mt-2 border-t border-gray-800/50">
+                <label className={labelClass}>Password Expiry</label>
+                {isEditing ? (
+                     <select 
+                        className={inputBaseClass}
+                        value={formData.data?.passwordExpiryInterval || 0}
+                        onChange={(e) => updateDataField('passwordExpiryInterval', parseInt(e.target.value))}
+                    >
+                        <option value={0}>Never (Default)</option>
+                        <option value={30}>1 Month (30 Days)</option>
+                        <option value={90}>3 Months (90 Days)</option>
+                        <option value={180}>6 Months (180 Days)</option>
+                    </select>
+                ) : (
+                    <div className="flex items-center gap-2 text-gray-300 py-2">
+                         <Clock size={16} className="text-gray-500" />
+                         {(() => {
+                             const val = formData.data?.passwordExpiryInterval;
+                             if (!val) return 'Never';
+                             if (val === 30) return 'Every 1 Month';
+                             if (val === 90) return 'Every 3 Months';
+                             if (val === 180) return 'Every 6 Months';
+                             return `Every ${val} Days`;
+                         })()}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     // Check if current type supports TOTP
     const supportsTOTP = formData.type === ItemType.LOGIN || formData.type === ItemType.SSH_KEY;
@@ -599,7 +723,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     type="text" 
                     {...autoCompleteProps}
                     readOnly={!isEditing}
-                    className={inputBaseClass}
+                    className={`${inputBaseClass} ${isEditing && usernameError ? 'border-red-500 focus:border-red-500' : ''}`}
                     value={formData.data?.username || ''}
                     onChange={(e) => updateDataField('username', e.target.value)}
                     placeholder={isEditing ? "e.g. user@example.com" : "—"}
@@ -623,6 +747,12 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     </button>
                 )}
               </div>
+              {isEditing && usernameError && (
+                  <div className="flex items-center gap-1 text-red-500 text-xs mt-1">
+                      <AlertCircle size={12} />
+                      <span>{usernameError}</span>
+                  </div>
+              )}
             </div>}
 
             {hasValue(formData.data?.password) && <div className="space-y-1 group">
@@ -632,88 +762,132 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                   <input 
                       type={showPassword ? "text" : "password"} 
                       {...autoCompleteProps}
-                      className={`${inputBaseClass} font-mono pr-12`}
+                      className={`${inputBaseClass} font-mono ${passwordError ? 'border-red-500 focus:border-red-500' : ''}`}
                       value={formData.data?.password || ''}
                       onChange={(e) => updateDataField('password', e.target.value)}
-                      placeholder="••••••••••••"
+                      placeholder="Enter password"
                   />
                 ) : (
-                  <div className={`${inputBaseClass} font-mono pr-12`}>
+                  <div className={`${inputBaseClass} font-mono flex-1`}>
                     <DecryptedText text={formData.data?.password || ''} show={showPassword} />
                   </div>
                 )}
                 <div className="flex items-center gap-1 ml-2">
-                    {!isEditing && formData.data?.password && (
-                        <>
-                            <button className="p-2 text-gray-500 hover:text-white" onClick={() => setShowPassword(!showPassword)}>
-                                {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
-                            </button>
-                            <button 
-                                className="p-2 text-gray-500 hover:text-white transition-opacity flex items-center gap-1 shrink-0" 
-                                onClick={() => copyToClipboard(formData.data?.password || '', 'password')}
-                            >
-                                {copiedField === 'password' ? (
-                                    <div className="relative w-9 h-9 flex items-center justify-center">
-                                        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 36 36">
-                                            <circle cx="18" cy="18" r="16" fill="none" stroke="#1f2937" strokeWidth="2"/>
-                                            <circle cx="18" cy="18" r="16" fill="none" stroke="#22c55e" strokeWidth="2" strokeDasharray="100.53" strokeDashoffset={100.53 * (1 - copyTimer / (settings.clipboardClearSeconds || 30))} className="transition-all duration-1000 linear"/>
-                                        </svg>
-                                        <span className="text-[10px] font-bold text-green-500">{copyTimer}</span>
-                                    </div>
-                                ) : (
-                                    <Copy size={18}/>
-                                )}
-                            </button>
-                        </>
-                    )}
-                    
-                    {isEditing && (
-                        <>
-                             <button className="p-2 text-gray-500 hover:text-white" onClick={() => setShowPassword(!showPassword)}>
-                                {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
-                            </button>
-                            <button className="p-2 text-gray-500 hover:text-primary-400" onClick={generateAndSetPassword} title="Generate">
-                                <RefreshCw size={18}/>
-                            </button>
-                        </>
-                    )}
-                 </div>
+                  {!isEditing && formData.data?.password && StrengthIcon && (
+                    <div className={`${strength.color}`}>
+                      <StrengthIcon size={18} />
+                    </div>
+                  )}
+                  {!isEditing && (
+                    <>
+                      <button className="p-2 text-gray-500 hover:text-white" onClick={() => setShowPassword(!showPassword)}>
+                        {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
+                      </button>
+                      <button 
+                          className="p-2 text-gray-500 hover:text-white transition-opacity flex items-center gap-1 shrink-0" 
+                          onClick={() => copyToClipboard(formData.data?.password || '', 'password')}
+                      >
+                          {copiedField === 'password' ? (
+                              <div className="relative w-9 h-9 flex items-center justify-center">
+                                  <svg className="absolute inset-0 -rotate-90" viewBox="0 0 36 36">
+                                      <circle cx="18" cy="18" r="16" fill="none" stroke="#1f2937" strokeWidth="2"/>
+                                      <circle cx="18" cy="18" r="16" fill="none" stroke="#22c55e" strokeWidth="2" strokeDasharray="100.53" strokeDashoffset={100.53 * (1 - copyTimer / (settings.clipboardClearSeconds || 30))} className="transition-all duration-1000 linear"/>
+                                  </svg>
+                                  <span className="text-[10px] font-bold text-green-500">{copyTimer}</span>
+                              </div>
+                          ) : (
+                              <Copy size={18}/>
+                          )}
+                      </button>
+                    </>
+                  )}
+                  {isEditing && (
+                    <>
+                      <button className="p-2 text-gray-500 hover:text-white" onClick={() => setShowPassword(!showPassword)}>
+                        {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
+                      </button>
+                      <button className="p-2 text-gray-500 hover:text-primary-400" onClick={generateAndSetPassword} title="Generate">
+                        <RefreshCw size={18}/>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
               {isEditing && formData.data?.password && (
-                  <div className="flex items-center justify-end mt-1 px-1 gap-3">
-                      <div className="flex gap-1 flex-1 max-w-[120px]">
-                          <div className={`h-1 flex-1 rounded-full ${(formData.data.password.length > 5) ? 'bg-red-500' : 'bg-gray-800'}`}></div>
-                          <div className={`h-1 flex-1 rounded-full ${(formData.data.password.length > 10) ? 'bg-yellow-500' : 'bg-gray-800'}`}></div>
-                          <div className={`h-1 flex-1 rounded-full ${(formData.data.password.length > 15) ? 'bg-green-500' : 'bg-gray-800'}`}></div>
-                      </div>
-                      <div className={`flex items-center gap-1.5 ${strength.color}`}>
-                          {StrengthIcon && <StrengthIcon size={14} />}
-                          <span className="text-[10px] font-bold uppercase tracking-wider">
-                              {strength.text}
-                          </span>
-                      </div>
+                <div className="flex items-center gap-3 mt-2 ml-12 mr-8">
+                  <div className="flex gap-1 flex-1">
+                    <div className={`h-1 flex-1 rounded-full ${(formData.data.password.length > 5) ? 'bg-red-500' : 'bg-gray-800'}`}></div>
+                    <div className={`h-1 flex-1 rounded-full ${(formData.data.password.length > 10) ? 'bg-yellow-500' : 'bg-gray-800'}`}></div>
+                    <div className={`h-1 flex-1 rounded-full ${(formData.data.password.length > 15) ? 'bg-green-500' : 'bg-gray-800'}`}></div>
+                  </div>
+                  <div className={`flex items-center gap-1.5 whitespace-nowrap ${strength.color}`}>
+                    {StrengthIcon && <StrengthIcon size={14} />}
+                    <span className="text-xs font-medium uppercase tracking-wider">
+                      {strength.text}
+                    </span>
+                  </div>
+                </div>
+              )}
+              {isEditing && passwordError && (
+                  <div className="flex items-center gap-1 text-red-500 text-xs mt-1">
+                      <AlertCircle size={12} />
+                      <span>{passwordError}</span>
                   </div>
               )}
             </div>}
 
-            {hasValue(formData.data?.passwordExpiryInterval) && renderExpiryDropdown()}
+            {renderExpiryDropdown()}
 
             {hasValue(formData.data?.url) && <div className="space-y-1 group mt-2">
               <label className={labelClass}>Website URL</label>
-              <div className="relative flex items-center">
-                <input 
-                    type="url" 
-                    {...autoCompleteProps}
-                    readOnly={!isEditing}
-                    className={`${inputBaseClass} ${urlError ? 'border-red-500 focus:border-red-500' : ''} text-primary-400`}
-                    value={formData.data?.url || ''}
-                    onChange={(e) => updateDataField('url', e.target.value)}
-                    placeholder={isEditing ? "https://" : "—"}
-                />
-                 {!isEditing && formData.data?.url && (
-                    <a href={formData.data.url} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                        <ExternalLink size={18} />
-                    </a>
+              <div className="relative">
+                {isEditing ? (
+                  <>
+                    <div className="flex items-center w-full bg-gray-950 border border-gray-800 rounded-lg overflow-hidden focus-within:border-primary-500">
+                      <span className={`px-3 py-3 select-none ${urlInputValue ? 'text-white' : 'text-gray-500'}`}>https://</span>
+                      <input 
+                          type="text" 
+                          {...autoCompleteProps}
+                          className={`flex-1 bg-transparent border-none outline-none py-3 pr-3 ${urlError ? 'text-red-400' : 'text-white'}`}
+                          value={urlInputValue}
+                          onChange={(e) => handleUrlChange(e.target.value)}
+                          onFocus={() => setShowDomainSuggestions(urlInputValue.length > 0 && !urlInputValue.includes('.'))}
+                          onBlur={() => setTimeout(() => setShowDomainSuggestions(false), 200)}
+                          placeholder="example.com"
+                      />
+                    </div>
+                    {showDomainSuggestions && (
+                      <div className="absolute z-10 w-full mt-1 bg-gray-900 border border-gray-800 rounded-lg shadow-xl overflow-hidden">
+                        {['com', 'in', 'net'].map(domain => (
+                          <button
+                            key={domain}
+                            type="button"
+                            onClick={() => applySuggestion(domain)}
+                            className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-800 transition-colors flex items-center gap-2"
+                          >
+                            <Globe size={14} className="text-gray-500" />
+                            <span className="text-gray-500">{urlInputValue.split('.')[0]}</span>
+                            <span className="text-primary-400">.{domain}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center">
+                    <input 
+                        type="url" 
+                        {...autoCompleteProps}
+                        readOnly
+                        className={`${inputBaseClass} text-primary-400`}
+                        value={formData.data?.url || ''}
+                    />
+                    {formData.data?.url && (
+                      <a href={formData.data.url.startsWith('http') ? formData.data.url : `https://${formData.data.url}`} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-500 hover:text-white transition-opacity">
+                          <ExternalLink size={18} />
+                      </a>
+                    )}
+                  </div>
                 )}
               </div>
               {isEditing && urlError && (
@@ -728,7 +902,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       case ItemType.ID_CARD:
           return (
               <>
-                 <div className="space-y-1">
+                 {hasValue(formData.data?.cardTitle) && <div className="space-y-1">
                     <label className={labelClass}>Title</label>
                     <input 
                         {...autoCompleteProps}
@@ -738,8 +912,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         onChange={(e) => updateDataField('cardTitle', e.target.value)}
                         placeholder={!isEditing ? "—" : "e.g. Work ID"}
                     />
-                </div>
-                <div className="space-y-1">
+                </div>}
+                {hasValue(formData.data?.idName) && <div className="space-y-1">
                     <label className={labelClass}>ID Name</label>
                     <input 
                         {...autoCompleteProps}
@@ -749,8 +923,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         onChange={(e) => updateDataField('idName', e.target.value)}
                         placeholder={!isEditing ? "—" : "e.g. National ID"}
                     />
-                </div>
-                 <div className="space-y-1">
+                </div>}
+                 {hasValue(formData.data?.fullName) && <div className="space-y-1">
                     <label className={labelClass}>Full Name</label>
                     <input 
                         {...autoCompleteProps}
@@ -760,8 +934,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         onChange={(e) => updateDataField('fullName', e.target.value)}
                         placeholder={!isEditing ? "—" : "Name on ID"}
                     />
-                </div>
-                 <div className="space-y-1">
+                </div>}
+                 {hasValue(formData.data?.validTill) && <div className="space-y-1">
                     <label className={labelClass}>Valid Till</label>
                     <input 
                         type={isEditing ? "date" : "text"}
@@ -772,8 +946,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         onChange={(e) => updateDataField('validTill', e.target.value)}
                         placeholder={!isEditing ? "—" : ""}
                     />
-                </div>
-                <div className="space-y-1">
+                </div>}
+                {hasValue(formData.data?.relationName) && <div className="space-y-1">
                     <label className={labelClass}>Father/Husband Name</label>
                     <input 
                         {...autoCompleteProps}
@@ -783,8 +957,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         onChange={(e) => updateDataField('relationName', e.target.value)}
                         placeholder={!isEditing ? "—" : ""}
                     />
-                </div>
-                 <div className="space-y-1">
+                </div>}
+                 {hasValue(formData.data?.address) && <div className="space-y-1">
                     <label className={labelClass}>Address</label>
                      {isEditing ? (
                          <textarea
@@ -796,7 +970,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                      ) : (
                          <div className="text-white text-lg font-medium py-2 whitespace-pre-wrap">{formData.data?.address || '—'}</div>
                      )}
-                </div>
+                </div>}
               </>
           )
       case ItemType.FILE:
@@ -882,7 +1056,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       case ItemType.BANK:
         return (
             <>
-                <div className="space-y-1">
+                {hasValue(formData.data?.bankName) && <div className="space-y-1">
                     <label className={labelClass}>Bank Name</label>
                     <input 
                         {...autoCompleteProps}
@@ -892,8 +1066,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         onChange={(e) => updateDataField('bankName', e.target.value)}
                         placeholder={!isEditing ? "—" : "e.g. Chase Bank"}
                     />
-                </div>
-                <div className="space-y-1">
+                </div>}
+                {hasValue(formData.data?.website) && <div className="space-y-1">
                     <label className={labelClass}>Bank Website (for logo)</label>
                     <div className="relative flex items-center">
                         <input 
@@ -910,9 +1084,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             </a>
                         )}
                     </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1">
+                </div>}
+                {(hasValue(formData.data?.branch) || hasValue(formData.data?.accountType)) && <div className="grid grid-cols-2 gap-4">
+                     {hasValue(formData.data?.branch) && <div className="space-y-1">
                         <label className={labelClass}>Branch</label>
                         <input 
                             {...autoCompleteProps}
@@ -922,8 +1096,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             onChange={(e) => updateDataField('branch', e.target.value)}
                             placeholder={!isEditing ? "—" : "Main St Branch"}
                         />
-                     </div>
-                     <div className="space-y-1">
+                     </div>}
+                     {hasValue(formData.data?.accountType) && <div className="space-y-1">
                         <label className={labelClass}>Account Type</label>
                         {isEditing ? (
                              <select
@@ -944,9 +1118,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 value={formData.data?.accountType || '—'}
                             />
                         )}
-                     </div>
-                </div>
-                <div className="space-y-1 group">
+                     </div>}
+                </div>}
+                {hasValue(formData.data?.accountNumber) && <div className="space-y-1 group">
                     <label className={labelClass}>Account Number</label>
                     <div className="flex items-center">
                          <input 
@@ -957,15 +1131,15 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             onChange={(e) => updateDataField('accountNumber', e.target.value)}
                             placeholder="000000000"
                         />
-                        {!isEditing && (
-                             <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.accountNumber || '')}>
+                        {!isEditing && formData.data?.accountNumber && (
+                             <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.accountNumber || '', 'accountNumber')}>
                                 <Copy size={16}/>
                             </button>
                         )}
                     </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1 group">
+                </div>}
+                {(hasValue(formData.data?.ifsc) || hasValue(formData.data?.swift)) && <div className="grid grid-cols-2 gap-4">
+                     {hasValue(formData.data?.ifsc) && <div className="space-y-1 group">
                         <label className={labelClass}>IFSC / IBAN</label>
                         <div className="flex items-center">
                              <input 
@@ -975,14 +1149,14 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 value={formData.data?.ifsc || ''}
                                 onChange={(e) => updateDataField('ifsc', e.target.value)}
                             />
-                            {!isEditing && (
-                                <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.ifsc || '')}>
+                            {!isEditing && formData.data?.ifsc && (
+                                <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.ifsc || '', 'ifsc')}>
                                     <Copy size={16}/>
                                 </button>
                             )}
                         </div>
-                     </div>
-                     <div className="space-y-1 group">
+                     </div>}
+                     {hasValue(formData.data?.swift) && <div className="space-y-1 group">
                         <label className={labelClass}>SWIFT / BIC</label>
                         <div className="flex items-center">
                              <input 
@@ -992,15 +1166,15 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 value={formData.data?.swift || ''}
                                 onChange={(e) => updateDataField('swift', e.target.value)}
                             />
-                            {!isEditing && (
-                                <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.swift || '')}>
+                            {!isEditing && formData.data?.swift && (
+                                <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.swift || '', 'swift')}>
                                     <Copy size={16}/>
                                 </button>
                             )}
                         </div>
-                     </div>
-                </div>
-                 <div className="space-y-1">
+                     </div>}
+                </div>}
+                 {hasValue(formData.data?.holderName) && <div className="space-y-1">
                     <label className={labelClass}>Account Holder</label>
                     <input 
                         {...autoCompleteProps}
@@ -1010,7 +1184,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         onChange={(e) => updateDataField('holderName', e.target.value)}
                         placeholder={!isEditing ? "—" : ""}
                     />
-                </div>
+                </div>}
             </>
         )
       case ItemType.DATABASE:
@@ -1783,9 +1957,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                        {/* Header */}
                        <div className="flex items-start gap-4 mb-8">
                            <div className="p-3 bg-gray-800 rounded-2xl text-primary-400 shadow-inner relative overflow-hidden">
-                               {formData.type === ItemType.LOGIN && formData.data?.url ? (
+                               {formData.type === ItemType.LOGIN && (formData.data?.url || faviconUrl) ? (
                                    <div className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center overflow-hidden">
-                                       <FaviconImage url={formData.data.url} />
+                                       <FaviconImage url={faviconUrl || formData.data?.url} fallbackText={formData.name} />
                                    </div>
                                ) : (
                                    getHeaderIcon()
@@ -1793,15 +1967,29 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                            </div>
                            <div className="flex-1">
                                {isEditing ? (
-                                   <input 
-                                        type="text" 
-                                        {...autoCompleteProps}
-                                        className="w-full bg-transparent border-b border-gray-700 focus:border-primary-500 text-2xl font-bold text-white placeholder-gray-600 focus:outline-none transition-colors pb-1"
-                                        placeholder="Description"
-                                        value={formData.name}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                                        autoFocus={!isMobile}
-                                   />
+                                   <div className="w-full">
+                                       <input 
+                                            type="text" 
+                                            {...autoCompleteProps}
+                                            className={`w-full bg-transparent border-b focus:border-primary-500 text-2xl font-bold text-white placeholder-gray-600 focus:outline-none transition-colors pb-1 ${descriptionError ? 'border-red-500' : 'border-gray-700'}`}
+                                            placeholder="Description"
+                                            value={formData.name}
+                                            onChange={(e) => {
+                                                setFormData(prev => ({ ...prev, name: e.target.value }));
+                                                validateDescription(e.target.value);
+                                            }}
+                                            autoFocus={!isMobile}
+                                       />
+                                       <div className="flex items-center justify-between mt-1">
+                                           {descriptionError && (
+                                               <div className="flex items-center gap-1 text-red-500 text-xs">
+                                                   <AlertCircle size={12} />
+                                                   <span>{descriptionError}</span>
+                                               </div>
+                                           )}
+                                           <div className={`text-xs ml-auto ${(formData.name?.length || 0) > 100 ? 'text-red-500' : 'text-gray-500'}`}>{formData.name?.length || 0}/100</div>
+                                       </div>
+                                   </div>
                                ) : (
                                    <h1 className="text-2xl font-bold text-white">{formData.name}</h1>
                                )}
@@ -1944,7 +2132,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                        </form>
 
                        {/* Notes Section (Common) */}
-                       {formData.type !== ItemType.NOTE && (
+                       {formData.type !== ItemType.NOTE && (isEditing || formData.notes) && (
                            <div className="pt-6 border-t border-gray-800">
                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Notes</label>
                                <textarea 
@@ -2028,22 +2216,29 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
               )}
               
               {/* History / Meta */}
-              {!isEditing && (
+              {!isEditing && formData.id && (
                   <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Item History</label>
                       <div className="text-xs text-gray-400 space-y-2">
-                          <div className="flex justify-between">
-                              <span>Created</span>
-                              <span>{new Date().toLocaleDateString()}</span> 
-                              {/* Mock date, ideally from item.createdAt */}
+                          {formData.lastUpdated && (
+                              <div className="flex justify-between">
+                                  <span>Last Modified</span>
+                                  <span>{new Date(formData.lastUpdated).toLocaleDateString()}</span>
+                              </div>
+                          )}
+                          {formData.data?.passwordLastModified && (
+                              <div className="flex justify-between">
+                                  <span>Password Changed</span>
+                                  <span>{new Date(formData.data.passwordLastModified).toLocaleDateString()}</span>
+                              </div>
+                          )}
+                      </div>
+                      <div className="pt-3 border-t border-gray-800 space-y-1">
+                          <div className="text-[10px] text-gray-600 font-mono break-all">
+                              <span className="text-gray-500">Item ID:</span> {formData.id}
                           </div>
-                          <div className="flex justify-between">
-                              <span>Last Password Change</span>
-                              <span>{formData.data?.passwordLastModified ? new Date(formData.data.passwordLastModified).toLocaleDateString() : 'Never'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                              <span>Times Viewed</span>
-                              <span>12</span>
+                          <div className="text-[10px] text-gray-600 font-mono break-all">
+                              <span className="text-gray-500">Vault ID:</span> {formData.vaultId}
                           </div>
                       </div>
                   </div>

@@ -8,6 +8,8 @@ const SUPPORTS_2FA = [
   'bitbucket.org', 'atlassian.com', 'notion.so', 'figma.com', 'adobe.com'
 ];
 
+//TODO: Implement real 2FA check APIs
+
 export const checkUrlSupports2FA = (url?: string): boolean => {
   if (!url) return false;
   
