@@ -10,16 +10,6 @@ import ShareModal from '../components/ShareModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import MoveToVaultModal from '../components/MoveToVaultModal';
 
-const getFaviconUrl = (url?: string) => {
-    if (!url) return null;
-    try {
-        const domain = new URL(url).hostname;
-        return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-    } catch (e) {
-        return null;
-    }
-}
-
 const ItemIcon = ({ item }: { item: Item }) => {
     const Icon = ({ type }: { type: ItemType }) => {
         switch(type) {
@@ -39,49 +29,20 @@ const ItemIcon = ({ item }: { item: Item }) => {
         }
     };
 
-    if (item.type === ItemType.LOGIN && item.data?.url) {
-        const favicon = getFaviconUrl(item.data.url);
-        if (favicon) {
-            return (
-                <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden p-1 shrink-0">
-                    <img 
-                        src={favicon} 
-                        alt="" 
-                        className="w-full h-full object-contain rounded-full" 
-                        onError={(e) => {
-                             e.currentTarget.style.display = 'none';
-                             e.currentTarget.parentElement?.classList.remove('p-2'); // Reset padding if hiding
-                        }}
-                    />
-                    <div className="hidden absolute inset-0 flex items-center justify-center">
-                         <Icon type={item.type} />
-                    </div>
-                </div>
-            )
-        }
-    }
-    
-    // Attempt to show bank logo if website is present
-    if (item.type === ItemType.BANK && item.data?.website) {
-         const favicon = getFaviconUrl(item.data.website?.startsWith('http') ? item.data.website : `https://${item.data.website}`);
-         if (favicon) {
-            return (
-                <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden p-1 shrink-0">
-                    <img 
-                        src={favicon} 
-                        alt="" 
-                        className="w-full h-full object-contain rounded-full" 
-                        onError={(e) => {
-                             e.currentTarget.style.display = 'none';
-                             e.currentTarget.parentElement?.classList.remove('p-2'); 
-                        }}
-                    />
-                     <div className="hidden absolute inset-0 flex items-center justify-center">
-                         <Icon type={item.type} />
-                    </div>
-                </div>
-            )
-         }
+    // Use stored favicon if available
+    if (item.faviconData && [ItemType.LOGIN, ItemType.BANK, ItemType.DATABASE].includes(item.type)) {
+        return (
+            <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden p-1 shrink-0">
+                <img 
+                    src={item.faviconData} 
+                    alt="" 
+                    className="w-full h-full object-contain rounded-full" 
+                    onError={(e) => {
+                         e.currentTarget.style.display = 'none';
+                    }}
+                />
+            </div>
+        )
     }
 
     return (

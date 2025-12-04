@@ -46,6 +46,7 @@ export interface ItemBase {
   lastUpdated: string;
   folder?: string;
   deletedAt?: string;
+  faviconData?: string; // Favicon URL for LOGIN, BANK, DATABASE types
 }
 
 // Specific data structures (simplified for the demo but structured)
@@ -204,6 +205,7 @@ export interface LogEntry {
 }
 
 export type AccentColor = 'violet' | 'blue' | 'emerald' | 'rose' | 'amber' | 'cyan';
+export type ThemePattern = 'none' | 'waves' | 'geometric' | 'dots' | 'gradient' | 'mesh' | 'circuit' | 'hexagon';
 
 export interface NotificationSettings {
     // Security
@@ -265,5 +267,6 @@ export interface AppSettings {
   groupItemsByCategory: boolean; // New setting
   categories: Category[]; // New setting
   accentColor: AccentColor; // New setting
+  themePattern: ThemePattern; // New setting
   notifications: NotificationSettings; // New setting
 }

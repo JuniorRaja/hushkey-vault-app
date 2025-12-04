@@ -4,9 +4,11 @@ import { useItemStore } from '../src/stores/itemStore';
 import { useAuthStore } from '../src/stores/authStore';
 import { useData } from '../App';
 import FileStorageService from '../src/services/fileStorage';
+import { FaviconService } from '../services/faviconService';
 import { Item, ItemType, FileAttachment } from '../types';
 import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers, Lock, Check, Copy as CopyIcon, Key, Trash } from 'lucide-react';
 import { generatePassword, generateTOTP } from '../services/passwordGenerator';
+import { analyzePassword } from '../src/services/passwordAnalyzer';
 import { checkUrlSupports2FA } from '../services/twoFactorChecker';
 import ShareModal from '../components/ShareModal';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -35,20 +37,20 @@ const getInitials = (text?: string) => {
     return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 }
 
-const FaviconImage = ({ url, fallbackText }: { url?: string; fallbackText?: string }) => {
+const FaviconImage = ({ url, fallbackText, faviconData }: { url?: string; fallbackText?: string; faviconData?: string }) => {
     const [imgError, setImgError] = React.useState(false);
-    const faviconUrl = getFaviconUrl(url);
     
-    if (!faviconUrl || imgError) {
-        const initials = getInitials(fallbackText);
-        return (
-            <div className="w-full h-full rounded-full bg-primary-900/30 flex items-center justify-center text-primary-400 font-bold text-sm">
-                {initials}
-            </div>
-        );
+    // Use stored favicon data if available
+    if (faviconData && !imgError) {
+        return <img src={faviconData} alt="" className="w-full h-full object-cover rounded-full" onError={() => setImgError(true)} />;
     }
     
-    return <img src={faviconUrl} alt="" className="w-full h-full object-cover rounded-full" onError={() => setImgError(true)} />;
+    const initials = getInitials(fallbackText);
+    return (
+        <div className="w-full h-full rounded-full bg-primary-900/30 flex items-center justify-center text-primary-400 font-bold text-sm">
+            {initials}
+        </div>
+    );
 }
 
 const formatBytes = (bytes: number, decimals = 2) => {
@@ -318,12 +320,15 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
           clearTimeout(faviconTimeoutRef.current);
       }
       
-      // Set new timeout for favicon fetch
+      // Store favicon URL
       if (value && validateUrl(fullUrl)) {
           faviconTimeoutRef.current = setTimeout(() => {
-              const favicon = getFaviconUrl(fullUrl);
-              setFaviconUrl(favicon);
-          }, 3000);
+              const faviconUrl = FaviconService.getFaviconUrl(fullUrl);
+              if (faviconUrl) {
+                  setFormData(prev => ({ ...prev, faviconData: faviconUrl }));
+                  setFaviconUrl(faviconUrl);
+              }
+          }, 1500);
       }
   };
 
@@ -420,18 +425,30 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
 
     setIsSaving(true);
     try {
+      // Generate favicon URL if not already present
+      let faviconData = formData.faviconData;
+      if (!faviconData && [ItemType.LOGIN, ItemType.BANK, ItemType.DATABASE].includes(formData.type!)) {
+          const url = formData.type === ItemType.LOGIN ? formData.data?.url : 
+                     formData.type === ItemType.BANK ? formData.data?.website : 
+                     formData.data?.host;
+          if (url) {
+              faviconData = FaviconService.getFaviconUrl(url) || undefined;
+          }
+      }
+
       if (isNew) {
         const newItem = await createItem(formData.vaultId!, {
           ...formData,
           name: formData.name!,
           type: formData.type || ItemType.LOGIN,
           isFavorite: false,
+          faviconData,
           data: finalData as any
         });
         await new Promise(resolve => setTimeout(resolve, 800));
         navigate(-1);
       } else {
-        await updateItem(itemId!, { ...formData, data: finalData });
+        await updateItem(itemId!, { ...formData, faviconData, data: finalData });
         await new Promise(resolve => setTimeout(resolve, 800));
         setIsEditing(false);
       }
@@ -553,9 +570,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
 
   const getPasswordStrength = (pass: string) => {
       if (!pass) return { text: '', color: '', icon: null };
-      if (pass.length < 8) return { text: 'Vulnerable', color: 'text-red-500', icon: ShieldAlert };
-      if (pass.length < 12) return { text: 'Weak', color: 'text-orange-500', icon: ShieldAlert };
-      if (pass.length < 16) return { text: 'Good', color: 'text-yellow-500', icon: Shield };
+      const analysis = analyzePassword(pass);
+      if (analysis.strength === 'weak') return { text: 'Weak', color: 'text-red-500', icon: ShieldAlert };
+      if (analysis.strength === 'medium') return { text: 'Medium', color: 'text-yellow-500', icon: Shield };
       return { text: 'Strong', color: 'text-green-500', icon: ShieldCheck };
   };
 
@@ -1957,9 +1974,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                        {/* Header */}
                        <div className="flex items-start gap-4 mb-8">
                            <div className="p-3 bg-gray-800 rounded-2xl text-primary-400 shadow-inner relative overflow-hidden">
-                               {formData.type === ItemType.LOGIN && (formData.data?.url || faviconUrl) ? (
+                               {formData.type === ItemType.LOGIN && (formData.faviconData || formData.data?.url) ? (
                                    <div className="w-10 h-10 rounded-full bg-gray-900 flex items-center justify-center overflow-hidden">
-                                       <FaviconImage url={faviconUrl || formData.data?.url} fallbackText={formData.name} />
+                                       <FaviconImage url={formData.data?.url} fallbackText={formData.name} faviconData={formData.faviconData} />
                                    </div>
                                ) : (
                                    getHeaderIcon()
