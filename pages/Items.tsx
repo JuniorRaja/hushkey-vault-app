@@ -331,7 +331,7 @@ const Items: React.FC = () => {
                     {item.isFavorite && <Star size={12} className="text-yellow-500 fill-yellow-500" />}
                 </h4>
                 <div className="text-gray-500 text-xs md:text-sm flex items-center gap-2">
-                    <span>
+                    <span style={item.type === ItemType.NOTE ? { filter: 'blur(1.5px)' } : undefined}>
                         {item.type === ItemType.NOTE ? (item.data?.content?.slice(0, 30) || 'No content') :
                          item.type === ItemType.LOGIN ? item.data?.username :
                          item.type === ItemType.WIFI ? item.data?.ssid :

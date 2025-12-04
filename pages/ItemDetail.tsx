@@ -1823,17 +1823,39 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
               </>
           );
       case ItemType.NOTE:
+          const noteContent = formData.data?.content || '';
+          const charCount = noteContent.length;
+          const maxChars = 2500;
           return (
              <div className="space-y-1">
-                <label className={labelClass}>Secure Note Content</label>
+                <div className="flex items-center justify-between">
+                    <label className={labelClass}>Secure Note Content</label>
+                    {isEditing && (
+                        <span className={`text-xs font-medium ${charCount > maxChars ? 'text-red-500' : charCount > maxChars * 0.9 ? 'text-orange-500' : 'text-gray-500'}`}>
+                            {charCount}/{maxChars}
+                        </span>
+                    )}
+                </div>
                 <textarea 
                     readOnly={!isEditing}
-                    className={`${inputBaseClass} font-mono text-sm leading-relaxed`}
+                    className={`${inputBaseClass} font-mono text-sm leading-relaxed ${isEditing && charCount > maxChars ? 'border-red-500 focus:border-red-500' : ''}`}
                     rows={12}
-                    value={formData.data?.content || ''}
-                    onChange={(e) => updateDataField('content', e.target.value)}
+                    value={noteContent}
+                    onChange={(e) => {
+                        const value = e.target.value;
+                        if (value.length <= maxChars) {
+                            updateDataField('content', value);
+                        }
+                    }}
                     placeholder="Write anything..."
+                    maxLength={maxChars}
                 />
+                {isEditing && charCount > maxChars && (
+                    <div className="flex items-center gap-1 text-red-500 text-xs mt-1">
+                        <AlertCircle size={12} />
+                        <span>Content exceeds maximum length of {maxChars} characters</span>
+                    </div>
+                )}
             </div>
           );
       case ItemType.IDENTITY:
