@@ -64,8 +64,11 @@ const formatBytes = (bytes: number, decimals = 2) => {
 
 // Simple Provider Logos Components
 const VisaLogo = ({ className }: { className?: string }) => (
-    <svg viewBox="0 0 36 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
-        <path d="M15.183 23.337H9.764L13.149 2.163H18.568L15.183 23.337ZM26.269 2.163L22.454 20.916L21.897 18.156C21.196 15.657 18.96 14.332 16.945 14.332H16.892L16.202 11.137C18.669 11.666 22.216 12.83 24.364 16.7L25.027 19.82L29.351 2.163H26.269ZM33.743 14.226C33.796 9.086 26.693 8.795 26.799 6.411C26.826 5.696 27.515 4.954 28.972 4.848C29.688 4.795 31.675 4.769 33.796 5.749L34.485 2.508C33.584 2.19 32.418 1.872 30.988 1.872C27.276 1.872 24.627 3.832 24.574 6.702C24.521 8.821 26.455 10.013 27.938 10.755C29.475 11.523 29.978 12.0 29.978 12.689C29.952 13.748 28.707 14.225 27.567 14.225C26.481 14.225 24.495 13.907 23.515 13.457L22.799 16.742C23.7 17.165 25.37 17.536 27.17 17.563C31.117 17.563 33.69 15.602 33.743 14.226ZM11.699 2.163H7.726C7.223 2.163 6.799 2.454 6.613 2.931L0.203 18.024L5.607 23.337C6.216 23.337 6.826 22.86 7.037 21.906L11.699 2.163Z" fill="currentColor"/>
+    <svg viewBox="0 0 48 32" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+        <rect width="48" height="32" fill="white" rx="2"/>
+        <rect y="0" width="48" height="10" fill="#1e2497ff"/>
+        <rect y="22" width="48" height="10" fill="#F7B600"/>
+        <text x="24" y="20" fontFamily="Arial, sans-serif" fontSize="10" fontWeight="bold" fill="#1A1F71" textAnchor="middle">VISA</text>
     </svg>
 );
 const MastercardLogo = ({ className }: { className?: string }) => (
@@ -181,6 +184,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const [showTotpSecret, setShowTotpSecret] = useState(false);
   const [showPin, setShowPin] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [cardProviderLocked, setCardProviderLocked] = useState(false);
+  const cardMockupRef = useRef<HTMLDivElement>(null);
   const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -1602,28 +1607,80 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         readOnly={!isEditing}
                         className={`${inputBaseClass} uppercase`}
                         value={formData.data?.holderName || ''}
-                        onChange={(e) => updateDataField('holderName', e.target.value)}
+                        onChange={(e) => {
+                            const value = e.target.value.replace(/[^a-zA-Z\s]/g, '').toUpperCase();
+                            updateDataField('holderName', value);
+                        }}
                         placeholder="ALEX STERLING"
                     />
                 </div>
                  <div className="space-y-1 group">
                     <label className={labelClass}>Card Number</label>
-                    <div className="flex items-center">
+                    <div className="flex items-center relative">
                          <input 
                             {...autoCompleteProps}
                             readOnly={!isEditing}
-                            className={`${inputBaseClass} font-mono text-lg tracking-widest`}
-                            value={formData.data?.number || ''}
-                            onChange={(e) => updateDataField('number', e.target.value)}
+                            className={`${inputBaseClass} font-mono text-lg tracking-widest ${formData.data?.provider ? 'pr-20' : ''}`}
+                            value={(formData.data?.number || '').match(/.{1,4}/g)?.join(' ') || formData.data?.number || ''}
+                            onChange={async (e) => {
+                                const value = e.target.value.replace(/\s/g, '').replace(/\D/g, '').slice(0, 16);
+                                updateDataField('number', value);
+                                
+                                if (value.length === 8) {
+                                    try {
+                                        const res = await fetch(`/api/binlist/${value}`);
+                                        if (res.ok) {
+                                            const data = await res.json();
+                                            const scheme = data.scheme?.toLowerCase();
+                                            if (['visa', 'mastercard', 'amex'].includes(scheme)) {
+                                                updateDataField('provider', scheme);
+                                                setCardProviderLocked(true);
+                                            }
+                                        }
+                                    } catch {}
+                                } else if (value.length < 8) {
+                                    if (cardProviderLocked) {
+                                        updateDataField('provider', '');
+                                        setCardProviderLocked(false);
+                                    }
+                                }
+                            }}
                             placeholder="0000 0000 0000 0000"
                         />
-                        {!isEditing && (
+                        {formData.data?.provider && (
+                            <div className="absolute right-3 flex items-center gap-2">
+                                {formData.data.provider === 'visa' && <VisaLogo className="h-6 w-auto text-white" />}
+                                {formData.data.provider === 'mastercard' && <MastercardLogo className="h-6 w-auto" />}
+                                {formData.data.provider === 'amex' && <AmexLogo className="h-6 w-auto" />}
+                                {formData.data.provider === 'rupay' && <RupayLogo className="h-6 w-auto" />}
+                            </div>
+                        )}
+                        {!isEditing && !formData.data?.provider && (
                             <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.number || '')}>
                                 <Copy size={16}/>
                             </button>
                         )}
                     </div>
                 </div>
+                {isEditing && <div className="space-y-1">
+                    <label className={labelClass}>Card Provider</label>
+                    <div className="flex flex-wrap gap-2">
+                        {['visa', 'mastercard', 'amex', 'rupay'].map(type => (
+                            <button
+                                key={type}
+                                type="button"
+                                disabled={cardProviderLocked}
+                                onClick={() => !cardProviderLocked && updateDataField('provider', type)}
+                                className={`px-3 py-2 rounded-lg border transition-all flex items-center justify-center ${formData.data?.provider === type ? 'bg-primary-900/30 border-primary-500' : cardProviderLocked ? 'bg-gray-900 border-gray-800 opacity-40 cursor-not-allowed' : 'bg-gray-800 border-gray-700 hover:border-gray-600'}`}
+                            >
+                                {type === 'visa' && <VisaLogo className="h-5 w-auto text-white" />}
+                                {type === 'mastercard' && <MastercardLogo className="h-5 w-auto" />}
+                                {type === 'amex' && <AmexLogo className="h-5 w-auto" />}
+                                {type === 'rupay' && <RupayLogo className="h-5 w-auto" />}
+                            </button>
+                        ))}
+                    </div>
+                </div>}
                 <div className="grid grid-cols-3 gap-4">
                      <div className="space-y-1">
                         <label className={labelClass}>Expiry</label>
@@ -1632,7 +1689,28 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             readOnly={!isEditing}
                             className={`${inputBaseClass} font-mono`}
                             value={formData.data?.expiry || ''}
-                            onChange={(e) => updateDataField('expiry', e.target.value)}
+                            onChange={(e) => {
+                                let value = e.target.value.replace(/\D/g, '');
+                                if (value.length >= 2) {
+                                    const month = parseInt(value.slice(0, 2));
+                                    if (month > 12) value = '12' + value.slice(2);
+                                    else if (month === 0) value = '01' + value.slice(2);
+                                    value = value.slice(0, 2) + '/' + value.slice(2, 4);
+                                }
+                                if (value.length > 5) value = value.slice(0, 5);
+                                
+                                if (value.length === 5) {
+                                    const [mm, yy] = value.split('/');
+                                    const currentYear = new Date().getFullYear() % 100;
+                                    const currentMonth = new Date().getMonth() + 1;
+                                    const year = parseInt(yy);
+                                    const month = parseInt(mm);
+                                    if (year < currentYear || (year === currentYear && month < currentMonth)) {
+                                        return;
+                                    }
+                                }
+                                updateDataField('expiry', value);
+                            }}
                             placeholder="MM/YY"
                         />
                      </div>
@@ -1645,8 +1723,12 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 readOnly={!isEditing}
                                 className={`${inputBaseClass} font-mono`}
                                 value={formData.data?.cvv || ''}
-                                onChange={(e) => updateDataField('cvv', e.target.value)}
+                                onChange={(e) => {
+                                    const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                    updateDataField('cvv', value);
+                                }}
                                 placeholder="123"
+                                maxLength={4}
                             />
                             {!isEditing && (
                                 <button className="absolute right-2 text-gray-500 hover:text-white" onClick={() => setShowPassword(!showPassword)}>
@@ -1664,8 +1746,12 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 readOnly={!isEditing}
                                 className={`${inputBaseClass} font-mono`}
                                 value={formData.data?.pin || ''}
-                                onChange={(e) => updateDataField('pin', e.target.value)}
+                                onChange={(e) => {
+                                    const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                    updateDataField('pin', value);
+                                }}
                                 placeholder="****"
+                                maxLength={4}
                             />
                             {!isEditing && (
                                 <button className="absolute right-2 text-gray-500 hover:text-white" onClick={() => setShowPin(!showPin)}>
@@ -1677,26 +1763,59 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                 </div>
                  {/* Visual Card Preview (Mock) */}
                  {!isEditing && (
-                     <div className="mt-4 p-6 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 shadow-xl relative overflow-hidden h-48 flex flex-col justify-between select-none">
-                         <div className="absolute top-0 right-0 p-4 opacity-20">
-                             <CreditCard size={100} />
+                     <div className="mt-4 space-y-2">
+                         <div className="flex items-center justify-between">
+                             <label className={labelClass}>Card Preview</label>
+                             <button 
+                                 onClick={async () => {
+                                     if (!cardMockupRef.current) return;
+                                     try {
+                                         const html2canvas = (await import('html2canvas')).default;
+                                         const canvas = await html2canvas(cardMockupRef.current, { backgroundColor: null });
+                                         canvas.toBlob((blob) => {
+                                             if (blob) {
+                                                 const url = URL.createObjectURL(blob);
+                                                 const a = document.createElement('a');
+                                                 a.href = url;
+                                                 a.download = `${formData.name || 'card'}-mockup.png`;
+                                                 a.click();
+                                                 URL.revokeObjectURL(url);
+                                             }
+                                         });
+                                     } catch (err) {
+                                         console.error('Failed to export card:', err);
+                                     }
+                                 }}
+                                 className="text-xs px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg flex items-center gap-1 transition-colors"
+                             >
+                                 <Share2 size={12} /> Share
+                             </button>
                          </div>
-                         <div className="flex justify-between items-start z-10">
-                             <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Sentinel Card</div>
-                             {formData.data?.provider === 'visa' && <VisaLogo className="h-8 w-auto text-white" />}
-                             {formData.data?.provider === 'mastercard' && <MastercardLogo className="h-8 w-auto" />}
-                         </div>
-                         <div className="z-10 text-2xl font-mono text-white tracking-widest shadow-black drop-shadow-md">
-                             {formData.data?.number ? formData.data.number.replace(/(.{4})/g, '$1 ').trim() : '•••• •••• •••• ••••'}
-                         </div>
-                         <div className="flex justify-between z-10">
-                             <div>
-                                 <div className="text-[8px] text-gray-400 uppercase font-bold">Card Holder</div>
-                                 <div className="text-sm font-medium text-gray-200 uppercase">{formData.data?.holderName || 'NAME'}</div>
+                         <div ref={cardMockupRef} className="p-6 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 shadow-xl relative overflow-hidden h-48 flex flex-col justify-between select-none">
+                             <div className="absolute top-0 right-0 p-4 opacity-20">
+                                 <CreditCard size={100} />
                              </div>
-                             <div>
-                                 <div className="text-[8px] text-gray-400 uppercase font-bold text-right">Expires</div>
-                                 <div className="text-sm font-medium text-gray-200">{formData.data?.expiry || 'MM/YY'}</div>
+                             <div className="flex justify-between items-start z-10">
+                                 <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">{formData.name || 'Card'}</div>
+                                 {formData.data?.provider === 'visa' && <VisaLogo className="h-8 w-auto text-white" />}
+                                 {formData.data?.provider === 'mastercard' && <MastercardLogo className="h-8 w-auto" />}
+                             </div>
+                             <div className="z-10 text-xl font-mono text-white tracking-widest shadow-black drop-shadow-md">
+                                 {formData.data?.number ? formData.data.number.replace(/(.{4})/g, '$1 ').trim() : '•••• •••• •••• ••••'}
+                             </div>
+                             <div className="flex justify-between items-end z-10">
+                                 <div>
+                                     <div className="text-[8px] text-gray-400 uppercase font-bold">Card Holder</div>
+                                     <div className="text-sm font-medium text-gray-200 uppercase">{formData.data?.holderName || 'NAME'}</div>
+                                 </div>
+                                 <div>
+                                     <div className="text-[8px] text-gray-400 uppercase font-bold text-right">Expires</div>
+                                     <div className="text-sm font-medium text-gray-200">{formData.data?.expiry || 'MM/YY'}</div>
+                                 </div>
+                                 <div>
+                                     <div className="text-[8px] text-gray-400 uppercase font-bold text-right">CVV</div>
+                                     <div className="text-sm font-medium text-gray-200">{formData.data?.cvv ? '•••' : '•••'}</div>
+                                 </div>
                              </div>
                          </div>
                      </div>

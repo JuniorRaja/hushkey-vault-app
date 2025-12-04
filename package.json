@@ -13,6 +13,7 @@
     "@aws-sdk/s3-request-presigner": "^3.940.0",
     "@supabase/supabase-js": "^2.86.0",
     "dexie": "^4.2.1",
+    "html2canvas": "^1.4.1",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.554.0",
     "react": "^19.2.1",
