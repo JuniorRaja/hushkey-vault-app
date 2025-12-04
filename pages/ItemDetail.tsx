@@ -6,10 +6,12 @@ import { useData } from '../App';
 import FileStorageService from '../src/services/fileStorage';
 import { FaviconService } from '../services/faviconService';
 import { Item, ItemType, FileAttachment } from '../types';
-import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers, Lock, Check, Copy as CopyIcon, Key, Trash } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers, Lock, Check, Copy as CopyIcon, Key, Trash, Scan } from 'lucide-react';
 import { generatePassword, generateTOTP } from '../services/passwordGenerator';
 import { analyzePassword } from '../src/services/passwordAnalyzer';
 import { checkUrlSupports2FA } from '../services/twoFactorChecker';
+import { generateWifiQR } from '../src/services/wifiDetector';
+import { QRCodeSVG } from 'qrcode.react';
 import ShareModal from '../components/ShareModal';
 import ConfirmationModal from '../components/ConfirmationModal';
 import MoveToVaultModal from '../components/MoveToVaultModal';
@@ -1523,6 +1525,10 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
             </>
         );
       case ItemType.WIFI:
+          const wifiQRData = formData.data?.ssid && formData.data?.password 
+            ? generateWifiQR(formData.data.ssid, formData.data.password, formData.data.securityType || 'WPA2')
+            : '';
+          
           return (
               <>
                  <div className="space-y-1 group">
@@ -1537,7 +1543,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             placeholder="MyWifi"
                         />
                          {!isEditing && (
-                            <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.ssid || '')}>
+                            <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.ssid || '', 'ssid')}>
                                 <Copy size={16}/>
                             </button>
                         )}
@@ -1559,7 +1565,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
                             </button>
                              {!isEditing && (
-                                <button className="p-2 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.password || '')}>
+                                <button className="p-2 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.password || '', 'wifipass')}>
                                     <Copy size={18}/>
                                 </button>
                             )}
@@ -1571,13 +1577,14 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     {isEditing ? (
                          <select 
                             className={inputBaseClass}
-                            value={formData.data?.securityType || ''}
+                            value={formData.data?.securityType || 'WPA2'}
                             onChange={(e) => updateDataField('securityType', e.target.value)}
                         >
                             <option value="WPA2">WPA2</option>
                             <option value="WPA3">WPA3</option>
+                            <option value="WPA">WPA</option>
                             <option value="WEP">WEP</option>
-                            <option value="Open">Open</option>
+                            <option value="nopass">Open (No Password)</option>
                         </select>
                     ) : (
                          <input 
@@ -1588,10 +1595,16 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     )}
                 </div>
                  {/* QR Code for WiFi */}
-                 {!isEditing && formData.data?.ssid && formData.data?.password && (
-                     <div className="mt-6 flex flex-col items-center p-4 bg-white rounded-xl w-fit mx-auto">
-                         <QrCode size={128} className="text-black" />
-                         <p className="text-black text-xs font-bold mt-2 uppercase tracking-wider">Scan to Join</p>
+                 {!isEditing && wifiQRData && (
+                     <div className="mt-6 flex flex-col items-center p-6 bg-white rounded-xl w-fit mx-auto shadow-lg">
+                         <QRCodeSVG 
+                           value={wifiQRData}
+                           size={200}
+                           level="M"
+                           includeMargin={true}
+                         />
+                         <p className="text-black text-sm font-bold mt-3 uppercase tracking-wider">Scan to Connect</p>
+                         <p className="text-gray-600 text-xs mt-1">{formData.data?.ssid}</p>
                      </div>
                  )}
               </>

@@ -10,43 +10,51 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       host: '0.0.0.0',
       headers: {
-        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.pwnedpasswords.com https://www.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.pwnedpasswords.com https://www.google.com https://lookup.binlist.net; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
         'X-Frame-Options': 'DENY',
         'X-Content-Type-Options': 'nosniff',
         'X-XSS-Protection': '1; mode=block',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
         'Permissions-Policy': 'geolocation=(), microphone=(), camera=(), clipboard-read=*, clipboard-write=*'
+      },
+      proxy: {
+      // Proxy /api/binlist/* -> https://lookup.binlist.net/*
+      '/api/binlist': {
+        target: 'https://lookup.binlist.net',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/binlist/, '')
       }
+    }
     },
     plugins: [
       react(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ["favicon.ico", "apple-touch-icon.png"],
+        includeAssets: ["AppImages/**/*.png"],
         manifest: {
           name: 'HushKey Vault',
           short_name: 'HushKey',
           description: 'Secure password manager and digital vault',
           theme_color: '#3b82f6',
-          background_color: '#0f172a',
+          background_color: '#ffffff',
           start_url: "/",
           display: 'standalone',
           orientation: 'portrait-primary',
           icons: [
             {
-              src: '/android-launchericon-192-192.png',
+              src: '/AppImages/android/android-launchericon-192-192.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: '/android-launchericon-512-512.png',
+              src: '/AppImages/android/android-launchericon-512-512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: '/android-launchericon-512-512.png',
+              src: '/AppImages/android/android-launchericon-512-512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable'
