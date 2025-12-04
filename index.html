@@ -4,11 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#3b82f6" />
+    <meta http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline' 'unsafe-eval';
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+        font-src 'self' https://fonts.gstatic.com data:;
+        connect-src 'self'
+          https://lpcmyofylxtgyullyzcn.supabase.co
+          wss://lpcmyofylxtgyullyzcn.supabase.co
+          https://lookup.binlist.net
+          https://generativelanguage.googleapis.com
+          https://fonts.googleapis.com;
+        img-src 'self' data: https:;
+        manifest-src 'self';
+        frame-ancestors 'none';
+        base-uri 'self';
+        form-action 'self';
+      " />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/AppImages/ios/32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/AppImages/ios/16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/AppImages/ios/180.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/AppImages/ios/152.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/AppImages/ios/120.png" />
     <title>Hushkey</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
