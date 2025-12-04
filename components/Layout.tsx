@@ -24,52 +24,7 @@ import SyncStatus from "./SyncStatus";
 import SearchOverlay from "./SearchOverlay";
 
 const HushkeyLogo = ({ size = 24 }: { size?: number }) => (
-  <div
-    className="relative flex items-center justify-center"
-    style={{ width: size, height: size }}
-  >
-    <svg
-      viewBox="0 0 100 100"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="w-full h-full text-white"
-    >
-      <path
-        d="M20 20V80"
-        stroke="currentColor"
-        strokeWidth="12"
-        strokeLinecap="round"
-      />
-      <path
-        d="M80 20V80"
-        stroke="currentColor"
-        strokeWidth="12"
-        strokeLinecap="round"
-      />
-      <path
-        d="M20 50H80"
-        stroke="currentColor"
-        strokeWidth="12"
-        strokeLinecap="round"
-      />
-      {/* Key Element interacting with H and K */}
-      <path
-        d="M45 50L65 30"
-        stroke="currentColor"
-        strokeWidth="8"
-        strokeLinecap="round"
-        opacity="0.8"
-      />
-      <path
-        d="M65 30L75 40"
-        stroke="currentColor"
-        strokeWidth="8"
-        strokeLinecap="round"
-        opacity="0.8"
-      />
-      <circle cx="40" cy="50" r="8" fill="currentColor" />
-    </svg>
-  </div>
+  <img src="/hushkey-icon.png" alt="Hushkey" width={size} height={size} />
 );
 
 const SidebarLink = memo(({
@@ -301,7 +256,7 @@ const Header = memo(({
     <header className="sticky top-0 z-50 bg-gray-950/80 backdrop-blur-md border-b border-gray-850 px-4 py-3 md:px-8 md:py-4 flex items-center justify-between">
       <div className="md:hidden flex items-center gap-2">
         <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-          <HushkeyLogo size={16} />
+          <HushkeyLogo size={24} />
         </div>
         <span className="font-bold text-lg">Hushkey</span>
       </div>

@@ -4,51 +4,7 @@ import { Github, Mail, Loader2, Delete } from "lucide-react";
 import { useAuthStore } from "../src/stores/authStore";
 
 const HushkeyLogo = ({ size = 24 }: { size?: number }) => (
-  <div
-    className="relative flex items-center justify-center"
-    style={{ width: size, height: size }}
-  >
-    <svg
-      viewBox="0 0 100 100"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className="w-full h-full text-white"
-    >
-      <path
-        d="M20 20V80"
-        stroke="currentColor"
-        strokeWidth="12"
-        strokeLinecap="round"
-      />
-      <path
-        d="M80 20V80"
-        stroke="currentColor"
-        strokeWidth="12"
-        strokeLinecap="round"
-      />
-      <path
-        d="M20 50H80"
-        stroke="currentColor"
-        strokeWidth="12"
-        strokeLinecap="round"
-      />
-      <path
-        d="M45 50L65 30"
-        stroke="currentColor"
-        strokeWidth="8"
-        strokeLinecap="round"
-        opacity="0.8"
-      />
-      <path
-        d="M65 30L75 40"
-        stroke="currentColor"
-        strokeWidth="8"
-        strokeLinecap="round"
-        opacity="0.8"
-      />
-      <circle cx="40" cy="50" r="8" fill="currentColor" />
-    </svg>
-  </div>
+  <img src="/hushkey-icon.png" alt="Hushkey" width={size} height={size} />
 );
 
 const Login: React.FC = () => {
@@ -213,7 +169,7 @@ const Login: React.FC = () => {
         <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
           <div className="mb-8 flex flex-col items-center animate-fade-in">
             <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl flex items-center justify-center shadow-2xl shadow-primary-900/50 mb-6">
-              <HushkeyLogo size={32} />
+              <HushkeyLogo size={50} />
             </div>
             <h1 className="text-3xl font-bold text-white mb-2">Hushkey Vault</h1>
             <p className="text-gray-400">
