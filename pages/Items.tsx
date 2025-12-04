@@ -19,7 +19,7 @@ const ItemIcon = ({ item }: { item: Item }) => {
             case ItemType.WIFI: return <Wifi className="text-purple-400" size={20} />;
             case ItemType.IDENTITY: return <User className="text-pink-400" size={20} />;
             case ItemType.BANK: return <Landmark className="text-emerald-400" size={20} />;
-            case ItemType.LICENSE: return <RectangleHorizontal className="text-orange-400" size={20} />;
+
             case ItemType.DATABASE: return <Database className="text-cyan-400" size={20} />;
             case ItemType.SERVER: return <Server className="text-indigo-400" size={20} />;
             case ItemType.SSH_KEY: return <Terminal className="text-slate-400" size={20} />;
@@ -62,7 +62,7 @@ const ITEM_TYPE_OPTIONS = [
     { type: ItemType.DATABASE, label: 'Database', description: 'Store database connection strings and creds.', icon: Database, color: 'text-cyan-400', bg: 'bg-cyan-400/10' },
     { type: ItemType.SERVER, label: 'Server', description: 'Manage server credentials and IP addresses.', icon: Server, color: 'text-indigo-400', bg: 'bg-indigo-400/10' },
     { type: ItemType.SSH_KEY, label: 'SSH Key', description: 'Store SSH keys and passphrases securely.', icon: Terminal, color: 'text-slate-400', bg: 'bg-slate-400/10' },
-    { type: ItemType.LICENSE, label: 'License', description: 'Store driving license details.', icon: RectangleHorizontal, color: 'text-orange-400', bg: 'bg-orange-400/10' },
+
     { type: ItemType.ID_CARD, label: 'ID Card', description: 'Government IDs, Passports, Employee IDs.', icon: IdCard, color: 'text-teal-400', bg: 'bg-teal-400/10' },
     { type: ItemType.FILE, label: 'Files', description: 'Securely store documents and files.', icon: FileText, color: 'text-rose-400', bg: 'bg-rose-400/10' },
 ];

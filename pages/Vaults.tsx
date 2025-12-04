@@ -15,7 +15,7 @@ const ItemTypeIcon = ({ type, size = 20 }: { type: string, size?: number }) => {
     case 'WIFI': return <Wifi className="text-purple-400" size={size} />;
     case 'IDENTITY': return <User className="text-pink-400" size={size} />;
     case 'BANK': return <Landmark className="text-emerald-400" size={size} />;
-    case 'LICENSE': return <RectangleHorizontal className="text-orange-400" size={size} />;
+
     case 'DATABASE': return <Database className="text-cyan-400" size={size} />;
     case 'SERVER': return <Server className="text-indigo-400" size={size} />;
     case 'SSH_KEY': return <Terminal className="text-slate-400" size={size} />;

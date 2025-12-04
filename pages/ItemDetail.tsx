@@ -1591,52 +1591,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                  )}
               </>
           );
-      case ItemType.LICENSE:
-          return (
-              <>
-                 <div className="space-y-1 group">
-                    <label className={labelClass}>License Number</label>
-                    <div className="flex items-center">
-                         <input 
-                            {...autoCompleteProps}
-                            readOnly={!isEditing}
-                            className={`${inputBaseClass} font-mono`}
-                            value={formData.data?.licenseNumber || ''}
-                            onChange={(e) => updateDataField('licenseNumber', e.target.value)}
-                        />
-                         {!isEditing && (
-                            <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.licenseNumber || '')}>
-                                <Copy size={16}/>
-                            </button>
-                        )}
-                    </div>
-                </div>
-                 <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1">
-                        <label className={labelClass}>State / Country</label>
-                        <input 
-                            {...autoCompleteProps}
-                            readOnly={!isEditing}
-                            className={inputBaseClass}
-                            value={formData.data?.state || ''}
-                            onChange={(e) => updateDataField('state', e.target.value)}
-                            placeholder="CA"
-                        />
-                     </div>
-                     <div className="space-y-1">
-                        <label className={labelClass}>Expiry Date</label>
-                        <input 
-                            type={isEditing ? "date" : "text"}
-                            {...autoCompleteProps}
-                            readOnly={!isEditing}
-                            className={inputBaseClass}
-                            value={formData.data?.expiryDate || ''}
-                            onChange={(e) => updateDataField('expiryDate', e.target.value)}
-                        />
-                     </div>
-                 </div>
-              </>
-          );
+
       case ItemType.CARD:
           return (
               <>
@@ -1865,7 +1820,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
             [ItemType.BANK]: <Landmark size={24} />,
             [ItemType.SERVER]: <Server size={24} />,
             [ItemType.SSH_KEY]: <Terminal size={24} />,
-            [ItemType.LICENSE]: <RectangleHorizontal size={24} />,
+
             [ItemType.FILE]: <Paperclip size={24} />,
             [ItemType.DATABASE]: <Database size={24} />,
             [ItemType.ID_CARD]: <IdCard size={24} />,

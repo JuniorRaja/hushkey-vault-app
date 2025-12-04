@@ -7,7 +7,6 @@ export enum ItemType {
   NOTE = 'NOTE',
   WIFI = 'WIFI',
   BANK = 'BANK',
-  LICENSE = 'LICENSE',
   DATABASE = 'DATABASE',
   SERVER = 'SERVER',
   SSH_KEY = 'SSH_KEY',
@@ -124,11 +123,7 @@ export interface BankData {
   holderName?: string;
 }
 
-export interface LicenseData {
-  licenseNumber: string;
-  expiryDate: string;
-  state: string;
-}
+
 
 export interface DatabaseData {
   host?: string;
@@ -186,7 +181,7 @@ export interface FileData {
 }
 
 export interface Item extends ItemBase {
-  data: LoginData & CardData & IdentityData & NoteData & WifiData & BankData & LicenseData & DatabaseData & ServerData & SSHKeyData & IdCardData & FileData; 
+  data: LoginData & CardData & IdentityData & NoteData & WifiData & BankData & DatabaseData & ServerData & SSHKeyData & IdCardData & FileData; 
 }
 
 export interface UserProfile {

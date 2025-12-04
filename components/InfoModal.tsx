@@ -57,7 +57,7 @@ const KPI_INFO: Record<string, KpiInfoData> = {
   },
   expiry: {
     title: "Expiry Reminders",
-    description: "Tracks expiration dates for passwords, credit cards, licenses, and ID cards. Get notified 90 days before expiry.",
+    description: "Tracks expiration dates for passwords, credit cards, and ID cards. Get notified 90 days before expiry.",
     bestPractices: [
       "Renew documents 3 months before expiry.",
       "Update the vault entry immediately after receiving the new card/ID.",

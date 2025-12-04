@@ -79,7 +79,7 @@ const KPI_INFO: Record<string, KpiInfoData> = {
     },
     expiry: {
         title: "Expiry Reminders",
-        description: "Tracks expiration dates for passwords, credit cards, licenses, and ID cards. Get notified 90 days before expiry.",
+        description: "Tracks expiration dates for passwords, credit cards, and ID cards. Get notified 90 days before expiry.",
         bestPractices: [
             "Renew documents 3 months before expiry.",
             "Update the vault entry immediately after receiving the new card/ID.",
@@ -645,7 +645,7 @@ const Guardian: React.FC = () => {
           }
       });
 
-      // 3. Expiry Reminders (Passwords, Cards, License, ID Card)
+      // 3. Expiry Reminders (Passwords, Cards, ID Card)
       const expiringItems: any[] = [];
       items.forEach(i => {
           let expiryDate: Date | null = null;
@@ -665,12 +665,7 @@ const Guardian: React.FC = () => {
               }
           }
           
-          if (i.type === 'LICENSE' && i.data.expiryDate) {
-              if (!isNaN(Date.parse(i.data.expiryDate))) {
-                  expiryDate = new Date(i.data.expiryDate);
-                  expiryType = 'License';
-              }
-          }
+
           
           if (i.type === 'ID_CARD' && i.data.validTill) {
               if (!isNaN(Date.parse(i.data.validTill))) {
