@@ -3,8 +3,9 @@ import { useParams, useNavigate, useSearchParams, useLocation } from 'react-rout
 import { useItemStore } from '../src/stores/itemStore';
 import { useAuthStore } from '../src/stores/authStore';
 import { useData } from '../App';
-import FileStorageService from '../src/services/fileStorage';
 import { FaviconService } from '../services/faviconService';
+import { FileAttachments } from '../src/components/FileAttachments';
+import { useAttachments } from '../src/hooks/useAttachments';
 import { Item, ItemType, FileAttachment } from '../types';
 import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers, Lock, Check, Copy as CopyIcon, Key, Trash, Scan } from 'lucide-react';
 import { generatePassword, generateTOTP } from '../services/passwordGenerator';
@@ -171,8 +172,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const { masterKey } = useAuthStore();
   const { settings } = useData();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const multipleFileInputRef = useRef<HTMLInputElement>(null);
-  const [fileAttachments, setFileAttachments] = useState<Array<{ id: string; name: string; size: number; mimeType: string }>>([]);
+  const { attachments: fileAttachments, refresh: refreshAttachments } = useAttachments(itemId || '');
 
   const [isEditing, setIsEditing] = useState(!!isNew);
   const [formData, setFormData] = useState<Partial<Item>>({
@@ -254,16 +254,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
           setFormData(JSON.parse(JSON.stringify(existing)));
           const url = existing.data?.url || '';
           setUrlInputValue(url.replace(/^https?:\/\//, ''));
-          
-          // Load file attachments if available
-          if (masterKey) {
-            try {
-              const attachments = await FileStorageService.getItemAttachments(itemId, masterKey);
-              setFileAttachments(attachments);
-            } catch (error) {
-              console.error('Failed to load attachments:', error);
-            }
-          }
+
           
           if (location.state && (location.state as any).isEditing) {
             setIsEditing(true);
@@ -629,55 +620,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       }
   };
 
-  const handleMultiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files || files.length === 0 || !itemId || !masterKey) return;
 
-      try {
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          await FileStorageService.uploadFile(itemId, file, masterKey);
-        }
-        
-        // Reload attachments
-        const attachments = await FileStorageService.getItemAttachments(itemId, masterKey);
-        setFileAttachments(attachments);
-        
-        if(multipleFileInputRef.current) multipleFileInputRef.current.value = '';
-      } catch (error) {
-        console.error('Failed to upload files:', error);
-        alert('Failed to upload files. Please try again.');
-      }
-  };
-
-  const removeAttachment = async (id: string) => {
-      try {
-        await FileStorageService.deleteFile(id);
-        setFileAttachments(prev => prev.filter(f => f.id !== id));
-      } catch (error) {
-        console.error('Failed to delete attachment:', error);
-        alert('Failed to delete attachment. Please try again.');
-      }
-  };
-
-  const downloadAttachment = async (fileId: string, fileName: string) => {
-      if (!masterKey) return;
-      
-      try {
-        const { data, mimeType } = await FileStorageService.downloadFile(fileId, masterKey);
-        const url = URL.createObjectURL(data);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error('Failed to download attachment:', error);
-        alert('Failed to download attachment. Please try again.');
-      }
-  };
 
   // --- Field Components based on Type ---
   const autoCompleteProps = { autoComplete: 'off', 'data-form-type': 'other', 'data-lpignore': 'true', 'data-1p-ignore': 'true', name: `field_${Math.random().toString(36)}` };
@@ -1012,69 +955,22 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     />
                 </div>
                 
-                <div className="space-y-2 mt-4">
-                     <label className={labelClass}>Files ({formData.data?.attachments?.length || 0})</label>
-                     
-                     {isEditing && (
-                        <div 
-                            onClick={() => multipleFileInputRef.current?.click()}
-                            className="w-full h-24 border-2 border-dashed border-gray-800 hover:border-primary-500/50 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors bg-gray-900/20 group"
-                        >
-                            <input 
-                                type="file" 
-                                multiple
-                                ref={multipleFileInputRef} 
-                                className="hidden" 
-                                onChange={handleMultiFileUpload} 
-                            />
-                            <div className="flex items-center gap-2 text-gray-500 group-hover:text-primary-400">
-                                <Upload size={20} />
-                                <span className="text-sm font-medium">Click to Upload Files</span>
-                            </div>
-                        </div>
-                     )}
-
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                         {fileAttachments.map((file) => (
-                             <div key={file.id} className="bg-gray-900 border border-gray-800 p-3 rounded-lg flex items-center justify-between group">
-                                 <div className="flex items-center gap-3 overflow-hidden">
-                                     <div className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center shrink-0 text-gray-400">
-                                         {file.mimeType.startsWith('image/') ? <ImageIcon size={20} /> : <FileText size={20} />}
-                                     </div>
-                                     <div className="min-w-0">
-                                         <p className="text-sm font-medium text-white truncate">{file.name}</p>
-                                         <p className="text-xs text-gray-500">{formatBytes(file.size)} • {file.mimeType.split('/')[1]?.toUpperCase() || 'FILE'}</p>
-                                     </div>
-                                 </div>
-                                 
-                                 <div className="flex items-center gap-1">
-                                     {isEditing ? (
-                                         <button 
-                                            onClick={() => removeAttachment(file.id)}
-                                            className="p-2 text-gray-500 hover:text-red-400 transition-colors"
-                                         >
-                                             <Trash2 size={16} />
-                                         </button>
-                                     ) : (
-                                          <button 
-                                            onClick={() => downloadAttachment(file.id, file.name)}
-                                            className="p-2 text-gray-500 hover:text-primary-400 transition-colors"
-                                            title="Download"
-                                         >
-                                             <Download size={16} />
-                                         </button>
-                                     )}
-                                 </div>
-                             </div>
-                         ))}
-                         
-                         {fileAttachments.length === 0 && !isEditing && (
-                             <div className="col-span-full text-center py-4 text-gray-500 text-sm">
-                                 No files attached.
-                             </div>
-                         )}
-                     </div>
-                </div>
+                
+                  {itemId && (
+                    <FileAttachments
+                      itemId={itemId}
+                      itemType={ItemType.FILE}
+                      attachments={fileAttachments}
+                      onAttachmentsChange={refreshAttachments}
+                      isEditing={isEditing}
+                    />
+                  )}
+                  {!itemId && (
+                    <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg text-center text-gray-400">
+                      <Paperclip size={24} className="mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Save this item first to add attachments</p>
+                    </div>
+                  )}
               </>
           )
       case ItemType.BANK:
@@ -2305,39 +2201,15 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
               )}
 
               {/* Attachments (Common for all except FILE which has main view) */}
-              {formData.type !== ItemType.FILE && (
+              {formData.type !== ItemType.FILE && itemId && (
                   <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
-                      <div className="flex items-center justify-between mb-3">
-                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Attachments</label>
-                          {isEditing && (
-                              <button onClick={() => multipleFileInputRef.current?.click()} className="p-1 hover:bg-gray-800 rounded text-primary-400">
-                                  <Plus size={16} />
-                              </button>
-                          )}
-                      </div>
-                      
-                      {isEditing && <input type="file" multiple ref={multipleFileInputRef} className="hidden" onChange={handleMultiFileUpload} />}
-
-                      <div className="space-y-2">
-                          {fileAttachments.map((file) => (
-                              <div key={file.id} className="flex items-center justify-between p-2 bg-gray-950 rounded-lg border border-gray-800 group">
-                                  <div className="flex items-center gap-2 overflow-hidden">
-                                      <File size={16} className="text-gray-500 shrink-0" />
-                                      <span className="text-sm text-gray-300 truncate">{file.name}</span>
-                                  </div>
-                                  <div className="flex items-center">
-                                      {isEditing ? (
-                                           <button onClick={() => removeAttachment(file.id)} className="p-1 text-gray-500 hover:text-red-400"><X size={14}/></button>
-                                      ) : (
-                                           <button onClick={() => downloadAttachment(file.id, file.name)} className="p-1 text-gray-500 hover:text-white"><Download size={14}/></button>
-                                      )}
-                                  </div>
-                              </div>
-                          ))}
-                          {fileAttachments.length === 0 && (
-                              <div className="text-xs text-gray-600 text-center py-4">No attachments</div>
-                          )}
-                      </div>
+                      <FileAttachments
+                        itemId={itemId}
+                        itemType={formData.type!}
+                        attachments={fileAttachments}
+                        onAttachmentsChange={refreshAttachments}
+                        isEditing={isEditing}
+                      />
                   </div>
               )}
               

@@ -172,7 +172,8 @@ export interface FileAttachment {
   name: string;
   size: number;
   type: string;
-  data: string; // Base64
+  data: string; // Base64 or storage path
+  createdAt?: string;
 }
 
 export interface FileData {
