@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Vault as VaultIcon, MoreVertical, Edit2, Trash2, Share2, Star, Globe, CreditCard, StickyNote, Wifi, User, Landmark, RectangleHorizontal, Database, Server, Terminal, IdCard, FileText, Folder, Briefcase, Shield, X } from 'lucide-react';
+import { Plus, Vault as VaultIcon, MoreVertical, Edit2, Trash2, Share2, Star, Globe, CreditCard, StickyNote, Wifi, User, Landmark, RectangleHorizontal, Database, Server, Terminal, IdCard, FileText, Folder, Briefcase, Shield, X, Link2 } from 'lucide-react';
 import { useVaultStore } from '../src/stores/vaultStore';
 import { Vault, ItemType } from '../types';
 import VaultModal from '../components/VaultModal';
 import ShareModal from '../components/ShareModal';
+import ShareManagement from '../components/ShareManagement';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 const ItemTypeIcon = ({ type, size = 20 }: { type: string, size?: number }) => {
@@ -266,6 +267,24 @@ const Vaults: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Share Management Section */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+            <Link2 size={16} className="text-primary-500" />
+            My Shares
+          </h3>
+          <button
+            onClick={() => navigate('/shares')}
+            className="text-xs text-primary-400 hover:text-primary-300 font-medium flex items-center gap-1"
+          >
+            View All
+            <span>→</span>
+          </button>
+        </div>
+        <ShareManagement />
+      </div>
 
       {/* Quick Access Section */}
       <div className="mt-8">

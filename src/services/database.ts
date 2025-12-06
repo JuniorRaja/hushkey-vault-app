@@ -366,7 +366,11 @@ class DatabaseService {
       })
     );
 
-    return items;
+    // Sort: favorites first (alphabetically), then non-favorites (alphabetically)
+    return items.sort((a, b) => {
+      if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+      return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+    });
   }
 
   /**
@@ -402,7 +406,11 @@ class DatabaseService {
       })
     );
 
-    return items;
+    // Sort: favorites first (alphabetically), then non-favorites (alphabetically)
+    return items.sort((a, b) => {
+      if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
+      return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+    });
   }
 
   /**

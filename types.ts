@@ -17,14 +17,14 @@ export enum ItemType {
 export interface Category {
   id: string;
   name: string;
-  color: string; // Tailwind color class or hex
+  color: string;
 }
 
 export interface Vault {
   id: string;
   name: string;
   description?: string;
-  icon: string; // Lucide icon name
+  icon: string;
   createdAt: string;
   itemCount: number;
   isShared: boolean;
@@ -33,11 +33,10 @@ export interface Vault {
   deletedAt?: string;
 }
 
-// Base fields
 export interface ItemBase {
   id: string;
   vaultId: string;
-  categoryId?: string; // New field
+  categoryId?: string;
   type: ItemType;
   name: string;
   notes?: string;
@@ -45,16 +44,15 @@ export interface ItemBase {
   lastUpdated: string;
   folder?: string;
   deletedAt?: string;
-  faviconData?: string; // Favicon URL for LOGIN, BANK, DATABASE types
+  faviconData?: string;
 }
 
-// Specific data structures (simplified for the demo but structured)
 export interface LoginData {
   username?: string;
   password?: string;
   url?: string;
   totp?: string;
-  passwordExpiryInterval?: number; // Days. 0 = Never
+  passwordExpiryInterval?: number;
   passwordLastModified?: string;
 }
 
@@ -66,7 +64,7 @@ export interface CardData {
   pin?: string;
   cardType?: 'debit' | 'credit';
   provider?: 'visa' | 'mastercard' | 'amex' | 'rupay' | 'other';
-  cardImage?: string; // base64
+  cardImage?: string;
 }
 
 export interface IdentityData {
@@ -76,25 +74,17 @@ export interface IdentityData {
   lastName?: string;
   username?: string;
   company?: string;
-  
-  // Personal
   dob?: string;
   gender?: string;
   bloodGroup?: string;
-
-  // Address
   address1?: string;
   address2?: string;
   city?: string;
   state?: string;
   postalCode?: string;
   country?: string;
-
-  // Contact
   email?: string;
   phone?: string;
-  
-  // IDs & Other
   passportNumber?: string;
   licenseNumber?: string;
   spouseName?: string;
@@ -114,23 +104,21 @@ export interface WifiData {
 
 export interface BankData {
   bankName?: string;
-  website?: string; // For logo fetching
+  website?: string;
   branch?: string;
   accountNumber?: string;
   accountType?: string;
-  ifsc?: string; // IFSC/IBAN
-  swift?: string; // SWIFT/BIC
+  ifsc?: string;
+  swift?: string;
   holderName?: string;
 }
-
-
 
 export interface DatabaseData {
   host?: string;
   port?: string;
   username?: string;
   password?: string;
-  databaseName?: string; // "Database" usually implies name
+  databaseName?: string;
   dbType?: 'mysql' | 'postgres' | 'oracle' | 'mssql' | 'mongo' | 'redis' | 'other';
   passwordExpiryInterval?: number;
   passwordLastModified?: string;
@@ -163,7 +151,7 @@ export interface IdCardData {
   idName?: string;
   fullName?: string;
   validTill?: string;
-  relationName?: string; // Father/Husband Name
+  relationName?: string;
   address?: string;
 }
 
@@ -172,7 +160,7 @@ export interface FileAttachment {
   name: string;
   size: number;
   type: string;
-  data: string; // Base64 or storage path
+  data: string;
   createdAt?: string;
 }
 
@@ -188,8 +176,8 @@ export interface Item extends ItemBase {
 export interface UserProfile {
   name: string;
   email: string;
-  avatar: string; // initials
-  pinHash: string; // Mock hash
+  avatar: string;
+  pinHash: string;
   recoveryEmail?: string;
 }
 
@@ -204,21 +192,14 @@ export type AccentColor = 'violet' | 'blue' | 'emerald' | 'rose' | 'amber' | 'cy
 export type ThemePattern = 'none' | 'waves' | 'geometric' | 'dots' | 'gradient' | 'mesh' | 'circuit' | 'hexagon';
 
 export interface NotificationSettings {
-    // Security
     newDeviceLogin: boolean;
     failedLoginAttempts: boolean;
     weakPasswordAlerts: boolean;
-    
-    // Reminders
     expiryReminders: boolean;
     backupHealth: boolean;
     monthlyReport: boolean;
-    
-    // Activity
     sessionAlerts: boolean;
     sharedVaultUpdates: boolean;
-
-    // Channels
     pushNotifications: boolean;
     emailNotifications: boolean;
 }
@@ -254,15 +235,36 @@ export interface AppNotification {
 }
 
 export interface AppSettings {
-  autoLockMinutes: number; // 0 = disabled
+  autoLockMinutes: number;
   clipboardClearSeconds: number;
   theme: 'dark' | 'light' | 'system';
   unlockMethod: 'pin' | 'biometric' | 'password';
   allowScreenshots: boolean;
   lastSync: string;
-  groupItemsByCategory: boolean; // New setting
-  categories: Category[]; // New setting
-  accentColor: AccentColor; // New setting
-  themePattern: ThemePattern; // New setting
-  notifications: NotificationSettings; // New setting
+  groupItemsByCategory: boolean;
+  categories: Category[];
+  accentColor: AccentColor;
+  themePattern: ThemePattern;
+  notifications: NotificationSettings;
+}
+
+export interface Share {
+  id: string;
+  userId: string;
+  shareType: 'item' | 'vault';
+  itemId?: string;
+  vaultId?: string;
+  shareMethod: 'in_app' | 'qr' | 'url';
+  shareToken: string;
+  encryptedData: string;
+  expiresAt?: string;
+  maxViews?: number;
+  viewCount: number;
+  oneTimeAccess: boolean;
+  passwordProtected: boolean;
+  recipientEmail?: string;
+  createdAt: string;
+  lastAccessedAt?: string;
+  revoked: boolean;
+  revokedAt?: string;
 }
