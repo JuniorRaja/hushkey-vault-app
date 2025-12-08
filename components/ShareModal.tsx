@@ -14,7 +14,7 @@ interface ShareModalProps {
 
 const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, item, type }) => {
   const { createShare } = useShareStore()
-  const { user } = useAuthStore()
+  const { user, masterKey } = useAuthStore()
   
   const [shareUrl, setShareUrl] = useState('')
   const [shareKey, setShareKey] = useState('')
@@ -50,7 +50,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, item, type }) 
   }
 
   const generateLink = async () => {
-    if (!user || !item) return
+    if (!user || !item || !masterKey) return
     
     if (passwordProtected && !password) {
       setError('Please enter a password')
@@ -65,6 +65,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, item, type }) 
         user.id,
         type,
         item,
+        masterKey,
         {
           itemId: type === 'item' ? item.id : undefined,
           vaultId: type === 'vault' ? item.id : undefined,
@@ -77,7 +78,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, item, type }) 
         }
       )
 
-      const url = `${window.location.origin}/#/share/${token}?key=${key}`
+      const url = `${window.location.origin}/#/share/${token}#${key}`
       setShareUrl(url)
       setShareKey(key)
     } catch (err) {

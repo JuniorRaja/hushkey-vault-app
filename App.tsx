@@ -40,6 +40,8 @@ import CategoriesSettings from "./pages/CategoriesSettings";
 import AuditLogsSettings from "./pages/AuditLogsSettings";
 import ItemDetail from "./pages/ItemDetail";
 import Trash from "./pages/Trash";
+import ShareAccess from "./pages/ShareAccess";
+import Shares from "./pages/Shares";
 import AppLayout from "./components/Layout";
 
 // --- Color Palettes ---
@@ -692,6 +694,16 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
 const AppRoutes = () => {
   const { user, isUnlocked } = useAuthStore();
+  const location = useLocation();
+
+  // Allow share route without authentication
+  if (location.pathname.startsWith('/share/')) {
+    return (
+      <Routes>
+        <Route path="/share/:token" element={<ShareAccess />} />
+      </Routes>
+    );
+  }
 
   // If not authenticated or not unlocked, show Login
   if (!user || !isUnlocked) {
@@ -712,6 +724,7 @@ const AppRoutes = () => {
         <Route path="settings/categories" element={<CategoriesSettings />} />
         <Route path="settings/audit-logs" element={<AuditLogsSettings />} />
         <Route path="trash" element={<Trash />} />
+        <Route path="shares" element={<Shares />} />
       </Route>
     </Routes>
   );

@@ -256,6 +256,7 @@ export interface Share {
   vaultId?: string;
   shareMethod: 'in_app' | 'qr' | 'url';
   shareToken: string;
+  encryptedShareKey: string; // Share key encrypted with user's master key
   encryptedData: string;
   expiresAt?: string;
   maxViews?: number;

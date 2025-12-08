@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Lock, Eye, EyeOff, AlertCircle, Copy, Check, Shield, Clock, User } from 'lucide-react'
+import { Lock, Eye, EyeOff, AlertCircle, Copy, Check, Shield, Clock, User, CreditCard, Wifi, Globe, StickyNote, Landmark, Database, Server, Terminal, IdCard, FileText } from 'lucide-react'
 import { useShareStore } from '../src/stores/shareStore'
-import { Item } from '../types'
+import { Item, ItemType } from '../types'
 
 const ShareAccess: React.FC = () => {
   const { token } = useParams<{ token: string }>()
@@ -22,14 +22,18 @@ const ShareAccess: React.FC = () => {
   }, [token])
 
   const loadShare = async () => {
-    if (!token) return
+    if (!token) {
+      setError('Invalid share link - missing token')
+      setLoading(false)
+      return
+    }
 
-    const hash = window.location.hash
-    const queryStart = hash.indexOf('?')
-    const key = queryStart > -1 ? new URLSearchParams(hash.substring(queryStart)).get('key') : null
+    const fullHash = window.location.href
+    const secondHashIndex = fullHash.indexOf('#', fullHash.indexOf('#') + 1)
+    const key = secondHashIndex > -1 ? fullHash.substring(secondHashIndex + 1) : null
 
     if (!key) {
-      setError('Invalid share link')
+      setError('Invalid share link - missing encryption key')
       setLoading(false)
       return
     }
@@ -41,6 +45,9 @@ const ShareAccess: React.FC = () => {
     } catch (err: any) {
       if (err.message.includes('password')) {
         setRequiresPassword(true)
+        setLoading(false)
+      } else if (err.message.includes('encryption key')) {
+        setError('Invalid or corrupted share link')
         setLoading(false)
       } else {
         setError(err.message || 'Failed to access share')
@@ -158,6 +165,66 @@ const ShareAccess: React.FC = () => {
 
   if (!data) return null
 
+  const FieldDisplay = ({ label, value, field, multiline = false }: { label: string; value: string; field: string; multiline?: boolean }) => (
+    <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</label>
+      <div className="flex items-center justify-between mt-2">
+        <p className={`text-white ${multiline ? 'text-sm font-mono whitespace-pre-wrap' : 'text-lg'} flex-1 break-all`}>{value}</p>
+        <button
+          onClick={() => copyToClipboard(value, field)}
+          className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white ml-2 shrink-0"
+        >
+          {copied === field ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+        </button>
+      </div>
+    </div>
+  )
+
+  const PasswordField = ({ label, value, field, multiline = false }: { label: string; value: string; field: string; multiline?: boolean }) => {
+    const [show, setShow] = useState(false)
+    return (
+      <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</label>
+        <div className="flex items-center justify-between mt-2 gap-3">
+          <p className={`text-white ${multiline ? 'text-sm' : 'text-lg'} font-mono flex-1 break-all ${multiline ? 'whitespace-pre-wrap' : ''}`}>
+            {show ? value : '••••••••••••'}
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShow(!show)}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+            >
+              {show ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+            <button
+              onClick={() => copyToClipboard(value, field)}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+            >
+              {copied === field ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const LinkField = ({ label, value, field }: { label: string; value: string; field: string }) => (
+    <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</label>
+      <div className="flex items-center justify-between mt-2">
+        <a href={value} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:text-primary-300 hover:underline text-lg truncate flex-1">
+          {value}
+        </a>
+        <button
+          onClick={() => copyToClipboard(value, field)}
+          className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white ml-2"
+        >
+          {copied === field ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col">
       <header className="p-6 border-b border-gray-800 bg-gray-950/50 backdrop-blur-sm">
@@ -199,63 +266,63 @@ const ShareAccess: React.FC = () => {
           </div>
 
           <div className="p-6 space-y-4">
-            {data.data?.username && (
+            {/* LOGIN fields */}
+            {data.data?.username && <FieldDisplay label="Username" value={data.data.username} field="username" />}
+            {data.data?.password && <PasswordField label="Password" value={data.data.password} field="password" />}
+            {data.data?.url && <LinkField label="Website URL" value={data.data.url} field="url" />}
+            
+            {/* CARD fields */}
+            {data.data?.holderName && <FieldDisplay label="Cardholder Name" value={data.data.holderName} field="holderName" />}
+            {data.data?.number && <FieldDisplay label="Card Number" value={data.data.number} field="number" />}
+            {data.data?.expiry && <FieldDisplay label="Expiry" value={data.data.expiry} field="expiry" />}
+            {data.data?.cvv && <PasswordField label="CVV" value={data.data.cvv} field="cvv" />}
+            {data.data?.pin && <PasswordField label="PIN" value={data.data.pin} field="pin" />}
+            
+            {/* WIFI fields */}
+            {data.data?.ssid && <FieldDisplay label="Network Name (SSID)" value={data.data.ssid} field="ssid" />}
+            {data.data?.securityType && <FieldDisplay label="Security Type" value={data.data.securityType} field="securityType" />}
+            
+            {/* BANK fields */}
+            {data.data?.bankName && <FieldDisplay label="Bank Name" value={data.data.bankName} field="bankName" />}
+            {data.data?.accountNumber && <FieldDisplay label="Account Number" value={data.data.accountNumber} field="accountNumber" />}
+            {data.data?.ifsc && <FieldDisplay label="IFSC/IBAN" value={data.data.ifsc} field="ifsc" />}
+            {data.data?.swift && <FieldDisplay label="SWIFT/BIC" value={data.data.swift} field="swift" />}
+            
+            {/* DATABASE fields */}
+            {data.data?.host && <FieldDisplay label="Host" value={data.data.host} field="host" />}
+            {data.data?.port && <FieldDisplay label="Port" value={data.data.port} field="port" />}
+            {data.data?.databaseName && <FieldDisplay label="Database Name" value={data.data.databaseName} field="databaseName" />}
+            
+            {/* SERVER fields */}
+            {data.data?.ip && <FieldDisplay label="IP Address" value={data.data.ip} field="ip" />}
+            {data.data?.hostname && <FieldDisplay label="Hostname" value={data.data.hostname} field="hostname" />}
+            
+            {/* SSH_KEY fields */}
+            {data.data?.publicKey && <FieldDisplay label="Public Key" value={data.data.publicKey} field="publicKey" multiline />}
+            {data.data?.privateKey && <PasswordField label="Private Key" value={data.data.privateKey} field="privateKey" multiline />}
+            {data.data?.passphrase && <PasswordField label="Passphrase" value={data.data.passphrase} field="passphrase" />}
+            
+            {/* ID_CARD fields */}
+            {data.data?.idName && <FieldDisplay label="ID Name" value={data.data.idName} field="idName" />}
+            {data.data?.fullName && <FieldDisplay label="Full Name" value={data.data.fullName} field="fullName" />}
+            {data.data?.validTill && <FieldDisplay label="Valid Till" value={data.data.validTill} field="validTill" />}
+            
+            {/* IDENTITY fields */}
+            {data.data?.firstName && <FieldDisplay label="First Name" value={data.data.firstName} field="firstName" />}
+            {data.data?.lastName && <FieldDisplay label="Last Name" value={data.data.lastName} field="lastName" />}
+            {data.data?.email && <FieldDisplay label="Email" value={data.data.email} field="email" />}
+            {data.data?.phone && <FieldDisplay label="Phone" value={data.data.phone} field="phone" />}
+            {data.data?.address1 && <FieldDisplay label="Address" value={data.data.address1} field="address1" />}
+            
+            {/* NOTE fields */}
+            {data.data?.content && (
               <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Username</label>
-                <div className="flex items-center justify-between mt-2">
-                  <p className="text-white text-lg">{data.data.username}</p>
-                  <button
-                    onClick={() => copyToClipboard(data.data.username, 'username')}
-                    className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
-                  >
-                    {copied === 'username' ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
-                  </button>
-                </div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Content</label>
+                <p className="text-white mt-2 whitespace-pre-wrap leading-relaxed font-mono text-sm">{data.data.content}</p>
               </div>
             )}
-
-            {data.data?.password && (
-              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Password</label>
-                <div className="flex items-center justify-between mt-2 gap-3">
-                  <p className="text-white text-lg font-mono flex-1">
-                    {showSharedPassword ? data.data.password : '••••••••••••'}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setShowSharedPassword(!showSharedPassword)}
-                      className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
-                    >
-                      {showSharedPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                    <button
-                      onClick={() => copyToClipboard(data.data.password, 'password')}
-                      className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
-                    >
-                      {copied === 'password' ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {data.data?.url && (
-              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Website URL</label>
-                <div className="flex items-center justify-between mt-2">
-                  <a href={data.data.url} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:text-primary-300 hover:underline text-lg truncate flex-1">
-                    {data.data.url}
-                  </a>
-                  <button
-                    onClick={() => copyToClipboard(data.data.url, 'url')}
-                    className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white ml-2"
-                  >
-                    {copied === 'url' ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
-                  </button>
-                </div>
-              </div>
-            )}
-
+            
+            {/* Common notes field */}
             {data.notes && (
               <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Notes</label>

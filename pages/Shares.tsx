@@ -16,11 +16,20 @@ const Shares: React.FC = () => {
     if (user) fetchShares(user.id)
   }, [user])
 
-  const copyShareUrl = async (token: string) => {
-    const url = `${window.location.origin}/#/share/${token}?key=ENCRYPTED_KEY`
-    await navigator.clipboard.writeText(url)
-    setCopied(token)
-    setTimeout(() => setCopied(null), 2000)
+  const copyShareUrl = async (shareId: string) => {
+    try {
+      const { getShareUrl } = useShareStore.getState()
+      const { masterKey } = useAuthStore.getState()
+      if (!masterKey) throw new Error('Master key not available')
+      
+      const url = await getShareUrl(shareId, masterKey)
+      await navigator.clipboard.writeText(url)
+      setCopied(shareId)
+      setTimeout(() => setCopied(null), 2000)
+    } catch (error) {
+      console.error('Failed to copy share URL:', error)
+      alert('Failed to copy share URL')
+    }
   }
 
   const handleRevoke = async (shareId: string) => {
@@ -86,143 +95,50 @@ const Shares: React.FC = () => {
           <p className="text-sm">Create shares from items or vaults</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 space-y-3">
-            {filteredShares.map(share => {
-              const status = getStatusBadge(share)
-              return (
-                <div
-                  key={share.id}
-                  onClick={() => setSelectedShare(share)}
-                  className={`bg-gray-900 border rounded-xl p-4 cursor-pointer transition-all hover:border-gray-700 ${selectedShare?.id === share.id ? 'border-primary-500' : 'border-gray-800'}`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-white font-medium">Share #{share.shareToken.substring(0, 12)}</h3>
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${status.class}`}>{status.text}</span>
-                      </div>
-                      <p className="text-xs text-gray-500">Created {new Date(share.createdAt).toLocaleDateString()}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredShares.map(share => {
+            const status = getStatusBadge(share)
+            return (
+              <div key={share.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-white font-medium">Share #{share.shareToken.substring(0, 12)}</h3>
+                      <span className={`px-2 py-0.5 text-xs rounded-full ${status.class}`}>{status.text}</span>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="flex items-center gap-1.5 text-gray-400">
-                      <Eye size={14} />
-                      <span>{share.viewCount} / {share.maxViews || '∞'} views</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-gray-400">
-                      <Clock size={14} />
-                      <span>{share.expiresAt ? new Date(share.expiresAt).toLocaleDateString() : 'No expiry'}</span>
-                    </div>
+                    <p className="text-xs text-gray-500">Created {new Date(share.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
-              )
-            })}
-          </div>
-
-          <div className="lg:col-span-1">
-            {selectedShare ? (
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 sticky top-4">
-                <h3 className="text-lg font-bold text-white mb-4">Share Details</h3>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Share Token</label>
-                    <div className="mt-1 flex items-center gap-2">
-                      <code className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 font-mono truncate">
-                        {selectedShare.shareToken}
-                      </code>
-                      <button onClick={() => copyShareUrl(selectedShare.shareToken)} className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white">
-                        {copied === selectedShare.shareToken ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
-                      </button>
-                    </div>
+                <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                  <div className="flex items-center gap-1.5 text-gray-400">
+                    <Eye size={14} />
+                    <span>{share.viewCount} / {share.maxViews || '∞'}</span>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Views</label>
-                      <div className="mt-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2">
-                        <p className="text-white font-medium">{selectedShare.viewCount} / {selectedShare.maxViews || '∞'}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Status</label>
-                      <div className="mt-1">
-                        <span className={`inline-block px-3 py-2 text-xs rounded-lg font-medium ${getStatusBadge(selectedShare).class}`}>
-                          {getStatusBadge(selectedShare).text}
-                        </span>
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-1.5 text-gray-400">
+                    <Clock size={14} />
+                    <span>{share.expiresAt ? new Date(share.expiresAt).toLocaleDateString() : 'No expiry'}</span>
                   </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Created</label>
-                    <div className="mt-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 flex items-center gap-2 text-gray-300">
-                      <Calendar size={14} />
-                      <span className="text-sm">{new Date(selectedShare.createdAt).toLocaleString()}</span>
-                    </div>
-                  </div>
-
-                  {selectedShare.expiresAt && (
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Expires</label>
-                      <div className="mt-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 flex items-center gap-2 text-gray-300">
-                        <Clock size={14} />
-                        <span className="text-sm">{new Date(selectedShare.expiresAt).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedShare.lastAccessedAt && (
-                    <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Last Accessed</label>
-                      <div className="mt-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 flex items-center gap-2 text-gray-300">
-                        <Eye size={14} />
-                        <span className="text-sm">{new Date(selectedShare.lastAccessedAt).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    {selectedShare.oneTimeAccess && (
-                      <span className="px-2 py-1 bg-amber-900/20 text-amber-400 text-xs rounded-lg flex items-center gap-1">
-                        <AlertCircle size={12} /> One-time
-                      </span>
-                    )}
-                    {selectedShare.passwordProtected && (
-                      <span className="px-2 py-1 bg-primary-900/20 text-primary-400 text-xs rounded-lg flex items-center gap-1">
-                        <Lock size={12} /> Protected
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="pt-4 space-y-2">
+                </div>
+                <div className="flex gap-2 mt-auto pt-3 border-t border-gray-800">
+                  <button
+                    onClick={() => copyShareUrl(share.id)}
+                    className="flex-1 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    {copied === share.id ? <Check size={14} /> : <Copy size={14} />}
+                    Copy
+                  </button>
+                  {!share.revoked && (
                     <button
-                      onClick={() => copyShareUrl(selectedShare.shareToken)}
-                      className="w-full py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                      onClick={() => handleRevoke(share.id)}
+                      className="px-3 py-2 border border-red-500/20 text-red-400 hover:bg-red-500/10 rounded-lg text-sm font-medium transition-colors"
                     >
-                      <ExternalLink size={16} />
-                      Copy Share Link
+                      <Trash2 size={14} />
                     </button>
-                    {!selectedShare.revoked && (
-                      <button
-                        onClick={() => handleRevoke(selectedShare.id)}
-                        className="w-full py-2.5 border border-red-500/20 text-red-400 hover:bg-red-500/10 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Trash2 size={16} />
-                        Revoke Share
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
-            ) : (
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center sticky top-4">
-                <Link2 size={32} className="text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-400 text-sm">Select a share to view details</p>
-              </div>
-            )}
-          </div>
+            )
+          })}
         </div>
       )}
     </div>
