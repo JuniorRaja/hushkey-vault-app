@@ -50,8 +50,13 @@ export const FindingsManager: React.FC<FindingsManagerProps> = ({
         .eq('user_id', userId);
       
       if (scanId) query = query.eq('scan_id', scanId);
-      if (filter === 'open') query = query.eq('resolved', false);
-      if (filter === 'resolved') query = query.eq('resolved', true);
+      
+      if (filter === 'open') {
+        query = query.eq('resolved', false).eq('obsolete', false);
+      } else if (filter === 'resolved') {
+        query = query.eq('resolved', true);
+      }
+      // 'all' includes obsolete findings
       
       const { data, error } = await query.order('created_at', { ascending: false });
       
@@ -157,6 +162,11 @@ export const FindingsManager: React.FC<FindingsManagerProps> = ({
                         }`}>
                           {finding.severity}
                         </span>
+                        {finding.obsolete && (
+                          <span className="text-[10px] md:text-xs px-2 py-0.5 md:py-1 rounded-full bg-gray-700/50 text-gray-500">
+                            Obsolete
+                          </span>
+                        )}
                         <span className="text-[10px] md:text-xs text-gray-600">
                           {new Date(finding.created_at).toLocaleDateString()}
                         </span>

@@ -59,7 +59,7 @@ export const ScanHistory: React.FC<ScanHistoryProps> = ({ userId, onClose }) => 
           </button>
         </div>
         
-        <div className="p-6 space-y-6">
+        <div className="px-2 py-4 space-y-6">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 size={32} className="animate-spin text-primary-500" />

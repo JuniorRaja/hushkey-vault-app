@@ -147,6 +147,7 @@ export const useGuardianStore = create<GuardianState & GuardianActions>((set, ge
         .select('*')
         .eq('user_id', userId)
         .eq('resolved', false)
+        .eq('obsolete', false)
         .order('created_at', { ascending: false });
       
       if (error) throw error;

@@ -239,6 +239,7 @@ CREATE TABLE IF NOT EXISTS guardian_findings (
   details JSONB,
   resolved BOOLEAN DEFAULT FALSE,
   resolved_at TIMESTAMPTZ,
+  obsolete BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -295,6 +296,7 @@ CREATE INDEX IF NOT EXISTS idx_biometric_credentials_user_id ON biometric_creden
 -- Guardian indexes
 CREATE INDEX idx_guardian_scans_user ON guardian_scans(user_id, scan_date DESC);
 CREATE INDEX idx_guardian_findings_scan ON guardian_findings(scan_id);
+CREATE INDEX idx_guardian_findings_obsolete ON guardian_findings(obsolete);
 CREATE INDEX idx_guardian_findings_user ON guardian_findings(user_id, resolved);
 CREATE INDEX idx_guardian_findings_item ON guardian_findings(item_id);
 

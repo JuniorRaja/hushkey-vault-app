@@ -68,6 +68,14 @@ export async function fetchFindings(userId: string, scanId?: string) {
 export async function runSecurityScan(userId: string, items: Item[]): Promise<ScanResult> {
   const startTime = Date.now();
   
+  // Mark all previous unresolved findings as obsolete
+  await supabase
+    .from('guardian_findings')
+    .update({ obsolete: true })
+    .eq('user_id', userId)
+    .eq('resolved', false)
+    .eq('obsolete', false);
+  
   // Filter items with passwords and valid UUIDs
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const loginItems = items.filter(i => i.data?.password && uuidRegex.test(i.id));
@@ -185,6 +193,15 @@ export async function runBreachCheck(
   onProgress?: (current: number, total: number) => void
 ): Promise<{ compromisedItems: any[], scanId: string }> {
   const startTime = Date.now();
+  
+  // Mark all previous unresolved findings as obsolete
+  await supabase
+    .from('guardian_findings')
+    .update({ obsolete: true })
+    .eq('user_id', userId)
+    .eq('resolved', false)
+    .eq('obsolete', false);
+  
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const loginItems = items.filter(i => i.data?.password && uuidRegex.test(i.id));
   const passwords = loginItems.map(i => i.data.password!);

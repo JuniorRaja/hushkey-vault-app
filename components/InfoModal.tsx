@@ -120,7 +120,7 @@ const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, kpiId }) => {
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 space-y-6">
           <div>
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Description</h4>
             <p className="text-gray-300 text-sm leading-relaxed">
