@@ -492,12 +492,10 @@ const AppLayout: React.FC = () => {
           {/* Lock tab */}
           <div
             onTouchStart={(e) => {
-              e.preventDefault();
               startY.current = e.touches[0].clientY;
               setIsDragging(true);
             }}
             onTouchMove={(e) => {
-              e.preventDefault();
               if (!isDragging) return;
               const currentY = e.touches[0].clientY;
               const distance = Math.max(0, startY.current - currentY);

@@ -60,30 +60,30 @@ const INITIAL_NOTIFICATIONS: AppNotification[] = [
 
 export const storageService = {
   getVaults: (): Vault[] => {
-    const stored = localStorage.getItem(KEYS.VAULTS);
+    const stored = sessionStorage.getItem(KEYS.VAULTS);
     return stored ? JSON.parse(stored) : INITIAL_VAULTS;
   },
   saveVaults: (vaults: Vault[]) => {
-    localStorage.setItem(KEYS.VAULTS, JSON.stringify(vaults));
+    sessionStorage.setItem(KEYS.VAULTS, JSON.stringify(vaults));
   },
   getItems: (): Item[] => {
-    const stored = localStorage.getItem(KEYS.ITEMS);
+    const stored = sessionStorage.getItem(KEYS.ITEMS);
     return stored ? JSON.parse(stored) : INITIAL_ITEMS;
   },
   saveItems: (items: Item[]) => {
-    localStorage.setItem(KEYS.ITEMS, JSON.stringify(items));
+    sessionStorage.setItem(KEYS.ITEMS, JSON.stringify(items));
   },
   getLogs: (): LogEntry[] => {
-    const stored = localStorage.getItem(KEYS.LOGS);
+    const stored = sessionStorage.getItem(KEYS.LOGS);
     return stored ? JSON.parse(stored) : INITIAL_LOGS;
   },
   addLog: (log: LogEntry) => {
     const logs = storageService.getLogs();
     const newLogs = [log, ...logs].slice(0, 100); // Keep last 100
-    localStorage.setItem(KEYS.LOGS, JSON.stringify(newLogs));
+    sessionStorage.setItem(KEYS.LOGS, JSON.stringify(newLogs));
   },
   getSettings: (): AppSettings => {
-    const stored = localStorage.getItem(KEYS.SETTINGS);
+    const stored = sessionStorage.getItem(KEYS.SETTINGS);
     const parsed = stored ? JSON.parse(stored) : {};
     return { 
         ...DEFAULT_SETTINGS, 
@@ -93,31 +93,31 @@ export const storageService = {
     };
   },
   saveSettings: (settings: AppSettings) => {
-      localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+      sessionStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
   },
   getUser: (): UserProfile => {
-      const stored = localStorage.getItem(KEYS.USER);
+      const stored = sessionStorage.getItem(KEYS.USER);
       return stored ? JSON.parse(stored) : INITIAL_USER;
   },
   saveUser: (user: UserProfile) => {
-      localStorage.setItem(KEYS.USER, JSON.stringify(user));
+      sessionStorage.setItem(KEYS.USER, JSON.stringify(user));
   },
   getNotifications: (): AppNotification[] => {
-      const stored = localStorage.getItem(KEYS.NOTIFICATIONS);
+      const stored = sessionStorage.getItem(KEYS.NOTIFICATIONS);
       return stored ? JSON.parse(stored) : INITIAL_NOTIFICATIONS;
   },
   saveNotifications: (notifications: AppNotification[]) => {
-      localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+      sessionStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(notifications));
   },
   clearAll: () => {
-      localStorage.clear();
+      sessionStorage.clear();
   },
   clearDataOnly: () => {
-      localStorage.removeItem(KEYS.VAULTS);
-      localStorage.removeItem(KEYS.ITEMS);
-      localStorage.removeItem(KEYS.LOGS);
-      localStorage.removeItem(KEYS.SETTINGS);
-      localStorage.removeItem(KEYS.NOTIFICATIONS);
+      sessionStorage.removeItem(KEYS.VAULTS);
+      sessionStorage.removeItem(KEYS.ITEMS);
+      sessionStorage.removeItem(KEYS.LOGS);
+      sessionStorage.removeItem(KEYS.SETTINGS);
+      sessionStorage.removeItem(KEYS.NOTIFICATIONS);
   },
   clearIndexedDB: async () => {
       const dbs = await indexedDB.databases();

@@ -512,11 +512,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const { user } = get();
         if (!user) return false;
 
-        let storedDeviceId = localStorage.getItem("hushkey_device_id");
+        let storedDeviceId = sessionStorage.getItem("hushkey_device_id");
 
         if (!storedDeviceId) {
           storedDeviceId = EncryptionService.generateRandomString();
-          localStorage.setItem("hushkey_device_id", storedDeviceId);
+          sessionStorage.setItem("hushkey_device_id", storedDeviceId);
           set({ deviceId: storedDeviceId });
 
           // Register device
@@ -584,6 +584,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
     }),
     {
       name: "hushkey-auth",
+      storage: {
+        getItem: (name) => sessionStorage.getItem(name),
+        setItem: (name, value) => sessionStorage.setItem(name, value),
+        removeItem: (name) => sessionStorage.removeItem(name),
+      },
       partialize: (state) => ({
         user: state.user,
         wrappedMasterKey: state.wrappedMasterKey,

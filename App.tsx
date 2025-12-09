@@ -621,9 +621,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       });
       // Simulate New Device Login Check
       // In reality, check local storage for a device UUID. If new, trigger.
-      const deviceId = localStorage.getItem("sentinel_device_id");
+      const deviceId = sessionStorage.getItem("sentinel_device_id");
       if (!deviceId) {
-        localStorage.setItem("sentinel_device_id", crypto.randomUUID());
+        sessionStorage.setItem("sentinel_device_id", crypto.randomUUID());
         // Need to defer this slightly as triggerNotification relies on DataContext which is parent/sibling
         // Actually AuthProvider wraps DataProvider is WRONG order if Auth needs Data.
         // FIX: DataProvider should be inside AuthProvider, OR they should be independent.
