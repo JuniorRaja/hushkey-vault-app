@@ -4,6 +4,7 @@
  */
 
 import Dexie, { Table } from 'dexie';
+import EncryptionService from './encryption';
 
 interface SyncRecord {
   id: string;
@@ -100,6 +101,38 @@ class HushkeyDB extends Dexie {
 const db = new HushkeyDB();
 
 class IndexedDBService {
+  private masterKey: Uint8Array | null = null;
+
+  /**
+   * Set master key for encryption
+   */
+  setMasterKey(key: Uint8Array): void {
+    this.masterKey = key;
+  }
+
+  /**
+   * Clear master key
+   */
+  clearMasterKey(): void {
+    this.masterKey = null;
+  }
+
+  /**
+   * Encrypt data for IndexedDB
+   */
+  private async encryptForDB(data: any): Promise<string> {
+    if (!this.masterKey) throw new Error('Master key not set');
+    return await EncryptionService.encryptObject(data, this.masterKey);
+  }
+
+  /**
+   * Decrypt data from IndexedDB
+   */
+  private async decryptFromDB<T>(encrypted: string): Promise<T> {
+    if (!this.masterKey) throw new Error('Master key not set');
+    return await EncryptionService.decryptObject<T>(encrypted, this.masterKey);
+  }
+
   /**
    * Save a single vault to IndexedDB
    */
@@ -227,8 +260,19 @@ class IndexedDBService {
     await db.metadata.put({ key: `profile_${userId}`, salt, updated_at: new Date().toISOString() });
   }
 
+  async getUserProfile(userId: string): Promise<any> {
+    return await db.metadata.get(`profile_${userId}`);
+  }
+
   async saveSettings(userId: string, settings: any): Promise<void> {
-    await db.metadata.put({ key: `settings_${userId}`, ...settings, updated_at: new Date().toISOString() });
+    const encrypted = await this.encryptForDB(settings);
+    await db.metadata.put({ key: `settings_${userId}`, data: encrypted, updated_at: new Date().toISOString() });
+  }
+
+  async getSettings(userId: string): Promise<any> {
+    const record = await db.metadata.get(`settings_${userId}`);
+    if (!record?.data) return null;
+    return await this.decryptFromDB(record.data);
   }
 
   async saveDevice(userId: string, deviceId: string, deviceName?: string): Promise<void> {

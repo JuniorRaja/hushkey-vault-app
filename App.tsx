@@ -731,7 +731,7 @@ const AppRoutes = () => {
 };
 
 const App: React.FC = () => {
-  const { hydrate, isLoading, user } = useAuthStore();
+  const { hydrate, isLoading, user, isUnlocked } = useAuthStore();
 
   useEffect(() => {
     hydrate();
@@ -739,7 +739,40 @@ const App: React.FC = () => {
     // Request PWA permissions
     requestNotificationPermission();
     requestClipboardPermission();
+
+    // Register service worker for offline support
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
   }, [hydrate]);
+
+  // Sync on app start and online events
+  useEffect(() => {
+    if (!user || !isUnlocked) return;
+
+    const syncData = async () => {
+      if (navigator.onLine) {
+        try {
+          const SyncService = (await import('./src/services/syncService')).default;
+          await SyncService.processSyncQueue();
+        } catch (error) {
+          console.error('Sync failed:', error);
+        }
+      }
+    };
+
+    // Sync on app start
+    syncData();
+
+    // Sync when coming back online
+    const handleOnline = () => {
+      console.log('Back online, syncing...');
+      syncData();
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [user, isUnlocked]);
 
   // Auto-cleanup expired trash on app launch
   // TODO: Change to cron job

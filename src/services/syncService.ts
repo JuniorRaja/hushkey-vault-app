@@ -8,12 +8,15 @@ import { useAuthStore } from '../stores/authStore';
 
 class SyncService {
   private isSyncing = false;
+  private retryAttempts = new Map<string, number>();
+  private maxRetries = 3;
+  private baseDelay = 1000; // 1 second
 
   /**
    * Process sync queue when coming back online
    */
   async processSyncQueue(): Promise<void> {
-    if (this.isSyncing) return;
+    if (this.isSyncing || !navigator.onLine) return;
     
     const { user, masterKey } = useAuthStore.getState();
     if (!user || !masterKey) return;
@@ -22,8 +25,18 @@ class SyncService {
 
     try {
       const queue = await IndexedDBService.getSyncQueue();
+      console.log(`Processing ${queue.length} queued changes...`);
       
       for (const item of queue) {
+        const retries = this.retryAttempts.get(item.id) || 0;
+        
+        if (retries >= this.maxRetries) {
+          console.error(`Max retries reached for ${item.entityType} ${item.entityId}`);
+          await IndexedDBService.clearSyncQueueItem(item.id);
+          this.retryAttempts.delete(item.id);
+          continue;
+        }
+
         try {
           switch (item.entityType) {
             case 'vault':
@@ -38,8 +51,15 @@ class SyncService {
           }
           
           await IndexedDBService.clearSyncQueueItem(item.id);
+          this.retryAttempts.delete(item.id);
+          console.log(`Synced ${item.entityType} ${item.entityId}`);
         } catch (error) {
           console.error(`Failed to sync ${item.entityType} ${item.entityId}:`, error);
+          this.retryAttempts.set(item.id, retries + 1);
+          
+          // Exponential backoff
+          const delay = this.baseDelay * Math.pow(2, retries);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
     } finally {
@@ -105,6 +125,23 @@ class SyncService {
   async getSyncStatus(): Promise<{ pending: number; syncing: boolean }> {
     const pending = await IndexedDBService.getPendingChangesCount();
     return { pending, syncing: this.isSyncing };
+  }
+
+  /**
+   * Force sync now
+   */
+  async forceSyncNow(): Promise<void> {
+    if (!navigator.onLine) {
+      throw new Error('Cannot sync while offline');
+    }
+    await this.processSyncQueue();
+  }
+
+  /**
+   * Clear retry attempts
+   */
+  clearRetries(): void {
+    this.retryAttempts.clear();
   }
 }
 

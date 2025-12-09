@@ -3,13 +3,14 @@
  * Handles Supabase backend + IndexedDB offline sync
  */
 
-import { create } from 'zustand';
-import { supabase } from '../supabaseClient';
-import DatabaseService from '../services/database';
-import IndexedDBService from '../services/indexedDB';
-import { useAuthStore } from './authStore';
-import { SoundService } from '../services/soundService';
-import type { Item, Vault, Category } from '../../types';
+import { create } from "zustand";
+import { supabase } from "../supabaseClient";
+import DatabaseService from "../services/database";
+import IndexedDBService from "../services/indexedDB";
+import EncryptionService from "../services/encryption";
+import { useAuthStore } from "./authStore";
+import { SoundService } from "../services/soundService";
+import type { Item, Vault, Category } from "../../types";
 
 interface ItemState {
   items: Item[];
@@ -28,14 +29,14 @@ interface ItemActions {
   updateItem: (itemId: string, updates: Partial<Item>) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
   toggleFavorite: (itemId: string) => Promise<void>;
-  
+
   // Vaults
   loadVaults: () => Promise<void>;
   getVaultItemCount: (vaultId: string) => Promise<number>;
-  
+
   // Categories
   loadCategories: () => Promise<void>;
-  
+
   // Sync
   syncWithServer: () => Promise<void>;
   setOnlineStatus: (status: boolean) => void;
@@ -52,44 +53,71 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
   async loadItems(vaultId?: string) {
     const { user, masterKey } = useAuthStore.getState();
     if (!user || !masterKey) {
-      console.log('loadItems: No user or masterKey');
+      console.log("loadItems: No user or masterKey");
       return;
     }
 
     set({ isLoading: true, error: null });
-    
+
     try {
-      const allItems = vaultId 
-        ? await DatabaseService.getItems(vaultId, masterKey)
-        : await DatabaseService.getAllItems(user.id, masterKey);
-            
-      // Filter out deleted items
-      const items = allItems.filter(i => !i.deletedAt);
-          
-      // Cache in IndexedDB
-      await IndexedDBService.bulkSaveItems(items.map(i => ({
-        id: i.id,
-        vaultId: i.vaultId,
-        categoryId: i.categoryId,
-        type: i.type,
-        dataEncrypted: '',
-        isFavorite: i.isFavorite,
-        folder: i.folder,
-        createdAt: i.lastUpdated,
-        updatedAt: i.lastUpdated,
-        deletedAt: i.deletedAt
-      })) as any);
-      
-      set({ items, isLoading: false });
-    } catch (error) {
-      console.error('Failed to load items:', error);
-      set({ isLoading: false, error: 'Failed to load items' });
-      
-      // Fallback to IndexedDB if offline
-      if (!get().isOnline && vaultId) {
-        const cachedItems = await IndexedDBService.getVaultItems(vaultId);
-        set({ items: cachedItems as any });
+      if (navigator.onLine) {
+        // Online: Fetch from server and rebuild IndexedDB
+        const allItems = vaultId
+          ? await DatabaseService.getItems(vaultId, masterKey)
+          : await DatabaseService.getAllItems(user.id, masterKey);
+
+        const items = allItems.filter((i) => !i.deletedAt);
+
+        // Rebuild IndexedDB cache with encrypted data
+        const itemRecords = await Promise.all(
+          items.map(async (i) => ({
+            id: i.id,
+            vaultId: i.vaultId,
+            categoryId: i.categoryId,
+            type: i.type,
+            dataEncrypted: await EncryptionService.encryptObject(i, masterKey),
+            isFavorite: i.isFavorite,
+            folder: i.folder,
+            createdAt: i.lastUpdated,
+            updatedAt: i.lastUpdated,
+            deletedAt: i.deletedAt,
+          }))
+        );
+
+        await IndexedDBService.bulkSaveItems(itemRecords);
+        set({ items, isLoading: false });
+      } else {
+        // Offline: Load from IndexedDB
+        const cachedItems = vaultId
+          ? await IndexedDBService.getVaultItems(vaultId)
+          : [];
+
+        const items = await Promise.all(
+          cachedItems
+            .filter((i) => i.dataEncrypted)
+            .map(async (i) => {
+              const decryptedData = await EncryptionService.decryptObject(
+                i.dataEncrypted,
+                masterKey
+              );
+              return {
+                id: i.id,
+                vaultId: i.vaultId,
+                categoryId: i.categoryId,
+                type: i.type,
+                isFavorite: i.isFavorite,
+                folder: i.folder,
+                lastUpdated: i.updatedAt,
+                deletedAt: i.deletedAt,
+                ...decryptedData,
+              } as Item;
+            })
+        );
+        set({ items: items.filter((i) => !i.deletedAt), isLoading: false });
       }
+    } catch (error) {
+      console.error("Failed to load items:", error);
+      set({ isLoading: false, error: "Failed to load items" });
     }
   },
 
@@ -99,7 +127,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
 
     try {
       // Check local state first
-      const localItem = get().items.find(i => i.id === itemId);
+      const localItem = get().items.find((i) => i.id === itemId);
       if (localItem) {
         await DatabaseService.updateLastAccessed(itemId);
         return localItem;
@@ -107,14 +135,15 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
 
       // Fetch from server
       const { data, error } = await supabase
-        .from('items')
-        .select('*')
-        .eq('id', itemId)
+        .from("items")
+        .select("*")
+        .eq("id", itemId)
         .single();
 
       if (error) throw error;
 
-      const EncryptionService = (await import('../services/encryption')).default;
+      const EncryptionService = (await import("../services/encryption"))
+        .default;
       const decryptedData = await EncryptionService.decryptObject(
         data.data_encrypted,
         masterKey
@@ -135,112 +164,182 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
       await DatabaseService.updateLastAccessed(itemId);
       return item;
     } catch (error) {
-      console.error('Failed to get item:', error);
+      console.error("Failed to get item:", error);
       return null;
     }
   },
 
   async createItem(vaultId: string, itemData: Partial<Item>) {
     const { user, masterKey } = useAuthStore.getState();
-    if (!user || !masterKey) throw new Error('Not authenticated');
+    if (!user || !masterKey) throw new Error("Not authenticated");
 
-    try {
-      const item = await DatabaseService.createItem(vaultId, itemData, masterKey);
-      
-      // Cache in IndexedDB
-      await IndexedDBService.saveVaultItem({
-        id: item.id,
-        vaultId: item.vaultId,
-        categoryId: item.categoryId,
-        type: item.type,
-        dataEncrypted: '',
-        isFavorite: item.isFavorite,
-        folder: item.folder,
-        createdAt: item.lastUpdated,
-        updatedAt: item.lastUpdated
-      } as any);
-      
-      // Log activity
-      await DatabaseService.logActivity(user.id, 'CREATE', `Created ${item.type} item: ${item.name}`);
-      
-      // Add to state immediately
-      set({ items: [...get().items, item] });
-      
-      return item;
-    } catch (error) {
-      console.error('Failed to create item:', error);
-      
-      // Queue for offline sync
-      if (!get().isOnline) {
-        await IndexedDBService.queueChange('CREATE', 'item', '', itemData);
+    const itemId = crypto.randomUUID();
+    const timestamp = new Date().toISOString();
+
+    const item: Item = {
+      id: itemId,
+      vaultId,
+      categoryId: itemData.categoryId,
+      type: itemData.type!,
+      isFavorite: itemData.isFavorite || false,
+      folder: itemData.folder,
+      lastUpdated: timestamp,
+      ...itemData,
+    } as Item;
+
+    // 1. Update local state immediately
+    set({ items: [...get().items, item] });
+
+    // 2. Save to IndexedDB
+    const dataEncrypted = await EncryptionService.encryptObject(
+      itemData,
+      masterKey
+    );
+    await IndexedDBService.saveVaultItem({
+      id: itemId,
+      vaultId,
+      categoryId: itemData.categoryId,
+      type: itemData.type!,
+      dataEncrypted,
+      isFavorite: itemData.isFavorite || false,
+      folder: itemData.folder,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+
+    // 3. Queue for sync
+    await IndexedDBService.queueChange("CREATE", "item", itemId, {
+      vaultId,
+      ...itemData,
+    });
+
+    // 4. Sync to server if online
+    if (navigator.onLine) {
+      try {
+        await DatabaseService.createItem(vaultId, itemData, masterKey);
+        await DatabaseService.logActivity(
+          user.id,
+          "CREATE",
+          `Created ${item.type} item: ${item.name}`
+        );
+        await IndexedDBService.clearSyncQueueItem(itemId);
+      } catch (error) {
+        console.log("Item queued for sync");
       }
-      
-      throw error;
     }
+
+    return item;
   },
 
   async updateItem(itemId: string, updates: Partial<Item>) {
     const { user, masterKey } = useAuthStore.getState();
-    if (!user || !masterKey) throw new Error('Not authenticated');
+    if (!user || !masterKey) throw new Error("Not authenticated");
 
-    try {
-      await DatabaseService.updateItem(itemId, updates, masterKey);
-      
-      // Log activity
-      await DatabaseService.logActivity(user.id, 'UPDATE', `Updated item: ${updates.name || itemId}`);
-      
-      // Update local state
-      const items = get().items.map(i => 
-        i.id === itemId ? { ...i, ...updates, lastUpdated: new Date().toISOString() } : i
+    const timestamp = new Date().toISOString();
+
+    // 1. Update local state immediately
+    const items = get().items.map((i) =>
+      i.id === itemId ? { ...i, ...updates, lastUpdated: timestamp } : i
+    );
+    set({ items });
+
+    // 2. Update IndexedDB
+    const item = items.find((i) => i.id === itemId);
+    if (item) {
+      const dataEncrypted = await EncryptionService.encryptObject(
+        item,
+        masterKey
       );
-      set({ items });
-    } catch (error) {
-      console.error('Failed to update item:', error);
-      
-      // Queue for offline sync
-      if (!get().isOnline) {
-        await IndexedDBService.queueChange('UPDATE', 'item', itemId, updates);
+      await IndexedDBService.saveVaultItem({
+        id: itemId,
+        vaultId: item.vaultId,
+        categoryId: item.categoryId,
+        type: item.type,
+        dataEncrypted,
+        isFavorite: item.isFavorite,
+        folder: item.folder,
+        createdAt: item.lastUpdated,
+        updatedAt: timestamp,
+      });
+    }
+
+    // 3. Queue for sync
+    await IndexedDBService.queueChange("UPDATE", "item", itemId, updates);
+
+    // 4. Sync to server if online
+    if (navigator.onLine && user) {
+      try {
+        await DatabaseService.updateItem(itemId, updates, masterKey);
+        await DatabaseService.logActivity(
+          user.id,
+          "UPDATE",
+          `Updated item: ${updates.name || itemId}`
+        );
+        await IndexedDBService.clearSyncQueueItem(itemId);
+      } catch (error) {
+        console.log("Item update queued for sync");
       }
-      
-      throw error;
     }
   },
 
   async deleteItem(itemId: string) {
-    const { user } = useAuthStore.getState();
-    
-    try {
-      await DatabaseService.deleteItem(itemId);
-      
-      // Play trash sound
-      SoundService.playTrash();
-      
-      // Log activity
-      if (user) {
-        await DatabaseService.logActivity(user.id, 'DELETE', `Moved item to trash: ${itemId}`);
+    const { user, masterKey } = useAuthStore.getState();
+    if (!masterKey) return;
+
+    const timestamp = new Date().toISOString();
+    SoundService.playTrash();
+
+    const item = get().items.find((i) => i.id === itemId);
+
+    // 1. Update local state - remove from display
+    const items = get().items.filter((i) => i.id !== itemId);
+    set({ items });
+
+    // 2. Update IndexedDB with deletedAt
+    if (item) {
+      await IndexedDBService.saveVaultItem({
+        id: itemId,
+        vaultId: item.vaultId,
+        categoryId: item.categoryId,
+        type: item.type,
+        dataEncrypted: await EncryptionService.encryptObject(item, masterKey),
+        isFavorite: item.isFavorite,
+        folder: item.folder,
+        createdAt: item.lastUpdated,
+        updatedAt: timestamp,
+        deletedAt: timestamp,
+      });
+    }
+
+    // 3. Queue for sync only once
+    const existingQueue = await IndexedDBService.getSyncQueue();
+    const alreadyQueued = existingQueue.some(
+      (q) => q.entityId === itemId && q.action === "DELETE"
+    );
+    if (!alreadyQueued) {
+      await IndexedDBService.queueChange("DELETE", "item", itemId, {});
+    }
+
+    // 4. Sync to server if online
+    if (navigator.onLine && user) {
+      try {
+        await DatabaseService.deleteItem(itemId);
+        await DatabaseService.logActivity(
+          user.id,
+          "DELETE",
+          `Moved item to trash: ${itemId}`
+        );
+        await IndexedDBService.clearSyncQueueItem(itemId);
+      } catch (error) {
+        console.log("Item deletion queued for sync");
       }
-      
-      // Update local state (soft delete)
-      const items = get().items.map(i => 
-        i.id === itemId ? { ...i, deletedAt: new Date().toISOString() } : i
-      );
-      set({ items });
-    } catch (error) {
-      console.error('Failed to delete item:', error);
-      
-      // Queue for offline sync
-      if (!get().isOnline) {
-        await IndexedDBService.queueChange('DELETE', 'item', itemId, {});
-      }
-      
-      throw error;
     }
   },
 
   async toggleFavorite(itemId: string) {
-    const item = get().items.find(i => i.id === itemId);
+    const item = get().items.find((i) => i.id === itemId);
     if (!item) return;
-    
+
     await get().updateItem(itemId, { isFavorite: !item.isFavorite });
   },
 
@@ -251,18 +350,18 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
     set({ isLoading: true });
     try {
       const vaults = await DatabaseService.getVaults(user.id, masterKey);
-      
+
       // Get actual item counts
       const vaultsWithCounts = await Promise.all(
         vaults.map(async (v) => ({
           ...v,
-          itemCount: await DatabaseService.getVaultItemCount(v.id)
+          itemCount: await DatabaseService.getVaultItemCount(v.id),
         }))
       );
-      
+
       set({ vaults: vaultsWithCounts, isLoading: false });
     } catch (error) {
-      console.error('Failed to load vaults:', error);
+      console.error("Failed to load vaults:", error);
       set({ isLoading: false });
     }
   },
@@ -271,7 +370,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
     try {
       return await DatabaseService.getVaultItemCount(vaultId);
     } catch (error) {
-      console.error('Failed to get vault item count:', error);
+      console.error("Failed to get vault item count:", error);
       return 0;
     }
   },
@@ -281,20 +380,30 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
     if (!user || !masterKey) return;
 
     try {
-      const categories = await DatabaseService.getCategories(user.id, masterKey);
+      const categories = await DatabaseService.getCategories(
+        user.id,
+        masterKey
+      );
       set({ categories });
     } catch (error) {
-      console.error('Failed to load categories:', error);
+      console.error("Failed to load categories:", error);
     }
   },
 
   async syncWithServer() {
+    if (!navigator.onLine) return;
+
     try {
+      // Process sync queue first
+      const SyncService = (await import("../services/syncService")).default;
+      await SyncService.processSyncQueue();
+
+      // Then reload from server to rebuild IndexedDB
       await get().loadVaults();
       await get().loadCategories();
       await get().loadItems();
     } catch (error) {
-      console.error('Failed to sync with server:', error);
+      console.error("Failed to sync with server:", error);
       throw error;
     }
   },
@@ -304,16 +413,22 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
     if (status) {
       get().syncWithServer();
     }
-  }
+  },
 }));
 
 // Listen for online/offline events
-if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => {
+if (typeof window !== "undefined") {
+  window.addEventListener("online", async () => {
     useItemStore.getState().setOnlineStatus(true);
+    try {
+      const SyncService = (await import("../services/syncService")).default;
+      await SyncService.processSyncQueue();
+    } catch (error) {
+      console.error("Sync failed:", error);
+    }
   });
-  
-  window.addEventListener('offline', () => {
+
+  window.addEventListener("offline", () => {
     useItemStore.getState().setOnlineStatus(false);
   });
 }

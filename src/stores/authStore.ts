@@ -85,16 +85,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           );
         }
 
-        console.log("Signup successful, creating profile...");
-
         try {
-          // 1. Create user profile with salt
           const salt = EncryptionService.generateSalt();
           await DatabaseService.createUserProfile(data.user.id, salt);
           await IndexedDBService.saveUserProfile(data.user.id, salt);
-          console.log("Profile created");
 
-          // 2. Create default settings
           const defaultSettings = {
             auto_lock_minutes: 5,
             clipboard_clear_seconds: 30,
@@ -102,20 +97,22 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             allow_screenshots: false,
           };
           await DatabaseService.saveUserSettings(data.user.id, defaultSettings);
-          await IndexedDBService.saveSettings(data.user.id, defaultSettings);
-          console.log("Settings created");
 
-          // 3. Register device
           const deviceId = EncryptionService.generateRandomString();
           const deviceName = navigator.userAgent.substring(0, 50);
           await DatabaseService.saveDevice(data.user.id, deviceId, deviceName);
           await IndexedDBService.saveDevice(data.user.id, deviceId, deviceName);
-          console.log("Device registered:", deviceId);
 
-          // 4. Log signup event
-          await DatabaseService.logActivity(data.user.id, "SIGNUP", "User account created");
-          await IndexedDBService.logActivity(data.user.id, "SIGNUP", "User account created");
-          console.log("Activity logged");
+          await DatabaseService.logActivity(
+            data.user.id,
+            "SIGNUP",
+            "User account created"
+          );
+          await IndexedDBService.logActivity(
+            data.user.id,
+            "SIGNUP",
+            "User account created"
+          );
 
           set({
             user: { id: data.user.id, email: data.user.email! },
@@ -141,20 +138,28 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
         // Log signin event with session details
         const deviceName = navigator.userAgent.substring(0, 50);
-        await DatabaseService.logActivity(data.user.id, "LOGIN", `User signed in from ${deviceName}`);
-        await IndexedDBService.logActivity(data.user.id, "LOGIN", `User signed in from ${deviceName}`);
-
-        // Load settings from Supabase and cache in IndexedDB
-        const settings = await DatabaseService.getUserSettings(data.user.id);
-        if (settings) {
-          await IndexedDBService.saveSettings(data.user.id, settings);
+        await IndexedDBService.logActivity(
+          data.user.id,
+          "LOGIN",
+          `User signed in from ${deviceName}`
+        );
+        if (navigator.onLine) {
+          try {
+            await DatabaseService.logActivity(
+              data.user.id,
+              "LOGIN",
+              `User signed in from ${deviceName}`
+            );
+          } catch (error) {
+            console.log("Failed to log to server");
+          }
         }
 
         set({
           user: { id: data.user.id, email: data.user.email! },
           isLoading: false,
           isUnlocked: false,
-          autoLockMinutes: settings?.auto_lock_minutes ?? 5,
+          autoLockMinutes: 5,
         });
       },
 
@@ -171,25 +176,40 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
       async signOut() {
         const { user, masterKey } = get();
-        
+
         // Securely wipe master key from memory
         if (masterKey) {
           SecureMemoryService.secureWipe(masterKey);
         }
-        
+
         // Clear all security services
         IntegrityCheckerService.clear();
         await SecureMemoryService.clearSecureStorage();
         RateLimiterService.clearAll();
-        
+        IndexedDBService.clearMasterKey();
+
         if (user) {
-          await DatabaseService.logActivity(user.id, "LOGOUT", "User signed out");
-          await IndexedDBService.logActivity(user.id, "LOGOUT", "User signed out");
+          await IndexedDBService.logActivity(
+            user.id,
+            "LOGOUT",
+            "User signed out"
+          );
+          if (navigator.onLine) {
+            try {
+              await DatabaseService.logActivity(
+                user.id,
+                "LOGOUT",
+                "User signed out"
+              );
+            } catch (error) {
+              console.log("Failed to log to server (offline)");
+            }
+          }
         }
-        
+
         await supabase.auth.signOut();
         await IndexedDBService.clearAll();
-        
+
         set({
           user: null,
           masterKey: null,
@@ -201,22 +221,33 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
       async lock() {
         const { user, masterKey } = get();
-        
+
         // Securely wipe master key from memory
         if (masterKey) {
           SecureMemoryService.secureWipe(masterKey);
         }
-        
+
         // Clear integrity checker
         IntegrityCheckerService.clear();
-        
+        IndexedDBService.clearMasterKey();
+
         if (user) {
-          await DatabaseService.logActivity(user.id, "LOCK", "Vault locked");
           await IndexedDBService.logActivity(user.id, "LOCK", "Vault locked");
+          if (navigator.onLine) {
+            try {
+              await DatabaseService.logActivity(
+                user.id,
+                "LOCK",
+                "Vault locked"
+              );
+            } catch (error) {
+              console.log("Failed to log to server (offline)");
+            }
+          }
         }
-        
+
         SoundService.playLockSound();
-        
+
         set({
           masterKey: null,
           isUnlocked: false,
@@ -228,7 +259,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const { user } = get();
         if (!user) throw new Error("No user logged in");
 
-        // Get or create profile
         let profile = await DatabaseService.getUserProfile(user.id);
         let salt = profile?.salt;
 
@@ -238,14 +268,13 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           await IndexedDBService.saveUserProfile(user.id, salt);
         }
 
-        // Derive master key from PIN
         const masterKey = await EncryptionService.deriveMasterKey(pin, salt);
 
-        // Wrap master key for secure storage
         await SecureMemoryService.initializeWrappingKey();
-        const wrappedMasterKey = await SecureMemoryService.wrapMasterKey(masterKey);
+        const wrappedMasterKey = await SecureMemoryService.wrapMasterKey(
+          masterKey
+        );
 
-        // Encrypt master key with PIN (legacy support)
         const pinSalt = EncryptionService.generateSalt();
         const pinKey = await EncryptionService.deriveMasterKey(pin, pinSalt);
         const masterKeyBase64 = EncryptionService.toBase64(masterKey);
@@ -254,10 +283,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           pinKey
         );
 
-        // Initialize integrity checker
         await IntegrityCheckerService.initialize(masterKey);
+        IndexedDBService.setMasterKey(masterKey);
 
-        // Get or create settings
+        // Load and cache settings
         let settings = await DatabaseService.getUserSettings(user.id);
         if (!settings) {
           const defaultSettings = {
@@ -267,41 +296,44 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             allow_screenshots: false,
           };
           await DatabaseService.saveUserSettings(user.id, defaultSettings);
-          await IndexedDBService.saveSettings(user.id, defaultSettings);
           settings = defaultSettings;
         }
+        await IndexedDBService.saveSettings(user.id, settings);
 
-        // Load user name
-        const userName = await DatabaseService.getUserProfileName(user.id, masterKey);
-
+        const userName = await DatabaseService.getUserProfileName(
+          user.id,
+          masterKey
+        );
         SoundService.playLockSound();
-        
-        set({ 
+
+        set({
           masterKey,
           wrappedMasterKey,
-          encryptedPinKey, 
-          pinSalt, 
-          isUnlocked: true, 
+          encryptedPinKey,
+          pinSalt,
+          isUnlocked: true,
           lastActivity: Date.now(),
           autoLockMinutes: settings?.auto_lock_minutes ?? 5,
           user: userName ? { ...user, name: userName } : user,
         });
 
-        // Log PIN creation
-        await DatabaseService.logActivity(user.id, "CREATE", "Master PIN created");
-        await IndexedDBService.logActivity(user.id, "CREATE", "Master PIN created");
-        
-        // Check and register device
+        await DatabaseService.logActivity(
+          user.id,
+          "CREATE",
+          "Master PIN created"
+        );
+        await IndexedDBService.logActivity(
+          user.id,
+          "CREATE",
+          "Master PIN created"
+        );
         await get().checkNewDevice();
-        
-        // Load items after successful unlock
-        const { useItemStore } = await import('./itemStore');
-        useItemStore.getState().loadItems();
       },
 
       async unlockWithPin(pin: string) {
         const { encryptedPinKey, pinSalt, user } = get();
-        if (!encryptedPinKey || !pinSalt || !user) throw new Error("PIN not set");
+        if (!encryptedPinKey || !pinSalt || !user)
+          throw new Error("PIN not set");
 
         // Check rate limiting
         const rateLimitCheck = RateLimiterService.canAttempt(user.id);
@@ -320,58 +352,101 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           // Initialize secure memory and integrity checker
           await SecureMemoryService.initializeWrappingKey();
           await IntegrityCheckerService.initialize(masterKey);
+          IndexedDBService.setMasterKey(masterKey);
 
           // Wrap master key for secure storage
-          const wrappedMasterKey = await SecureMemoryService.wrapMasterKey(masterKey);
+          const wrappedMasterKey = await SecureMemoryService.wrapMasterKey(
+            masterKey
+          );
 
-          // Load settings from Supabase and cache
-          const settings = await DatabaseService.getUserSettings(user.id);
-          if (settings) {
-            await IndexedDBService.saveSettings(user.id, settings);
+          // Try to load settings from cache first, then Supabase
+          let settings = await IndexedDBService.getSettings(user.id);
+          let userName = null;
+
+          if (navigator.onLine) {
+            try {
+              settings = await DatabaseService.getUserSettings(user.id);
+              if (settings) {
+                await IndexedDBService.saveSettings(user.id, settings);
+              }
+              userName = await DatabaseService.getUserProfileName(
+                user.id,
+                masterKey
+              );
+            } catch (error) {
+              console.log("Using cached settings (offline)");
+            }
           }
-
-          // Load user name
-          const userName = await DatabaseService.getUserProfileName(user.id, masterKey);
 
           // Record successful attempt
           RateLimiterService.recordSuccessfulAttempt(user.id);
 
           SoundService.playLockSound();
 
-          set({ 
+          set({
             masterKey,
             wrappedMasterKey,
-            isUnlocked: true, 
-            failedAttempts: 0, 
+            isUnlocked: true,
+            failedAttempts: 0,
             lastActivity: Date.now(),
             autoLockMinutes: settings?.auto_lock_minutes ?? 5,
             user: userName ? { ...user, name: userName } : user,
           });
-          
-          // Log unlock with session details
+
+          // Log unlock
           const deviceName = navigator.userAgent.substring(0, 50);
-          await DatabaseService.logActivity(user.id, "LOGIN", `Vault unlocked via PIN from ${deviceName}`);
-          await IndexedDBService.logActivity(user.id, "LOGIN", `Vault unlocked via PIN from ${deviceName}`);
-          
+          await IndexedDBService.logActivity(
+            user.id,
+            "LOGIN",
+            `Vault unlocked via PIN from ${deviceName}`
+          );
+          if (navigator.onLine) {
+            try {
+              await DatabaseService.logActivity(
+                user.id,
+                "LOGIN",
+                `Vault unlocked via PIN from ${deviceName}`
+              );
+            } catch (error) {
+              console.log("Failed to log to server (offline)");
+            }
+          }
+
           // Check and update device
           await get().checkNewDevice();
-          
-          // Load items after successful unlock
-          const { useItemStore } = await import('./itemStore');
-          useItemStore.getState().loadItems();
+
+          if (navigator.onLine) {
+            // Load items after successful unlock
+            const { useItemStore } = await import("./itemStore");
+            useItemStore.getState().loadItems();
+          }
         } catch (error) {
           // Record failed attempt
           RateLimiterService.recordFailedAttempt(user.id);
-          
+
           const newFailedAttempts = get().failedAttempts + 1;
           const remaining = RateLimiterService.getRemainingAttempts(user.id);
           set({ failedAttempts: newFailedAttempts });
-          
-          // Log failed attempt with session details
+
+          // Log failed attempt
           const deviceName = navigator.userAgent.substring(0, 50);
-          await DatabaseService.logActivity(user.id, "FAILED_LOGIN", `Failed PIN attempt #${newFailedAttempts} from ${deviceName}`);
-          await IndexedDBService.logActivity(user.id, "FAILED_LOGIN", `Failed PIN attempt #${newFailedAttempts} from ${deviceName}`);
-          
+          await IndexedDBService.logActivity(
+            user.id,
+            "FAILED_LOGIN",
+            `Failed PIN attempt #${newFailedAttempts} from ${deviceName}`
+          );
+          if (navigator.onLine) {
+            try {
+              await DatabaseService.logActivity(
+                user.id,
+                "FAILED_LOGIN",
+                `Failed PIN attempt #${newFailedAttempts} from ${deviceName}`
+              );
+            } catch (error) {
+              console.log("Failed to log to server (offline)");
+            }
+          }
+
           throw new Error(`Invalid PIN. ${remaining} attempts remaining.`);
         }
       },
@@ -388,7 +463,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const { wrappedMasterKey } = get();
         if (!wrappedMasterKey) throw new Error("Master key not found");
 
-        const masterKey = await SecureMemoryService.unwrapMasterKey(wrappedMasterKey);
+        const masterKey = await SecureMemoryService.unwrapMasterKey(
+          wrappedMasterKey
+        );
         await IntegrityCheckerService.initialize(masterKey);
 
         const settings = await DatabaseService.getUserSettings(user.id);
@@ -396,24 +473,30 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
         SoundService.playLockSound();
 
-        set({ 
+        set({
           masterKey,
-          isUnlocked: true, 
-          failedAttempts: 0, 
+          isUnlocked: true,
+          failedAttempts: 0,
           lastActivity: Date.now(),
           autoLockMinutes: settings?.auto_lock_minutes ?? 5,
         });
-        
-        await DatabaseService.logActivity(user.id, "LOGIN", "Vault unlocked via biometrics");
-        await IndexedDBService.logActivity(user.id, "LOGIN", "Vault unlocked via biometrics");
+
+        await DatabaseService.logActivity(
+          user.id,
+          "LOGIN",
+          "Vault unlocked via biometrics"
+        );
+        await IndexedDBService.logActivity(
+          user.id,
+          "LOGIN",
+          "Vault unlocked via biometrics"
+        );
         await get().checkNewDevice();
-        
+
         // Load items after successful unlock
-        const { useItemStore } = await import('./itemStore');
+        const { useItemStore } = await import("./itemStore");
         useItemStore.getState().loadItems();
       },
-
-
 
       setUnlockMethod(method) {
         set({ unlockMethod: method });
@@ -430,17 +513,21 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         if (!user) return false;
 
         let storedDeviceId = localStorage.getItem("hushkey_device_id");
-        
+
         if (!storedDeviceId) {
           storedDeviceId = EncryptionService.generateRandomString();
           localStorage.setItem("hushkey_device_id", storedDeviceId);
           set({ deviceId: storedDeviceId });
-          
+
           // Register device
           const deviceName = navigator.userAgent.substring(0, 50);
           await DatabaseService.saveDevice(user.id, storedDeviceId, deviceName);
-          await IndexedDBService.saveDevice(user.id, storedDeviceId, deviceName);
-          
+          await IndexedDBService.saveDevice(
+            user.id,
+            storedDeviceId,
+            deviceName
+          );
+
           // Log new device
           await DatabaseService.logActivity(
             user.id,
@@ -452,12 +539,12 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             "SECURITY",
             "New device login detected"
           );
-          
+
           return true;
         } else {
           set({ deviceId: storedDeviceId });
         }
-        
+
         return false;
       },
 
