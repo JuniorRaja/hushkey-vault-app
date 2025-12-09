@@ -778,7 +778,7 @@ const App: React.FC = () => {
   // TODO: Change to cron job
   useEffect(() => {
     const cleanupTrash = async () => {
-      if (!user) return;
+       if (!user || !isUnlocked) return;
       
       try {
         const { useTrashStore } = await import('./src/stores/trashStore');
@@ -790,10 +790,10 @@ const App: React.FC = () => {
       }
     };
 
-    if (user) {
+    if (user && isUnlocked) {
       cleanupTrash();
     }
-  }, [user]);
+  }, [user, isUnlocked]);
 
   if (isLoading) {
     return (

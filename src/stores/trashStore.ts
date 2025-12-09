@@ -245,52 +245,52 @@ export const useTrashStore = create<TrashState & TrashActions>((set, get) => ({
   },
 
   async cleanupExpiredTrash(autoDeleteDays: number) {
-    if (autoDeleteDays === 0) return; // Never auto-delete
+    if (autoDeleteDays === 0) return;
 
-    const { user } = useAuthStore.getState();
-    if (!user) return;
+    const { user, masterKey } = useAuthStore.getState();
+    if (!user || !masterKey) return;
 
     try {
-      const now = new Date();
-      const cutoffDate = new Date(now.getTime() - autoDeleteDays * 24 * 60 * 60 * 1000);
+      const cutoffDate = new Date(Date.now() - autoDeleteDays * 24 * 60 * 60 * 1000);
 
-      const { deletedItems, deletedVaults } = get();
+      // Fetch expired items from database
+      const { data: itemsData } = await supabase
+        .from('items')
+        .select('id, deleted_at, vaults!inner(user_id)')
+        .eq('vaults.user_id', user.id)
+        .eq('is_deleted', true)
+        .lt('deleted_at', cutoffDate.toISOString());
 
-      // Find expired items
-      const expiredItems = deletedItems.filter(item => {
-        if (!item.deletedAt) return false;
-        return new Date(item.deletedAt) < cutoffDate;
-      });
+      // Fetch expired vaults from database
+      const { data: vaultsData } = await supabase
+        .from('vaults')
+        .select('id, deleted_at')
+        .eq('user_id', user.id)
+        .eq('is_deleted', true)
+        .lt('deleted_at', cutoffDate.toISOString());
 
-      // Find expired vaults
-      const expiredVaults = deletedVaults.filter(vault => {
-        if (!vault.deletedAt) return false;
-        return new Date(vault.deletedAt) < cutoffDate;
-      });
+      const expiredItemIds = itemsData?.map(i => i.id) || [];
+      const expiredVaultIds = vaultsData?.map(v => v.id) || [];
 
-      if (expiredItems.length === 0 && expiredVaults.length === 0) return;
+      if (expiredItemIds.length === 0 && expiredVaultIds.length === 0) return;
 
       // Delete expired items
-      await Promise.all(
-        expiredItems.map(item => DatabaseService.permanentlyDeleteItem(item.id))
-      );
+      await Promise.all(expiredItemIds.map(id => DatabaseService.permanentlyDeleteItem(id)));
 
       // Delete expired vaults
-      await Promise.all(
-        expiredVaults.map(vault => DatabaseService.permanentlyDeleteVault(vault.id))
-      );
+      await Promise.all(expiredVaultIds.map(id => DatabaseService.permanentlyDeleteVault(id)));
 
-      // Update state
+      // Update local state
       set(state => ({
-        deletedItems: state.deletedItems.filter(i => !expiredItems.includes(i)),
-        deletedVaults: state.deletedVaults.filter(v => !expiredVaults.includes(v))
+        deletedItems: state.deletedItems.filter(i => !expiredItemIds.includes(i.id)),
+        deletedVaults: state.deletedVaults.filter(v => !expiredVaultIds.includes(v.id))
       }));
 
       // Log activity
       await DatabaseService.logActivity(
         user.id,
         'PERMANENT_DELETE',
-        `Auto-deleted ${expiredItems.length} items and ${expiredVaults.length} vaults`
+        `Auto-deleted ${expiredItemIds.length} items and ${expiredVaultIds.length} vaults`
       );
     } catch (error) {
       console.error('Failed to cleanup expired trash:', error);
