@@ -45,6 +45,7 @@ import {
   ScanFace,
   Loader2,
   Bell,
+  Info,
 } from "lucide-react";
 
 // --- UI Components ---
@@ -509,6 +510,183 @@ const BackupModal = ({ onClose }: { onClose: () => void }) => {
         <span className="flex items-center gap-1 text-orange-400/80">
           <AlertTriangle size={12} /> Always verify your exports.
         </span>
+      </div>
+    </ModalLayout>
+  );
+};
+
+const BiometricModal = ({ onClose }: { onClose: () => void }) => {
+  const { user: authUser } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(false);
+
+  useEffect(() => {
+    const checkStatus = async () => {
+      if (!authUser) return;
+      const available = await BiometricService.isAvailable();
+      setIsAvailable(available);
+      
+      const settings = await DatabaseService.getUserSettings(authUser.id);
+      setBiometricEnabled(settings?.biometric_enabled || false);
+    };
+    checkStatus();
+  }, [authUser]);
+
+  const handleSetup = async () => {
+    if (!authUser) return;
+    setIsLoading(true);
+    setMessage(null);
+    
+    try {
+      await BiometricService.register(authUser.id);
+      await DatabaseService.saveUserSettings(authUser.id, { biometric_enabled: true });
+      setBiometricEnabled(true);
+      setMessage({ type: 'success', text: 'Biometric authentication enabled successfully!' });
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Failed to setup biometric authentication' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!authUser) return;
+    setIsLoading(true);
+    setMessage(null);
+    
+    try {
+      const { error } = await supabase
+        .from('biometric_credentials')
+        .delete()
+        .eq('user_id', authUser.id);
+      
+      if (error) throw error;
+      
+      await DatabaseService.saveUserSettings(authUser.id, { biometric_enabled: false });
+      setBiometricEnabled(false);
+      setMessage({ type: 'success', text: 'Biometric authentication removed successfully!' });
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Failed to remove biometric authentication' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <ModalLayout title="Biometric Authentication" onClose={onClose} maxWidth="max-w-md">
+      <div className="p-6 space-y-6">
+        {/* Status */}
+        <div className="bg-gray-950 border border-gray-800 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-gray-400">Status</span>
+            <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+              biometricEnabled 
+                ? 'bg-green-500/20 text-green-400' 
+                : 'bg-gray-800 text-gray-500'
+            }`}>
+              {biometricEnabled ? 'Enabled' : 'Disabled'}
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-400">Device Support</span>
+            <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+              isAvailable 
+                ? 'bg-blue-500/20 text-blue-400' 
+                : 'bg-red-500/20 text-red-400'
+            }`}>
+              {isAvailable ? 'Available' : 'Not Available'}
+            </div>
+          </div>
+        </div>
+
+        {/* Message */}
+        {message && (
+          <div className={`p-4 rounded-xl border animate-fade-in ${
+            message.type === 'success' 
+              ? 'bg-green-900/20 border-green-500/30 text-green-400' 
+              : message.type === 'error'
+              ? 'bg-red-900/20 border-red-500/30 text-red-400'
+              : 'bg-blue-900/20 border-blue-500/30 text-blue-400'
+          }`}>
+            <p className="text-sm font-medium">{message.text}</p>
+          </div>
+        )}
+
+        {/* Info */}
+        <div className="bg-gray-950 border border-gray-800 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-primary-900/30 rounded-lg text-primary-400 mt-0.5">
+              <Info size={18} />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-bold text-white mb-2">About Biometric Authentication</h4>
+              <ul className="space-y-2 text-xs text-gray-400">
+                <li className="flex items-start gap-2">
+                  <span className="text-primary-500 mt-0.5">•</span>
+                  <span>PIN is the default unlock method. Biometric is optional for convenience.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary-500 mt-0.5">•</span>
+                  <span>You can always unlock with your PIN if biometric fails.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary-500 mt-0.5">•</span>
+                  <span>Failed biometric attempts are tracked for security.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        {!isAvailable ? (
+          <div className="text-center py-4">
+            <p className="text-sm text-gray-500">Biometric authentication is not available on this device.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {!biometricEnabled ? (
+              <button
+                onClick={handleSetup}
+                disabled={isLoading}
+                className="w-full py-3 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-900/30"
+              >
+                {isLoading ? (
+                  <><Loader2 size={16} className="animate-spin" /> Setting up...</>
+                ) : (
+                  <><ScanFace size={16} /> Enable Biometric Authentication</>
+                )}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleSetup}
+                  disabled={isLoading}
+                  className="w-full py-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-300 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 border border-gray-700"
+                >
+                  {isLoading ? (
+                    <><Loader2 size={16} className="animate-spin" /> Updating...</>
+                  ) : (
+                    <><RefreshCw size={16} /> Update Biometric</>
+                  )}
+                </button>
+                <button
+                  onClick={handleRemove}
+                  disabled={isLoading}
+                  className="w-full py-3 bg-red-900/20 hover:bg-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed text-red-400 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 border border-red-500/30"
+                >
+                  {isLoading ? (
+                    <><Loader2 size={16} className="animate-spin" /> Removing...</>
+                  ) : (
+                    <><X size={16} /> Remove Biometric</>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </ModalLayout>
   );
@@ -1276,7 +1454,7 @@ const Settings: React.FC = () => {
 
   // Modals
   const [activeModal, setActiveModal] = useState<
-    "profile" | "logs" | "categories" | "backup" | "privacy" | "terms" | null
+    "profile" | "logs" | "categories" | "backup" | "privacy" | "terms" | "biometric" | null
   >(null);
 
   // Notification Drawer
@@ -1285,8 +1463,12 @@ const Settings: React.FC = () => {
   // Sync State
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Biometric Verification State
-  const [verifyingBiometric, setVerifyingBiometric] = useState(false);
+  // Biometric State
+  const [biometricStatus, setBiometricStatus] = useState<{
+    enabled: boolean;
+    available: boolean;
+    loading: boolean;
+  }>({ enabled: false, available: false, loading: false });
 
   // Handlers
   const handleSettingChange = async (key: string, value: any) => {
@@ -1327,31 +1509,14 @@ const Settings: React.FC = () => {
     });
   };
 
-  const handleUnlockMethodChange = async (
-    val: "pin" | "biometric" | "password"
-  ) => {
-    if (val === "biometric") {
-      if (!await BiometricService.isAvailable()) {
-        alert("Biometric authentication is not available on this device.");
-        return;
-      }
-      setVerifyingBiometric(true);
-      try {
-        if (!authUser) throw new Error("User not authenticated");
-        await BiometricService.register(authUser.id);
-        setUnlockMethod(val);
-        await handleSettingChange("unlock_method", val);
-        alert("Face ID / Touch ID enabled successfully.");
-      } catch (err: any) {
-        alert("Biometric setup failed: " + err.message);
-      } finally {
-        setVerifyingBiometric(false);
-      }
-    } else {
-      setUnlockMethod(val);
-      await handleSettingChange("unlock_method", val);
-    }
-  };
+  useEffect(() => {
+    const checkBiometric = async () => {
+      const available = await BiometricService.isAvailable();
+      const enabled = userSettings?.biometric_enabled || false;
+      setBiometricStatus({ enabled, available, loading: false });
+    };
+    checkBiometric();
+  }, [userSettings]);
 
   const handleSync = () => {
     setIsSyncing(true);
@@ -1399,6 +1564,9 @@ const Settings: React.FC = () => {
           onClose={() => setActiveModal(null)}
           content="Terms of Service Placeholder..."
         />
+      )}
+      {activeModal === "biometric" && (
+        <BiometricModal onClose={() => setActiveModal(null)} />
       )}
 
       <h1 className="text-3xl font-bold text-white mb-6">Settings</h1>
@@ -1451,26 +1619,18 @@ const Settings: React.FC = () => {
                 <span className="text-gray-200 font-medium block">
                   Unlock Method
                 </span>
-                {verifyingBiometric && (
-                  <span className="text-[10px] text-primary-400 flex items-center gap-1 mt-0.5">
-                    <Loader2 size={10} className="animate-spin" /> Verifying...
-                  </span>
-                )}
+                <span className="text-[10px] text-gray-500 mt-0.5 block">
+                  PIN is default, Biometric is optional
+                </span>
               </div>
             </div>
-            <CustomDropdown
-              value={settings.unlockMethod}
-              onChange={(val) => handleUnlockMethodChange(val)}
-              options={[
-                { label: "PIN Code", value: "pin", icon: Lock },
-                {
-                  label: "Face ID / Touch ID",
-                  value: "biometric",
-                  icon: ScanFace,
-                },
-                { label: "Password", value: "password", icon: Lock },
-              ]}
-            />
+            <button
+              onClick={() => setActiveModal("biometric")}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm font-medium transition-colors border border-gray-700 flex items-center gap-2"
+            >
+              <ScanFace size={16} />
+              {userSettings?.biometric_enabled ? "Manage" : "Setup"}
+            </button>
           </div>
 
           <div className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors">

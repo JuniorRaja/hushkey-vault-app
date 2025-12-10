@@ -456,46 +456,114 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         if (!user) throw new Error("No user logged in");
         if (!encryptedPinKey || !pinSalt) throw new Error("PIN not set");
 
-        const authenticated = await BiometricService.authenticate(user.id);
-        if (!authenticated) throw new Error("Biometric authentication failed");
+        // Check rate limiting
+        const rateLimitCheck = RateLimiterService.canAttempt(user.id);
+        if (!rateLimitCheck.allowed) {
+          throw new Error(rateLimitCheck.reason || "Too many attempts");
+        }
 
-        // Retrieve master key from secure storage
-        const { wrappedMasterKey } = get();
-        if (!wrappedMasterKey) throw new Error("Master key not found");
+        try {
+          const authenticated = await BiometricService.authenticate(user.id);
+          if (!authenticated) throw new Error("Biometric authentication failed");
 
-        const masterKey = await SecureMemoryService.unwrapMasterKey(
-          wrappedMasterKey
-        );
-        await IntegrityCheckerService.initialize(masterKey);
+          // Retrieve master key from secure storage
+          const { wrappedMasterKey } = get();
+          if (!wrappedMasterKey) throw new Error("Master key not found");
 
-        const settings = await DatabaseService.getUserSettings(user.id);
-        if (settings) await IndexedDBService.saveSettings(user.id, settings);
+          const masterKey = await SecureMemoryService.unwrapMasterKey(
+            wrappedMasterKey
+          );
+          await IntegrityCheckerService.initialize(masterKey);
+          IndexedDBService.setMasterKey(masterKey);
 
-        SoundService.playLockSound();
+          // Try to load settings from cache first, then Supabase
+          let settings = await IndexedDBService.getSettings(user.id);
+          let userName = null;
 
-        set({
-          masterKey,
-          isUnlocked: true,
-          failedAttempts: 0,
-          lastActivity: Date.now(),
-          autoLockMinutes: settings?.auto_lock_minutes ?? 5,
-        });
+          if (navigator.onLine) {
+            try {
+              settings = await DatabaseService.getUserSettings(user.id);
+              if (settings) {
+                await IndexedDBService.saveSettings(user.id, settings);
+              }
+              userName = await DatabaseService.getUserProfileName(
+                user.id,
+                masterKey
+              );
+            } catch (error) {
+              console.log("Using cached settings (offline)");
+            }
+          }
 
-        await DatabaseService.logActivity(
-          user.id,
-          "LOGIN",
-          "Vault unlocked via biometrics"
-        );
-        await IndexedDBService.logActivity(
-          user.id,
-          "LOGIN",
-          "Vault unlocked via biometrics"
-        );
-        await get().checkNewDevice();
+          // Record successful attempt
+          RateLimiterService.recordSuccessfulAttempt(user.id);
 
-        // Load items after successful unlock
-        const { useItemStore } = await import("./itemStore");
-        useItemStore.getState().loadItems();
+          SoundService.playLockSound();
+
+          set({
+            masterKey,
+            isUnlocked: true,
+            failedAttempts: 0,
+            lastActivity: Date.now(),
+            autoLockMinutes: settings?.auto_lock_minutes ?? 5,
+            user: userName ? { ...user, name: userName } : user,
+          });
+
+          // Log unlock
+          const deviceName = navigator.userAgent.substring(0, 50);
+          await IndexedDBService.logActivity(
+            user.id,
+            "LOGIN",
+            `Vault unlocked via biometrics from ${deviceName}`
+          );
+          if (navigator.onLine) {
+            try {
+              await DatabaseService.logActivity(
+                user.id,
+                "LOGIN",
+                `Vault unlocked via biometrics from ${deviceName}`
+              );
+            } catch (error) {
+              console.log("Failed to log to server (offline)");
+            }
+          }
+
+          await get().checkNewDevice();
+
+          if (navigator.onLine) {
+            // Load items after successful unlock
+            const { useItemStore } = await import("./itemStore");
+            useItemStore.getState().loadItems();
+          }
+        } catch (error) {
+          // Record failed attempt
+          RateLimiterService.recordFailedAttempt(user.id);
+
+          const newFailedAttempts = get().failedAttempts + 1;
+          const remaining = RateLimiterService.getRemainingAttempts(user.id);
+          set({ failedAttempts: newFailedAttempts });
+
+          // Log failed attempt
+          const deviceName = navigator.userAgent.substring(0, 50);
+          await IndexedDBService.logActivity(
+            user.id,
+            "FAILED_LOGIN",
+            `Failed biometric attempt #${newFailedAttempts} from ${deviceName}`
+          );
+          if (navigator.onLine) {
+            try {
+              await DatabaseService.logActivity(
+                user.id,
+                "FAILED_LOGIN",
+                `Failed biometric attempt #${newFailedAttempts} from ${deviceName}`
+              );
+            } catch (error) {
+              console.log("Failed to log to server (offline)");
+            }
+          }
+
+          throw new Error(`Biometric authentication failed. ${remaining} attempts remaining.`);
+        }
       },
 
       setUnlockMethod(method) {

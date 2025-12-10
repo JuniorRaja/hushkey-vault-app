@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Github, Mail, Loader2, Delete } from "lucide-react";
+import { Github, Mail, Loader2, Delete, ScanFace } from "lucide-react";
 import { useAuthStore } from "../src/stores/authStore";
+import { BiometricService } from "../src/services/biometric";
+import DatabaseService from "../src/services/database";
 
 const HushkeyLogo = ({ size = 24 }: { size?: number }) => (
   <img src="/hushkey-icon.png" alt="Hushkey" width={size} height={size} />
@@ -17,6 +19,9 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSettingPin, setIsSettingPin] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [showBiometricError, setShowBiometricError] = useState(false);
 
   const {
     user,
@@ -28,6 +33,7 @@ const Login: React.FC = () => {
     signInWithOAuth,
     setupMasterPin,
     unlockWithPin,
+    unlockWithBiometrics,
     checkNewDevice,
   } = useAuthStore();
   
@@ -38,6 +44,17 @@ const Login: React.FC = () => {
       setMode("setpin");
     } else if (user && !isUnlocked && encryptedPinKey) {
       setMode("unlock");
+      // Check biometric availability
+      const checkBiometric = async () => {
+        const available = await BiometricService.isAvailable();
+        setBiometricAvailable(available);
+        
+        if (available && user) {
+          const settings = await DatabaseService.getUserSettings(user.id);
+          setBiometricEnabled(settings?.biometric_enabled || false);
+        }
+      };
+      checkBiometric();
     } else if (user && isUnlocked) {
       navigate("/vaults", { replace: true });
     }
@@ -137,6 +154,21 @@ const Login: React.FC = () => {
     }
   };
 
+  const attemptBiometricUnlock = async () => {
+    setIsLoading(true);
+    setShowBiometricError(false);
+    try {
+      await unlockWithBiometrics();
+      await handleSuccess();
+    } catch (err: any) {
+      setShowBiometricError(true);
+      setError("Biometric authentication failed. Use PIN to unlock.");
+      setTimeout(() => setShowBiometricError(false), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleDelete = () => {
     if (mode === "setpin") {
       if (isSettingPin && confirmPin.length > 0) {
@@ -205,9 +237,22 @@ const Login: React.FC = () => {
           </div>
 
           {error && (
-            <p className="text-red-500 text-sm mb-4 text-center animate-bounce">
-              {error} {mode === "unlock" && failedAttempts > 0 && `(${failedAttempts} failed attempts)`}
-            </p>
+            <div className="mb-4 animate-fade-in">
+              <div className={`p-3 rounded-xl border text-center ${
+                showBiometricError
+                  ? 'bg-orange-900/20 border-orange-500/30'
+                  : 'bg-red-900/20 border-red-500/30'
+              }`}>
+                <p className="text-sm font-medium text-red-400">
+                  {error}
+                </p>
+                {mode === "unlock" && failedAttempts > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {failedAttempts} failed attempts
+                  </p>
+                )}
+              </div>
+            </div>
           )}
 
           <div className="grid grid-cols-3 gap-6 w-full px-4">
@@ -222,7 +267,17 @@ const Login: React.FC = () => {
               </button>
             ))}
 
-            <div className="col-span-1" />
+            {mode === "unlock" && biometricEnabled && biometricAvailable ? (
+              <button
+                onClick={attemptBiometricUnlock}
+                disabled={isLoading}
+                className="w-16 h-16 rounded-full bg-primary-600/20 hover:bg-primary-600/30 border border-primary-500/30 text-primary-400 transition-all active:scale-95 flex items-center justify-center mx-auto disabled:opacity-50"
+              >
+                <ScanFace size={24} />
+              </button>
+            ) : (
+              <div className="col-span-1" />
+            )}
             <button
               onClick={() => handleNumberClick("0")}
               disabled={isLoading}
@@ -240,16 +295,34 @@ const Login: React.FC = () => {
           </div>
 
           {mode === "unlock" && (
-            <button 
-              onClick={() => {
-                setMode("signin");
-                setPin("");
-                setError("");
-              }}
-              className="mt-12 text-sm text-primary-400 hover:text-primary-300 font-medium transition-colors"
-            >
-              Forgot PIN? Sign in again
-            </button>
+            <div className="mt-8 space-y-4 w-full px-4">
+              {biometricEnabled && biometricAvailable && (
+                <button
+                  onClick={attemptBiometricUnlock}
+                  disabled={isLoading}
+                  className="w-full py-3 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-900/30"
+                >
+                  {isLoading ? (
+                    <Loader2 className="animate-spin" size={20} />
+                  ) : (
+                    <>
+                      <ScanFace size={20} />
+                      Unlock with Biometric
+                    </>
+                  )}
+                </button>
+              )}
+              <button 
+                onClick={() => {
+                  setMode("signin");
+                  setPin("");
+                  setError("");
+                }}
+                className="text-sm text-gray-400 hover:text-white font-medium transition-colors"
+              >
+                Forgot PIN? Sign in again
+              </button>
+            </div>
           )}
         </div>
       </div>
