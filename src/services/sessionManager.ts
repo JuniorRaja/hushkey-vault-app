@@ -109,7 +109,7 @@ class SessionManagerService {
    */
   private storeSession(userId: string, session: SessionToken): void {
     const key = `hushkey-session-${userId}`;
-    sessionStorage.setItem(key, JSON.stringify(session));
+    localStorage.setItem(key, JSON.stringify(session));
   }
 
   /**
@@ -118,7 +118,7 @@ class SessionManagerService {
   loadSession(userId: string): SessionToken | null {
     try {
       const key = `hushkey-session-${userId}`;
-      const stored = sessionStorage.getItem(key);
+      const stored = localStorage.getItem(key);
       
       if (!stored) return null;
       
@@ -142,7 +142,7 @@ class SessionManagerService {
    */
   private removeStoredSession(userId: string): void {
     const key = `hushkey-session-${userId}`;
-    sessionStorage.removeItem(key);
+    localStorage.removeItem(key);
   }
 
   /**

@@ -753,7 +753,7 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
       storageService.clearDataOnly();
       await storageService.clearIndexedDB();
       await supabase.auth.signOut();
-      sessionStorage.clear();
+      localStorage.clear();
       
       window.location.href = "/login";
     } catch (err: any) {

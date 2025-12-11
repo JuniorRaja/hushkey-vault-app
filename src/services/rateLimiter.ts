@@ -129,7 +129,7 @@ class RateLimiterService {
   resetAttempts(userId: string): void {
     const storage = this.getAllRecords();
     delete storage[userId];
-    sessionStorage.setItem(this.STORAGE_KEY, JSON.stringify(storage));
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(storage));
   }
 
   /**
@@ -146,7 +146,7 @@ class RateLimiterService {
   private saveAttemptRecord(userId: string, record: AttemptRecord): void {
     const storage = this.getAllRecords();
     storage[userId] = record;
-    sessionStorage.setItem(this.STORAGE_KEY, JSON.stringify(storage));
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(storage));
   }
 
   /**
@@ -154,7 +154,7 @@ class RateLimiterService {
    */
   private getAllRecords(): Record<string, AttemptRecord> {
     try {
-      const data = sessionStorage.getItem(this.STORAGE_KEY);
+      const data = localStorage.getItem(this.STORAGE_KEY);
       return data ? JSON.parse(data) : {};
     } catch {
       return {};
@@ -179,7 +179,7 @@ class RateLimiterService {
    * Clear all rate limit data
    */
   clearAll(): void {
-    sessionStorage.removeItem(this.STORAGE_KEY);
+    localStorage.removeItem(this.STORAGE_KEY);
   }
 }
 
