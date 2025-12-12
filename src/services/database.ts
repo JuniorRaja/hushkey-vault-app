@@ -10,6 +10,8 @@ import type { Vault, Item, Category } from "../../types";
 interface UserProfile {
   user_id: string;
   salt: string;
+  pin_verification?: string;
+  name_encrypted?: string;
   public_key?: string;
   private_key_encrypted?: string;
   recovery_email_encrypted?: string;
@@ -32,6 +34,20 @@ class DatabaseService {
         onConflict: "user_id",
       }
     );
+
+    if (error) throw error;
+  }
+
+  /**
+   * Update PIN verification hash
+   */
+  async updatePinVerification(userId: string, pinVerification: string): Promise<void> {
+    const { error } = await supabase.from("user_profiles").update(
+      {
+        pin_verification: pinVerification,
+        updated_at: new Date().toISOString(),
+      }
+    ).eq("user_id", userId);
 
     if (error) throw error;
   }

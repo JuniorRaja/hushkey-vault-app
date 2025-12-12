@@ -27,14 +27,14 @@ interface AuthState {
   isLoading: boolean;
   masterKey: Uint8Array | null;
   wrappedMasterKey: string | null;
-  encryptedPinKey: string | null;
-  pinSalt: string | null;
   isUnlocked: boolean;
   deviceId: string;
   unlockMethod: "pin" | "biometric" | "password";
   failedAttempts: number;
   lastActivity: number;
   autoLockMinutes: number;
+  hasPinSet: boolean;
+  biometricEnabled: boolean;
 }
 
 interface AuthActions {
@@ -61,14 +61,14 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       isLoading: true,
       masterKey: null,
       wrappedMasterKey: null,
-      encryptedPinKey: null,
-      pinSalt: null,
       isUnlocked: false,
       deviceId: "",
       unlockMethod: "password",
       failedAttempts: 0,
       lastActivity: Date.now(),
       autoLockMinutes: 5,
+      hasPinSet: false,
+      biometricEnabled: false,
 
       async signUp(email: string, password: string) {
         const { data, error } = await supabase.auth.signUp({
@@ -259,28 +259,16 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const { user } = get();
         if (!user) throw new Error("No user logged in");
 
-        let profile = await DatabaseService.getUserProfile(user.id);
-        let salt = profile?.salt;
+        const profile = await DatabaseService.getUserProfile(user.id);
+        if (!profile?.salt) throw new Error("User profile not found");
 
-        if (!salt) {
-          salt = EncryptionService.generateSalt();
-          await DatabaseService.saveUserProfile(user.id, salt);
-          await IndexedDBService.saveUserProfile(user.id, salt);
-        }
-
-        const masterKey = await EncryptionService.deriveMasterKey(pin, salt);
+        const masterKey = await EncryptionService.deriveMasterKey(pin, profile.salt);
+        const pinVerification = await EncryptionService.createPinVerification(masterKey);
+        await DatabaseService.updatePinVerification(user.id, pinVerification);
 
         await SecureMemoryService.initializeWrappingKey();
         const wrappedMasterKey = await SecureMemoryService.wrapMasterKey(
           masterKey
-        );
-
-        const pinSalt = EncryptionService.generateSalt();
-        const pinKey = await EncryptionService.deriveMasterKey(pin, pinSalt);
-        const masterKeyBase64 = EncryptionService.toBase64(masterKey);
-        const encryptedPinKey = await EncryptionService.encrypt(
-          masterKeyBase64,
-          pinKey
         );
 
         await IntegrityCheckerService.initialize(masterKey);
@@ -309,9 +297,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         set({
           masterKey,
           wrappedMasterKey,
-          encryptedPinKey,
-          pinSalt,
           isUnlocked: true,
+          hasPinSet: true,
           lastActivity: Date.now(),
           autoLockMinutes: settings?.auto_lock_minutes ?? 5,
           user: userName ? { ...user, name: userName } : user,
@@ -331,9 +318,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       async unlockWithPin(pin: string) {
-        const { encryptedPinKey, pinSalt, user } = get();
-        if (!encryptedPinKey || !pinSalt || !user)
-          throw new Error("PIN not set");
+        const { user } = get();
+        if (!user) throw new Error("No user logged in");
 
         // Check rate limiting
         const rateLimitCheck = RateLimiterService.canAttempt(user.id);
@@ -342,12 +328,28 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         }
 
         try {
-          const pinKey = await EncryptionService.deriveMasterKey(pin, pinSalt);
-          const masterKeyBase64 = await EncryptionService.decrypt(
-            encryptedPinKey,
-            pinKey
-          );
-          const masterKey = EncryptionService.fromBase64(masterKeyBase64);
+          // Try to get salt from IndexedDB cache first
+          let salt = await IndexedDBService.getUserProfile(user.id).then(p => p?.salt);
+          
+          if (!salt) {
+            // Fallback to server if not cached
+            const profile = await DatabaseService.getUserProfile(user.id);
+            if (!profile?.salt) throw new Error("User profile not found");
+            salt = profile.salt;
+            await IndexedDBService.saveUserProfile(user.id, salt);
+          }
+
+          // Derive master key from PIN
+          const masterKey = await EncryptionService.deriveMasterKey(pin, salt);
+          
+          // Verify PIN by attempting to decrypt verification hash from server
+          const profile = await DatabaseService.getUserProfile(user.id);
+          if (!profile?.pin_verification) throw new Error("PIN not set");
+          
+          const isValid = await EncryptionService.verifyPin(profile.pin_verification, masterKey);
+          if (!isValid) {
+            throw new Error("Invalid PIN");
+          }
 
           // Initialize secure memory and integrity checker
           await SecureMemoryService.initializeWrappingKey();
@@ -378,6 +380,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             }
           }
 
+          const biometricEnabled = settings?.biometric_enabled || false;
+
           // Record successful attempt
           RateLimiterService.recordSuccessfulAttempt(user.id);
 
@@ -387,6 +391,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             masterKey,
             wrappedMasterKey,
             isUnlocked: true,
+            hasPinSet: true,
+            biometricEnabled,
             failedAttempts: 0,
             lastActivity: Date.now(),
             autoLockMinutes: settings?.auto_lock_minutes ?? 5,
@@ -452,9 +458,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       async unlockWithBiometrics() {
-        const { user, encryptedPinKey, pinSalt } = get();
+        const { user } = get();
         if (!user) throw new Error("No user logged in");
-        if (!encryptedPinKey || !pinSalt) throw new Error("PIN not set");
 
         // Check rate limiting
         const rateLimitCheck = RateLimiterService.canAttempt(user.id);
@@ -495,6 +500,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             }
           }
 
+          const biometricEnabled = settings?.biometric_enabled || false;
+
           // Record successful attempt
           RateLimiterService.recordSuccessfulAttempt(user.id);
 
@@ -503,6 +510,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           set({
             masterKey,
             isUnlocked: true,
+            biometricEnabled,
             failedAttempts: 0,
             lastActivity: Date.now(),
             autoLockMinutes: settings?.auto_lock_minutes ?? 5,
@@ -629,16 +637,31 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       async hydrate() {
-        try {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
+        const state = get();
+        
+        // If already hydrated from localStorage, just validate session
+        if (state.user) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+              // Session expired, clear state
+              set({ user: null, isLoading: false, isUnlocked: false });
+            } else {
+              set({ isLoading: false });
+            }
+          } catch (error) {
+            console.error("Hydration error:", error);
+            set({ isLoading: false });
+          }
+          return;
+        }
 
+        // No cached user, check session
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-            const settings = await DatabaseService.getUserSettings(user.id);
             set({
               user: { id: user.id, email: user.email! },
-              autoLockMinutes: settings?.auto_lock_minutes ?? 5,
               isLoading: false,
             });
           } else {
@@ -652,20 +675,15 @@ export const useAuthStore = create<AuthState & AuthActions>()(
     }),
     {
       name: "hushkey-auth",
-      storage: {
-        getItem: (name) => localStorage.getItem(name),
-        setItem: (name, value) => localStorage.setItem(name, value),
-        removeItem: (name) => localStorage.removeItem(name),
-      },
       partialize: (state) => ({
         user: state.user,
         wrappedMasterKey: state.wrappedMasterKey,
-        encryptedPinKey: state.encryptedPinKey,
-        pinSalt: state.pinSalt,
         deviceId: state.deviceId,
         unlockMethod: state.unlockMethod,
         lastActivity: state.lastActivity,
         autoLockMinutes: state.autoLockMinutes,
+        hasPinSet: state.hasPinSet,
+        biometricEnabled: state.biometricEnabled,
       }),
     }
   )

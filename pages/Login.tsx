@@ -28,7 +28,8 @@ const Login: React.FC = () => {
   const {
     user,
     isUnlocked,
-    encryptedPinKey,
+    hasPinSet,
+    biometricEnabled: biometricEnabledStore,
     failedAttempts,
     signIn,
     signUp,
@@ -42,33 +43,51 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user && !isUnlocked && !encryptedPinKey) {
-      setMode("setpin");
-    } else if (user && !isUnlocked && encryptedPinKey) {
-      setMode("unlock");
-      // Check biometric availability
-      const checkBiometric = async () => {
+    const checkPinStatus = async () => {
+      if (user && !isUnlocked) {
+        // Use cached hasPinSet from localStorage first
+        if (!hasPinSet) {
+          // Double-check with server for new users
+          const profile = await DatabaseService.getUserProfile(user.id);
+          if (!profile?.pin_verification) {
+            setMode("setpin");
+            return;
+          }
+        }
+        
+        // PIN is set, show unlock screen
+        setMode("unlock");
+        
+        // Check biometric availability
         const available = await BiometricService.isAvailable();
         setBiometricAvailable(available);
 
-        if (available && user) {
-          const settings = await DatabaseService.getUserSettings(user.id);
-          const enabled = settings?.biometric_enabled || false;
+        if (available) {
+          // Use cached biometricEnabled from localStorage first
+          let enabled = biometricEnabledStore;
+          
+          // If not cached or on new device, fetch from server
+          if (!enabled && navigator.onLine) {
+            const settings = await DatabaseService.getUserSettings(user.id);
+            enabled = settings?.biometric_enabled || false;
+          }
+          
           setBiometricEnabled(enabled);
 
           // Auto-trigger if enabled
-          if (enabled) {
-            setTimeout(() => {
-              attemptBiometricUnlock().catch(() => {});
-            }, 500);
-          }
+          // if (enabled) {
+          //   setTimeout(() => {
+          //     attemptBiometricUnlock().catch(() => {});
+          //   }, 500);
+          // }
         }
-      };
-      checkBiometric();
-    } else if (user && isUnlocked) {
-      navigate("/vaults", { replace: true });
-    }
-  }, [user, isUnlocked, encryptedPinKey, navigate]);
+      } else if (user && isUnlocked) {
+        navigate("/vaults", { replace: true });
+      }
+    };
+    
+    checkPinStatus();
+  }, [user?.id, isUnlocked, hasPinSet, biometricEnabledStore]);
 
   const handleSuccess = async () => {
     const isNewDevice = await checkNewDevice();

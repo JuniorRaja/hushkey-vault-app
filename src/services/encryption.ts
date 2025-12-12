@@ -232,6 +232,27 @@ class EncryptionService {
 
     return new Uint8Array(decryptedBuffer);
   }
+
+  /**
+   * Create PIN verification hash (encrypt known constant)
+   */
+  async createPinVerification(masterKey: Uint8Array): Promise<string> {
+    const VERIFICATION_CONSTANT = 'HUSHKEY_PIN_VERIFICATION';
+    return await this.encrypt(VERIFICATION_CONSTANT, masterKey);
+  }
+
+  /**
+   * Verify PIN by attempting to decrypt verification hash
+   */
+  async verifyPin(verificationHash: string, masterKey: Uint8Array): Promise<boolean> {
+    try {
+      const VERIFICATION_CONSTANT = 'HUSHKEY_PIN_VERIFICATION';
+      const decrypted = await this.decrypt(verificationHash, masterKey);
+      return decrypted === VERIFICATION_CONSTANT;
+    } catch {
+      return false;
+    }
+  }
 }
 
 export default new EncryptionService();
