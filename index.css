@@ -137,3 +137,13 @@ kbd {
   padding: 0.125rem 0.375rem;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.animate-shake {
+  animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both;
+}

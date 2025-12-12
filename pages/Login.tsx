@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Github, Mail, Loader2, Delete, ScanFace } from "lucide-react";
+import { Github, Mail, Loader2, Delete, ScanFace, LogOut } from "lucide-react";
 import { useAuthStore } from "../src/stores/authStore";
 import { BiometricService } from "../src/services/biometric";
 import DatabaseService from "../src/services/database";
@@ -10,7 +10,9 @@ const HushkeyLogo = ({ size = 24 }: { size?: number }) => (
 );
 
 const Login: React.FC = () => {
-  const [mode, setMode] = useState<"signin" | "signup" | "setpin" | "unlock">("signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "setpin" | "unlock">(
+    "signin"
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pin, setPin] = useState("");
@@ -36,7 +38,7 @@ const Login: React.FC = () => {
     unlockWithBiometrics,
     checkNewDevice,
   } = useAuthStore();
-  
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,10 +50,18 @@ const Login: React.FC = () => {
       const checkBiometric = async () => {
         const available = await BiometricService.isAvailable();
         setBiometricAvailable(available);
-        
+
         if (available && user) {
           const settings = await DatabaseService.getUserSettings(user.id);
-          setBiometricEnabled(settings?.biometric_enabled || false);
+          const enabled = settings?.biometric_enabled || false;
+          setBiometricEnabled(enabled);
+
+          // Auto-trigger if enabled
+          if (enabled) {
+            setTimeout(() => {
+              attemptBiometricUnlock().catch(() => {});
+            }, 500);
+          }
         }
       };
       checkBiometric();
@@ -88,7 +98,7 @@ const Login: React.FC = () => {
 
   const handleNumberClick = (num: string) => {
     if (isLoading) return;
-    
+
     if (mode === "setpin") {
       if (!isSettingPin && pin.length < 6) {
         const newPin = pin + num;
@@ -140,7 +150,7 @@ const Login: React.FC = () => {
 
   const attemptUnlock = async (inputPin: string) => {
     setIsVerifying(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 300));
     setIsLoading(true);
     try {
       await unlockWithPin(inputPin);
@@ -191,9 +201,10 @@ const Login: React.FC = () => {
   };
 
   if (mode === "setpin" || mode === "unlock") {
-    const currentPin = mode === "setpin" ? (isSettingPin ? confirmPin : pin) : pin;
+    const currentPin =
+      mode === "setpin" ? (isSettingPin ? confirmPin : pin) : pin;
     const pinLength = mode === "setpin" ? 6 : 6;
-    
+
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-900/20 rounded-full blur-[128px] pointer-events-none" />
@@ -203,17 +214,31 @@ const Login: React.FC = () => {
             <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl flex items-center justify-center shadow-2xl shadow-primary-900/50 mb-6">
               <HushkeyLogo size={50} />
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Hushkey Vault</h1>
-            <p className="text-gray-400">
-              {mode === "setpin" 
-                ? isSettingPin 
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Hushkey Vault
+            </h1>
+            <p
+              className={`transition-colors duration-300 h-6 ${
+                error
+                  ? "text-red-400 font-medium animate-shake"
+                  : "text-gray-400"
+              }`}
+            >
+              {error
+                ? error
+                : mode === "setpin"
+                ? isSettingPin
                   ? "Confirm your 6-digit PIN"
                   : "Set your 6-digit Master PIN"
                 : "Enter your PIN to unlock vault"}
             </p>
           </div>
 
-          <div className="h-8 mb-8 flex items-center justify-center">
+          <div
+            className={`h-8 mb-8 flex items-center justify-center transition-all ${
+              error ? "animate-shake" : ""
+            }`}
+          >
             {isVerifying ? (
               <Loader2 className="animate-spin text-primary-500" size={24} />
             ) : (
@@ -236,25 +261,6 @@ const Login: React.FC = () => {
             )}
           </div>
 
-          {error && (
-            <div className="mb-4 animate-fade-in">
-              <div className={`p-3 rounded-xl border text-center ${
-                showBiometricError
-                  ? 'bg-orange-900/20 border-orange-500/30'
-                  : 'bg-red-900/20 border-red-500/30'
-              }`}>
-                <p className="text-sm font-medium text-red-400">
-                  {error}
-                </p>
-                {mode === "unlock" && failedAttempts > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {failedAttempts} failed attempts
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
           <div className="grid grid-cols-3 gap-6 w-full px-4">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
               <button
@@ -273,7 +279,11 @@ const Login: React.FC = () => {
                 disabled={isLoading}
                 className="w-16 h-16 rounded-full bg-primary-600/20 hover:bg-primary-600/30 border border-primary-500/30 text-primary-400 transition-all active:scale-95 flex items-center justify-center mx-auto disabled:opacity-50"
               >
-                <ScanFace size={24} />
+                {isLoading ? (
+                  <Loader2 className="animate-spin" size={24} />
+                ) : (
+                  <ScanFace size={24} />
+                )}
               </button>
             ) : (
               <div className="col-span-1" />
@@ -294,36 +304,18 @@ const Login: React.FC = () => {
             </button>
           </div>
 
-          {mode === "unlock" && (
-            <div className="mt-8 space-y-4 w-full px-4">
-              {biometricEnabled && biometricAvailable && (
-                <button
-                  onClick={attemptBiometricUnlock}
-                  disabled={isLoading}
-                  className="w-full py-3 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-900/30"
-                >
-                  {isLoading ? (
-                    <Loader2 className="animate-spin" size={20} />
-                  ) : (
-                    <>
-                      <ScanFace size={20} />
-                      Unlock with Biometric
-                    </>
-                  )}
-                </button>
-              )}
-              <button 
-                onClick={() => {
-                  setMode("signin");
-                  setPin("");
-                  setError("");
-                }}
-                className="text-sm text-gray-400 hover:text-white font-medium transition-colors"
-              >
-                Forgot PIN? Sign in again
-              </button>
-            </div>
-          )}
+          <div className="mt-8 space-y-4 w-full px-4 text-center">
+            <button
+              onClick={() => {
+                useAuthStore.getState().signOut();
+                setMode("signin");
+              }}
+              className="text-sm text-gray-500 hover:text-white font-medium transition-colors flex items-center justify-center gap-2 mx-auto"
+            >
+              <LogOut size={14} />
+              Switch Accounts
+            </button>
+          </div>
         </div>
       </div>
     );

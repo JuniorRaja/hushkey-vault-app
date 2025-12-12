@@ -5,21 +5,21 @@
 
 class SecureMemoryService {
   private wrappingKey: CryptoKey | null = null;
-  private readonly WRAPPING_KEY_NAME = 'hushkey-wrapping-key';
+  private readonly WRAPPING_KEY_NAME = "hushkey-wrapping-key";
 
   /**
    * Initialize or retrieve the wrapping key from IndexedDB
    */
   async initializeWrappingKey(): Promise<void> {
     const stored = await this.getStoredWrappingKey();
-    
+
     if (stored) {
       this.wrappingKey = stored;
     } else {
       this.wrappingKey = await crypto.subtle.generateKey(
-        { name: 'AES-GCM', length: 256 },
+        { name: "AES-GCM", length: 256 },
         false, // non-extractable for security
-        ['wrapKey', 'unwrapKey']
+        ["wrapKey", "unwrapKey"]
       );
       await this.storeWrappingKey(this.wrappingKey);
     }
@@ -34,21 +34,27 @@ class SecureMemoryService {
     }
 
     const cryptoKey = await crypto.subtle.importKey(
-      'raw',
+      "raw",
       masterKey,
-      { name: 'AES-GCM' },
+      { name: "AES-GCM" },
       true,
-      ['encrypt', 'decrypt']
+      ["encrypt", "decrypt"]
     );
 
+    const iv = crypto.getRandomValues(new Uint8Array(12));
     const wrapped = await crypto.subtle.wrapKey(
-      'raw',
+      "raw",
       cryptoKey,
       this.wrappingKey!,
-      { name: 'AES-GCM', iv: crypto.getRandomValues(new Uint8Array(12)) }
+      { name: "AES-GCM", iv }
     );
 
-    return btoa(String.fromCharCode(...new Uint8Array(wrapped)));
+    // Concatenate IV + WrappedKey
+    const combined = new Uint8Array(iv.length + wrapped.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(wrapped), iv.length);
+
+    return btoa(String.fromCharCode(...combined));
   }
 
   /**
@@ -59,19 +65,24 @@ class SecureMemoryService {
       await this.initializeWrappingKey();
     }
 
-    const wrappedBuffer = Uint8Array.from(atob(wrappedKey), c => c.charCodeAt(0));
+    const combined = Uint8Array.from(atob(wrappedKey), (c) => c.charCodeAt(0));
+
+    // Extract IV (first 12 bytes)
+    const iv = combined.slice(0, 12);
+    // Extract WrappedKey (remaining bytes)
+    const wrappedBuffer = combined.slice(12);
 
     const cryptoKey = await crypto.subtle.unwrapKey(
-      'raw',
+      "raw",
       wrappedBuffer,
       this.wrappingKey!,
-      { name: 'AES-GCM', iv: crypto.getRandomValues(new Uint8Array(12)) },
-      { name: 'AES-GCM' },
+      { name: "AES-GCM", iv },
+      { name: "AES-GCM" },
       true,
-      ['encrypt', 'decrypt']
+      ["encrypt", "decrypt"]
     );
 
-    const exported = await crypto.subtle.exportKey('raw', cryptoKey);
+    const exported = await crypto.subtle.exportKey("raw", cryptoKey);
     return new Uint8Array(exported);
   }
 
@@ -89,7 +100,7 @@ class SecureMemoryService {
    * Securely clear string data
    */
   secureWipeString(str: string): void {
-    if (typeof str === 'string' && str.length > 0) {
+    if (typeof str === "string" && str.length > 0) {
       // Create array and overwrite
       const arr = new Uint8Array(str.length);
       crypto.getRandomValues(arr);
@@ -101,9 +112,9 @@ class SecureMemoryService {
    */
   private async storeWrappingKey(key: CryptoKey): Promise<void> {
     const db = await this.openSecureDB();
-    const tx = db.transaction('keys', 'readwrite');
-    const store = tx.objectStore('keys');
-    
+    const tx = db.transaction("keys", "readwrite");
+    const store = tx.objectStore("keys");
+
     await store.put({ id: this.WRAPPING_KEY_NAME, key });
     await tx.done;
   }
@@ -114,10 +125,10 @@ class SecureMemoryService {
   private async getStoredWrappingKey(): Promise<CryptoKey | null> {
     try {
       const db = await this.openSecureDB();
-      const tx = db.transaction('keys', 'readonly');
-      const store = tx.objectStore('keys');
+      const tx = db.transaction("keys", "readonly");
+      const store = tx.objectStore("keys");
       const result = await store.get(this.WRAPPING_KEY_NAME);
-      
+
       return result?.key || null;
     } catch {
       return null;
@@ -129,15 +140,15 @@ class SecureMemoryService {
    */
   private async openSecureDB(): Promise<any> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open('hushkey-secure', 1);
-      
+      const request = indexedDB.open("hushkey-secure", 1);
+
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve(request.result);
-      
+
       request.onupgradeneeded = (event: any) => {
         const db = event.target.result;
-        if (!db.objectStoreNames.contains('keys')) {
-          db.createObjectStore('keys', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains("keys")) {
+          db.createObjectStore("keys", { keyPath: "id" });
         }
       };
     });
@@ -149,12 +160,12 @@ class SecureMemoryService {
   async clearSecureStorage(): Promise<void> {
     try {
       const db = await this.openSecureDB();
-      const tx = db.transaction('keys', 'readwrite');
-      await tx.objectStore('keys').clear();
+      const tx = db.transaction("keys", "readwrite");
+      await tx.objectStore("keys").clear();
       await tx.done;
       this.wrappingKey = null;
     } catch (error) {
-      console.error('Failed to clear secure storage:', error);
+      console.error("Failed to clear secure storage:", error);
     }
   }
 }
