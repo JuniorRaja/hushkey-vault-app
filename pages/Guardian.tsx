@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useItemStore } from '../src/stores/itemStore';
 import { useAuthStore } from '../src/stores/authStore';
 import { useGuardianStore } from '../src/stores/guardianStore';
+import { useBackupStore } from '../src/stores/backupStore';
 import { analyzePassword } from '../src/services/passwordAnalyzer';
 import { generatePassword, generateMemorablePassword } from '../services/passwordGenerator';
 import { 
@@ -106,11 +107,12 @@ const KPI_INFO: Record<string, KpiInfoData> = {
     },
     backup: {
         title: "Backup Health",
-        description: "Status of your encrypted cloud synchronization.",
+        description: "Status of your vault backups. Regular backups protect against data loss.",
         bestPractices: [
-            "Ensure sync is set to 'Automatic'.",
-            "Periodically export a local backup (Settings > Export) for offline safety.",
-            "Verify your recovery phrase is stored securely."
+            "Create backups every 30 days.",
+            "Use HushKey Backup (.hkb) format for best security.",
+            "Store backups in multiple secure locations.",
+            "Test restore process periodically."
         ]
     }
 };
@@ -509,6 +511,31 @@ const KpiDetailView = ({ id, data, onBack, items }: { id: KpiId, data: any, onBa
                          ))}
                      </div>
                  )
+             case 'backup':
+                 return (
+                     <div className="space-y-6">
+                         <div className="grid grid-cols-2 gap-4">
+                             <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-xl">
+                                 <div className="text-sm text-gray-400 mb-1">Last Backup</div>
+                                 <div className="text-2xl font-bold text-white">{data.lastBackup}</div>
+                             </div>
+                             <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-xl">
+                                 <div className="text-sm text-gray-400 mb-1">Items Backed Up</div>
+                                 <div className="text-2xl font-bold text-white">{data.itemCount}</div>
+                             </div>
+                         </div>
+                         <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-xl">
+                             <div className="text-sm text-gray-400 mb-1">Total Backups</div>
+                             <div className="text-2xl font-bold text-white">{data.totalBackups}</div>
+                         </div>
+                         <button 
+                             onClick={() => window.location.href = '/settings/backup'}
+                             className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-lg font-semibold transition-colors"
+                         >
+                             Manage Backups
+                         </button>
+                     </div>
+                 )
             default:
                 return <p className="text-gray-500">Details not available for this metric.</p>;
         }
@@ -549,6 +576,7 @@ const Guardian: React.FC = () => {
   const { items: storeItems, loadItems } = useItemStore();
   const { user } = useAuthStore();
   const { isScanning, scanProgress, lastScan, findings, compromisedCount: storeCompromisedCount, startScan, startBreachCheck, fetchLatestScan, fetchFindings } = useGuardianStore();
+  const { backupHealth, loadBackupHealth } = useBackupStore();
   
   // Load items on mount
   useEffect(() => {
@@ -826,7 +854,14 @@ const Guardian: React.FC = () => {
   const mockData = {
       compromisedCount,
       sessions: activeSessions,
-      backup: { score: 98, last: '15m ago', status: 'Secure' }
+      backup: backupHealth ? {
+          score: backupHealth.status === 'healthy' ? 100 : backupHealth.status === 'warning' ? 70 : 30,
+          last: backupHealth.daysSinceLastBackup === 999 ? 'Never' : `${backupHealth.daysSinceLastBackup}d ago`,
+          status: backupHealth.status === 'healthy' ? 'Healthy' : backupHealth.status === 'warning' ? 'Warning' : 'Critical',
+          itemCount: backupHealth.lastBackupItemCount,
+          totalBackups: backupHealth.totalBackups,
+          recommendation: backupHealth.recommendation
+      } : { score: 0, last: 'Never', status: 'Unknown', itemCount: 0, totalBackups: 0, recommendation: 'Loading...' }
   };
 
   // --- Handlers ---
@@ -852,8 +887,9 @@ const Guardian: React.FC = () => {
       if (user) {
           fetchLatestScan(user.id);
           fetchFindings(user.id);
+          loadBackupHealth();
       }
-  }, [user, fetchLatestScan, fetchFindings]);
+  }, [user, fetchLatestScan, fetchFindings, loadBackupHealth]);
   
   // Set current scan ID when lastScan changes
   useEffect(() => {
@@ -1019,7 +1055,15 @@ const Guardian: React.FC = () => {
               detailData = { title: 'Active Sessions', value: mockData.sessions.length, description: 'Devices currently authorized to access your vault.', color: 'text-green-500', sessions: mockData.sessions, onTerminate: handleTerminateSession };
               break;
            case 'backup':
-              detailData = { title: 'Backup Health', value: 'Secure', description: 'Status of your encrypted cloud synchronization.', color: 'text-green-500', affectedItems: [] };
+              detailData = { 
+                  title: 'Backup Health', 
+                  value: mockData.backup.status, 
+                  description: mockData.backup.recommendation,
+                  color: mockData.backup.status === 'Healthy' ? 'text-green-500' : mockData.backup.status === 'Warning' ? 'text-yellow-500' : 'text-red-500',
+                  lastBackup: mockData.backup.last,
+                  itemCount: mockData.backup.itemCount,
+                  totalBackups: mockData.backup.totalBackups
+              };
               break;
           default:
               break;
@@ -1261,10 +1305,18 @@ const Guardian: React.FC = () => {
                     onMouseDown={() => {
                       setDetailViewId('backup');
                     }}
-                    className="bg-gray-900 border border-gray-800 rounded-2xl p-5 cursor-pointer hover:border-gray-700 hover:bg-gray-850 transition-colors group relative"
+                    className={`bg-gray-900 border rounded-2xl p-5 cursor-pointer hover:border-gray-700 hover:bg-gray-850 transition-colors group relative ${
+                        mockData.backup.status === 'Critical' ? 'border-red-500/50 bg-red-900/10' : 
+                        mockData.backup.status === 'Warning' ? 'border-yellow-500/50 bg-yellow-900/10' : 
+                        'border-gray-800'
+                    }`}
                 >
                      <div className="flex justify-between items-start mb-4">
-                        <div className="p-2.5 rounded-xl bg-gray-950/50 text-green-400 shadow-lg">
+                        <div className={`p-2.5 rounded-xl bg-gray-950/50 shadow-lg ${
+                            mockData.backup.status === 'Healthy' ? 'text-green-400' :
+                            mockData.backup.status === 'Warning' ? 'text-yellow-400' :
+                            'text-red-400'
+                        }`}>
                             <HardDrive size={22} />
                         </div>
                         <button 
@@ -1280,12 +1332,14 @@ const Guardian: React.FC = () => {
                     </div>
                      <div>
                         <div className="text-3xl font-bold text-white mb-1 flex items-center gap-2">
-                            {mockData.backup.score}% 
-                            <span className="text-xs bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full font-bold uppercase">Secure</span>
+                            {mockData.backup.status}
                         </div>
-                        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Cloud Backup</div>
-                         <div className="text-xs text-gray-600 mt-2 font-medium">Synced {mockData.backup.last}</div>
+                        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Backup Health</div>
+                         <div className="text-xs text-gray-600 mt-2 font-medium">Last: {mockData.backup.last}</div>
                     </div>
+                    {(mockData.backup.status === 'Critical' || mockData.backup.status === 'Warning') && (
+                        <div className="absolute top-2 right-10 px-1.5 py-0.5 bg-red-500 text-white text-[8px] font-bold uppercase rounded-full animate-pulse shadow-lg shadow-red-900/50">Alert</div>
+                    )}
                     <div className="absolute bottom-4 right-4 text-gray-700 group-hover:text-primary-400 opacity-50 group-hover:opacity-100 transition-all">
                         <ChevronRight size={20} />
                     </div>

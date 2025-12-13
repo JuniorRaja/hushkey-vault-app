@@ -1,17 +1,15 @@
-
-
 export enum ItemType {
-  LOGIN = 'LOGIN',
-  CARD = 'CARD',
-  IDENTITY = 'IDENTITY',
-  NOTE = 'NOTE',
-  WIFI = 'WIFI',
-  BANK = 'BANK',
-  DATABASE = 'DATABASE',
-  SERVER = 'SERVER',
-  SSH_KEY = 'SSH_KEY',
-  ID_CARD = 'ID_CARD',
-  FILE = 'FILE'
+  LOGIN = "LOGIN",
+  CARD = "CARD",
+  IDENTITY = "IDENTITY",
+  NOTE = "NOTE",
+  WIFI = "WIFI",
+  BANK = "BANK",
+  DATABASE = "DATABASE",
+  SERVER = "SERVER",
+  SSH_KEY = "SSH_KEY",
+  ID_CARD = "ID_CARD",
+  FILE = "FILE",
 }
 
 export interface Category {
@@ -62,8 +60,8 @@ export interface CardData {
   expiry?: string;
   cvv?: string;
   pin?: string;
-  cardType?: 'debit' | 'credit';
-  provider?: 'visa' | 'mastercard' | 'amex' | 'rupay' | 'other';
+  cardType?: "debit" | "credit";
+  provider?: "visa" | "mastercard" | "amex" | "rupay" | "other";
   cardImage?: string;
 }
 
@@ -119,7 +117,14 @@ export interface DatabaseData {
   username?: string;
   password?: string;
   databaseName?: string;
-  dbType?: 'mysql' | 'postgres' | 'oracle' | 'mssql' | 'mongo' | 'redis' | 'other';
+  dbType?:
+    | "mysql"
+    | "postgres"
+    | "oracle"
+    | "mssql"
+    | "mongo"
+    | "redis"
+    | "other";
   passwordExpiryInterval?: number;
   passwordLastModified?: string;
 }
@@ -170,7 +175,17 @@ export interface FileData {
 }
 
 export interface Item extends ItemBase {
-  data: LoginData & CardData & IdentityData & NoteData & WifiData & BankData & DatabaseData & ServerData & SSHKeyData & IdCardData & FileData; 
+  data: LoginData &
+    CardData &
+    IdentityData &
+    NoteData &
+    WifiData &
+    BankData &
+    DatabaseData &
+    ServerData &
+    SSHKeyData &
+    IdCardData &
+    FileData;
 }
 
 export interface UserProfile {
@@ -184,61 +199,90 @@ export interface UserProfile {
 export interface LogEntry {
   id: string;
   timestamp: string;
-  action: 'LOGIN' | 'CREATE' | 'UPDATE' | 'DELETE' | 'VIEW' | 'EXPORT' | 'RESTORE' | 'PERMANENT_DELETE' | 'CLEAR_DATA' | 'SYNC';
+  action:
+    | "LOGIN"
+    | "CREATE"
+    | "UPDATE"
+    | "DELETE"
+    | "VIEW"
+    | "EXPORT"
+    | "RESTORE"
+    | "PERMANENT_DELETE"
+    | "CLEAR_DATA"
+    | "SYNC";
   details: string;
 }
 
-export type AccentColor = 'violet' | 'blue' | 'emerald' | 'rose' | 'amber' | 'cyan';
-export type ThemePattern = 'none' | 'waves' | 'geometric' | 'dots' | 'gradient' | 'mesh' | 'circuit' | 'hexagon';
+export type AccentColor =
+  | "violet"
+  | "blue"
+  | "emerald"
+  | "rose"
+  | "amber"
+  | "cyan";
+export type ThemePattern =
+  | "none"
+  | "waves"
+  | "geometric"
+  | "dots"
+  | "gradient"
+  | "mesh"
+  | "circuit"
+  | "hexagon";
 
 export interface NotificationSettings {
-    newDeviceLogin: boolean;
-    failedLoginAttempts: boolean;
-    weakPasswordAlerts: boolean;
-    expiryReminders: boolean;
-    backupHealth: boolean;
-    monthlyReport: boolean;
-    sessionAlerts: boolean;
-    sharedVaultUpdates: boolean;
-    pushNotifications: boolean;
-    emailNotifications: boolean;
+  newDeviceLogin: boolean;
+  failedLoginAttempts: boolean;
+  weakPasswordAlerts: boolean;
+  expiryReminders: boolean;
+  backupHealth: boolean;
+  monthlyReport: boolean;
+  sessionAlerts: boolean;
+  sharedVaultUpdates: boolean;
+  pushNotifications: boolean;
+  emailNotifications: boolean;
 }
 
-export function isValidNotificationSettings(obj: any): obj is NotificationSettings {
-    return obj && typeof obj === 'object' &&
-        typeof obj.newDeviceLogin === 'boolean' &&
-        typeof obj.failedLoginAttempts === 'boolean' &&
-        typeof obj.weakPasswordAlerts === 'boolean' &&
-        typeof obj.expiryReminders === 'boolean' &&
-        typeof obj.backupHealth === 'boolean' &&
-        typeof obj.monthlyReport === 'boolean' &&
-        typeof obj.sessionAlerts === 'boolean' &&
-        typeof obj.sharedVaultUpdates === 'boolean' &&
-        typeof obj.pushNotifications === 'boolean' &&
-        typeof obj.emailNotifications === 'boolean';
+export function isValidNotificationSettings(
+  obj: any
+): obj is NotificationSettings {
+  return (
+    obj &&
+    typeof obj === "object" &&
+    typeof obj.newDeviceLogin === "boolean" &&
+    typeof obj.failedLoginAttempts === "boolean" &&
+    typeof obj.weakPasswordAlerts === "boolean" &&
+    typeof obj.expiryReminders === "boolean" &&
+    typeof obj.backupHealth === "boolean" &&
+    typeof obj.monthlyReport === "boolean" &&
+    typeof obj.sessionAlerts === "boolean" &&
+    typeof obj.sharedVaultUpdates === "boolean" &&
+    typeof obj.pushNotifications === "boolean" &&
+    typeof obj.emailNotifications === "boolean"
+  );
 }
 
 export enum NotificationType {
-    SECURITY = 'SECURITY',
-    ALERT = 'ALERT',
-    INFO = 'INFO',
-    SUCCESS = 'SUCCESS'
+  SECURITY = "SECURITY",
+  ALERT = "ALERT",
+  INFO = "INFO",
+  SUCCESS = "SUCCESS",
 }
 
 export interface AppNotification {
-    id: string;
-    title: string;
-    message: string;
-    type: NotificationType;
-    timestamp: string;
-    read: boolean;
+  id: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  timestamp: string;
+  read: boolean;
 }
 
 export interface AppSettings {
   autoLockMinutes: number;
   clipboardClearSeconds: number;
-  theme: 'dark' | 'light' | 'system';
-  unlockMethod: 'pin' | 'biometric' | 'password';
+  theme: "dark" | "light" | "system";
+  unlockMethod: "pin" | "biometric" | "password";
   allowScreenshots: boolean;
   lastSync: string;
   groupItemsByCategory: boolean;
@@ -251,10 +295,10 @@ export interface AppSettings {
 export interface Share {
   id: string;
   userId: string;
-  shareType: 'item' | 'vault';
+  shareType: "item" | "vault";
   itemId?: string;
   vaultId?: string;
-  shareMethod: 'in_app' | 'qr' | 'url';
+  shareMethod: "in_app" | "qr" | "url";
   shareToken: string;
   encryptedShareKey: string; // Share key encrypted with user's master key
   encryptedData: string;
@@ -269,3 +313,5 @@ export interface Share {
   revoked: boolean;
   revokedAt?: string;
 }
+
+export type UserSettings = AppSettings;

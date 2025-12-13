@@ -1843,7 +1843,7 @@ const Settings: React.FC = () => {
           </div>
 
           <div
-            onClick={() => setActiveModal("backup")}
+            onClick={() => navigate("/settings/backup")}
             className="p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group"
           >
             <div className="flex items-center gap-3">
@@ -1852,10 +1852,10 @@ const Settings: React.FC = () => {
               </div>
               <div>
                 <span className="text-gray-200 font-medium block">
-                  Backup & Import
+                  Backup & Restore
                 </span>
                 <span className="text-[10px] text-gray-500">
-                  Last backup: Never
+                  Create and manage backups
                 </span>
               </div>
             </div>
