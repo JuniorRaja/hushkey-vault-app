@@ -28,7 +28,10 @@ import { storageService } from "./services/storage";
 import { INITIAL_USER } from "./services/mockData";
 import { useAuthStore } from "./src/stores/authStore";
 import DatabaseService from "./src/services/database";
-import { requestNotificationPermission, requestClipboardPermission } from "./src/services/pwa";
+import {
+  requestNotificationPermission,
+  requestClipboardPermission,
+} from "./src/services/pwa";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Items from "./pages/Items";
@@ -38,10 +41,12 @@ import Settings from "./pages/Settings";
 import NotificationsSettings from "./pages/NotificationsSettings";
 import CategoriesSettings from "./pages/CategoriesSettings";
 import AuditLogsSettings from "./pages/AuditLogsSettings";
+import BackupSettings from "./pages/BackupSettings";
 import ItemDetail from "./pages/ItemDetail";
 import Trash from "./pages/Trash";
 import ShareAccess from "./pages/ShareAccess";
 import Shares from "./pages/Shares";
+import ImportData from "./pages/ImportData";
 import AppLayout from "./components/Layout";
 
 // --- Color Palettes ---
@@ -697,7 +702,7 @@ const AppRoutes = () => {
   const location = useLocation();
 
   // Allow share route without authentication
-  if (location.pathname.startsWith('/share/')) {
+  if (location.pathname.startsWith("/share/")) {
     return (
       <Routes>
         <Route path="/share/:token" element={<ShareAccess />} />
@@ -720,9 +725,14 @@ const AppRoutes = () => {
         <Route path="items/new" element={<ItemDetail isNew />} />
         <Route path="guardian" element={<Guardian />} />
         <Route path="settings" element={<Settings />} />
-        <Route path="settings/notifications" element={<NotificationsSettings />} />
+        <Route
+          path="settings/notifications"
+          element={<NotificationsSettings />}
+        />
         <Route path="settings/categories" element={<CategoriesSettings />} />
         <Route path="settings/audit-logs" element={<AuditLogsSettings />} />
+        <Route path="settings/backup" element={<BackupSettings />} />
+        <Route path="import" element={<ImportData />} />
         <Route path="trash" element={<Trash />} />
         <Route path="shares" element={<Shares />} />
       </Route>
@@ -735,14 +745,14 @@ const App: React.FC = () => {
 
   useEffect(() => {
     hydrate();
-    
+
     // Request PWA permissions
     requestNotificationPermission();
     requestClipboardPermission();
 
     // Register service worker for offline support
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
   }, [hydrate]);
 
@@ -753,10 +763,11 @@ const App: React.FC = () => {
     const syncData = async () => {
       if (navigator.onLine) {
         try {
-          const SyncService = (await import('./src/services/syncService')).default;
+          const SyncService = (await import("./src/services/syncService"))
+            .default;
           await SyncService.processSyncQueue();
         } catch (error) {
-          console.error('Sync failed:', error);
+          console.error("Sync failed:", error);
         }
       }
     };
@@ -766,27 +777,27 @@ const App: React.FC = () => {
 
     // Sync when coming back online
     const handleOnline = () => {
-      console.log('Back online, syncing...');
+      console.log("Back online, syncing...");
       syncData();
     };
 
-    window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
   }, [user, isUnlocked]);
 
   // Auto-cleanup expired trash on app launch
   // TODO: Change to cron job
   useEffect(() => {
     const cleanupTrash = async () => {
-       if (!user || !isUnlocked) return;
-      
+      if (!user || !isUnlocked) return;
+
       try {
-        const { useTrashStore } = await import('./src/stores/trashStore');
+        const { useTrashStore } = await import("./src/stores/trashStore");
         const { cleanupExpiredTrash } = useTrashStore.getState();
         const autoDeleteDays = await DatabaseService.getAutoDeleteDays(user.id);
         await cleanupExpiredTrash(autoDeleteDays);
       } catch (error) {
-        console.error('Failed to cleanup expired trash:', error);
+        console.error("Failed to cleanup expired trash:", error);
       }
     };
 

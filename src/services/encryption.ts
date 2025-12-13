@@ -21,11 +21,20 @@ class EncryptionService {
   }
 
   /**
+   * Generate a random 32-byte key for encryption
+   */
+  generateKey(): Uint8Array {
+    return crypto.getRandomValues(new Uint8Array(this.KEY_LENGTH / 8));
+  }
+
+  /**
    * Generate a random string (for device IDs, etc.)
    */
   generateRandomString(length: number = 32): string {
     const bytes = crypto.getRandomValues(new Uint8Array(length));
-    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+      ""
+    );
   }
 
   /**
@@ -38,29 +47,29 @@ class EncryptionService {
 
     // Import password as key material
     const keyMaterial = await crypto.subtle.importKey(
-      'raw',
+      "raw",
       passwordBuffer,
-      { name: 'PBKDF2' },
+      { name: "PBKDF2" },
       false,
-      ['deriveBits', 'deriveKey']
+      ["deriveBits", "deriveKey"]
     );
 
     // Derive key using PBKDF2
     const key = await crypto.subtle.deriveKey(
       {
-        name: 'PBKDF2',
+        name: "PBKDF2",
         salt: saltBuffer.buffer as ArrayBuffer,
         iterations: this.ITERATIONS,
-        hash: 'SHA-256'
+        hash: "SHA-256",
       },
       keyMaterial,
-      { name: 'AES-GCM', length: this.KEY_LENGTH },
+      { name: "AES-GCM", length: this.KEY_LENGTH },
       true,
-      ['encrypt', 'decrypt']
+      ["encrypt", "decrypt"]
     );
 
     // Export as raw bytes
-    const exportedKey = await crypto.subtle.exportKey('raw', key);
+    const exportedKey = await crypto.subtle.exportKey("raw", key);
     return new Uint8Array(exportedKey);
   }
 
@@ -70,24 +79,24 @@ class EncryptionService {
   async encrypt(data: string, masterKey: Uint8Array): Promise<string> {
     const encoder = new TextEncoder();
     const dataBuffer = encoder.encode(data);
-    
+
     // Generate random IV
     const iv = crypto.getRandomValues(new Uint8Array(this.IV_LENGTH));
 
     // Import key
     const cryptoKey = await crypto.subtle.importKey(
-      'raw',
+      "raw",
       masterKey.buffer as ArrayBuffer,
-      { name: 'AES-GCM' },
+      { name: "AES-GCM" },
       false,
-      ['encrypt']
+      ["encrypt"]
     );
 
     // Encrypt
     const encryptedBuffer = await crypto.subtle.encrypt(
       {
-        name: 'AES-GCM',
-        iv: iv
+        name: "AES-GCM",
+        iv: iv,
       },
       cryptoKey,
       dataBuffer
@@ -113,18 +122,18 @@ class EncryptionService {
 
     // Import key
     const cryptoKey = await crypto.subtle.importKey(
-      'raw',
+      "raw",
       masterKey.buffer as ArrayBuffer,
-      { name: 'AES-GCM' },
+      { name: "AES-GCM" },
       false,
-      ['decrypt']
+      ["decrypt"]
     );
 
     // Decrypt
     const decryptedBuffer = await crypto.subtle.decrypt(
       {
-        name: 'AES-GCM',
-        iv: iv
+        name: "AES-GCM",
+        iv: iv,
       },
       cryptoKey,
       encryptedBuffer
@@ -164,7 +173,10 @@ class EncryptionService {
   /**
    * Decrypt to an object (parses JSON after decryption)
    */
-  async decryptObject<T>(encryptedData: string, masterKey: Uint8Array): Promise<T> {
+  async decryptObject<T>(
+    encryptedData: string,
+    masterKey: Uint8Array
+  ): Promise<T> {
     const json = await this.decrypt(encryptedData, masterKey);
     return JSON.parse(json);
   }
@@ -172,24 +184,27 @@ class EncryptionService {
   /**
    * Encrypt binary data (for files)
    */
-  async encryptBinary(data: Uint8Array, masterKey: Uint8Array): Promise<Uint8Array> {
+  async encryptBinary(
+    data: Uint8Array,
+    masterKey: Uint8Array
+  ): Promise<Uint8Array> {
     // Generate random IV
     const iv = crypto.getRandomValues(new Uint8Array(this.IV_LENGTH));
 
     // Import key
     const cryptoKey = await crypto.subtle.importKey(
-      'raw',
+      "raw",
       masterKey.buffer as ArrayBuffer,
-      { name: 'AES-GCM' },
+      { name: "AES-GCM" },
       false,
-      ['encrypt']
+      ["encrypt"]
     );
 
     // Encrypt
     const encryptedBuffer = await crypto.subtle.encrypt(
       {
-        name: 'AES-GCM',
-        iv: iv
+        name: "AES-GCM",
+        iv: iv,
       },
       cryptoKey,
       data
@@ -206,25 +221,28 @@ class EncryptionService {
   /**
    * Decrypt binary data (for files)
    */
-  async decryptBinary(encryptedData: Uint8Array, masterKey: Uint8Array): Promise<Uint8Array> {
+  async decryptBinary(
+    encryptedData: Uint8Array,
+    masterKey: Uint8Array
+  ): Promise<Uint8Array> {
     // Extract IV and encrypted data
     const iv = encryptedData.slice(0, this.IV_LENGTH);
     const encryptedBuffer = encryptedData.slice(this.IV_LENGTH);
 
     // Import key
     const cryptoKey = await crypto.subtle.importKey(
-      'raw',
+      "raw",
       masterKey.buffer as ArrayBuffer,
-      { name: 'AES-GCM' },
+      { name: "AES-GCM" },
       false,
-      ['decrypt']
+      ["decrypt"]
     );
 
     // Decrypt
     const decryptedBuffer = await crypto.subtle.decrypt(
       {
-        name: 'AES-GCM',
-        iv: iv
+        name: "AES-GCM",
+        iv: iv,
       },
       cryptoKey,
       encryptedBuffer
@@ -237,16 +255,19 @@ class EncryptionService {
    * Create PIN verification hash (encrypt known constant)
    */
   async createPinVerification(masterKey: Uint8Array): Promise<string> {
-    const VERIFICATION_CONSTANT = 'HUSHKEY_PIN_VERIFICATION';
+    const VERIFICATION_CONSTANT = "HUSHKEY_PIN_VERIFICATION";
     return await this.encrypt(VERIFICATION_CONSTANT, masterKey);
   }
 
   /**
    * Verify PIN by attempting to decrypt verification hash
    */
-  async verifyPin(verificationHash: string, masterKey: Uint8Array): Promise<boolean> {
+  async verifyPin(
+    verificationHash: string,
+    masterKey: Uint8Array
+  ): Promise<boolean> {
     try {
-      const VERIFICATION_CONSTANT = 'HUSHKEY_PIN_VERIFICATION';
+      const VERIFICATION_CONSTANT = "HUSHKEY_PIN_VERIFICATION";
       const decrypted = await this.decrypt(verificationHash, masterKey);
       return decrypted === VERIFICATION_CONSTANT;
     } catch {

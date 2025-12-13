@@ -38,46 +38,63 @@ const Login: React.FC = () => {
     unlockWithPin,
     unlockWithBiometrics,
     checkNewDevice,
+    setHasPinSet,
   } = useAuthStore();
 
   const navigate = useNavigate();
 
   useEffect(() => {
+    let mounted = true;
+
     const checkPinStatus = async () => {
       if (user && !isUnlocked) {
         // Use cached hasPinSet from localStorage first
         if (!hasPinSet) {
           // Double-check with server for new users
-          const profile = await DatabaseService.getUserProfile(user.id);
-          if (!profile?.pin_verification) {
-            setMode("setpin");
-            return;
+          try {
+            const profile = await DatabaseService.getUserProfile(user.id);
+            if (!profile?.pin_verification) {
+              if (mounted) setMode("setpin");
+              return;
+            } else {
+              // Found pin on server, update store
+              setHasPinSet(true);
+            }
+          } catch (e) {
+            console.error("Failed to check profile", e);
+            // Fallback to generic unlock screen or remain on loading?
+            // If offline and no cache, we might be stuck.
+            // But if offline, hasPinSet should be true if they ever logged in before.
           }
         }
-        
+
         // PIN is set, show unlock screen
-        setMode("unlock");
-        
+        if (mounted) setMode("unlock");
+
         // Check biometric availability
         const available = await BiometricService.isAvailable();
-        setBiometricAvailable(available);
+        if (mounted) setBiometricAvailable(available);
 
         if (available) {
           // Use cached biometricEnabled from localStorage first
           let enabled = biometricEnabledStore;
-          
+
           // If not cached or on new device, fetch from server
           if (!enabled && navigator.onLine) {
-            const settings = await DatabaseService.getUserSettings(user.id);
-            enabled = settings?.biometric_enabled || false;
+            try {
+              const settings = await DatabaseService.getUserSettings(user.id);
+              enabled = settings?.biometric_enabled || false;
+            } catch (e) {
+              console.warn("Using default biometric setting");
+            }
           }
-          
-          setBiometricEnabled(enabled);
+
+          if (mounted) setBiometricEnabled(enabled);
 
           // Auto-trigger if enabled
-          // if (enabled) {
+          // if (enabled && mounted) {
           //   setTimeout(() => {
-          //     attemptBiometricUnlock().catch(() => {});
+          //     if (mounted) attemptBiometricUnlock().catch(() => {});
           //   }, 500);
           // }
         }
@@ -85,8 +102,12 @@ const Login: React.FC = () => {
         navigate("/vaults", { replace: true });
       }
     };
-    
+
     checkPinStatus();
+
+    return () => {
+      mounted = false;
+    };
   }, [user?.id, isUnlocked, hasPinSet, biometricEnabledStore]);
 
   const handleSuccess = async () => {

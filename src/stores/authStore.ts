@@ -52,6 +52,7 @@ interface AuthActions {
   logActivity: (action: string, details: string) => Promise<void>;
   updateActivity: () => void;
   hydrate: () => Promise<void>;
+  setHasPinSet: (value: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState & AuthActions>()(
@@ -69,6 +70,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       autoLockMinutes: 5,
       hasPinSet: false,
       biometricEnabled: false,
+
+      setHasPinSet(value: boolean) {
+        set({ hasPinSet: value });
+      },
 
       async signUp(email: string, password: string) {
         const { data, error } = await supabase.auth.signUp({
@@ -262,8 +267,13 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const profile = await DatabaseService.getUserProfile(user.id);
         if (!profile?.salt) throw new Error("User profile not found");
 
-        const masterKey = await EncryptionService.deriveMasterKey(pin, profile.salt);
-        const pinVerification = await EncryptionService.createPinVerification(masterKey);
+        const masterKey = await EncryptionService.deriveMasterKey(
+          pin,
+          profile.salt
+        );
+        const pinVerification = await EncryptionService.createPinVerification(
+          masterKey
+        );
         await DatabaseService.updatePinVerification(user.id, pinVerification);
 
         await SecureMemoryService.initializeWrappingKey();
@@ -329,8 +339,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
         try {
           // Try to get salt from IndexedDB cache first
-          let salt = await IndexedDBService.getUserProfile(user.id).then(p => p?.salt);
-          
+          let salt = await IndexedDBService.getUserProfile(user.id).then(
+            (p) => p?.salt
+          );
+
           if (!salt) {
             // Fallback to server if not cached
             const profile = await DatabaseService.getUserProfile(user.id);
@@ -341,12 +353,15 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
           // Derive master key from PIN
           const masterKey = await EncryptionService.deriveMasterKey(pin, salt);
-          
+
           // Verify PIN by attempting to decrypt verification hash from server
           const profile = await DatabaseService.getUserProfile(user.id);
           if (!profile?.pin_verification) throw new Error("PIN not set");
-          
-          const isValid = await EncryptionService.verifyPin(profile.pin_verification, masterKey);
+
+          const isValid = await EncryptionService.verifyPin(
+            profile.pin_verification,
+            masterKey
+          );
           if (!isValid) {
             throw new Error("Invalid PIN");
           }
@@ -469,7 +484,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
         try {
           const authenticated = await BiometricService.authenticate(user.id);
-          if (!authenticated) throw new Error("Biometric authentication failed");
+          if (!authenticated)
+            throw new Error("Biometric authentication failed");
 
           // Retrieve master key from secure storage
           const { wrappedMasterKey } = get();
@@ -570,7 +586,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             }
           }
 
-          throw new Error(`Biometric authentication failed. ${remaining} attempts remaining.`);
+          throw new Error(
+            `Biometric authentication failed. ${remaining} attempts remaining.`
+          );
         }
       },
 
@@ -638,37 +656,70 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
       async hydrate() {
         const state = get();
-        
-        // If already hydrated from localStorage, just validate session
-        if (state.user) {
-          try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-              // Session expired, clear state
-              set({ user: null, isLoading: false, isUnlocked: false });
-            } else {
-              set({ isLoading: false });
-            }
-          } catch (error) {
-            console.error("Hydration error:", error);
-            set({ isLoading: false });
-          }
-          return;
-        }
 
-        // No cached user, check session
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
+        // 1. Validate Supabase Session
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session || !session.user) {
+          // No active session or expired
+          if (state.user) {
             set({
-              user: { id: user.id, email: user.email! },
+              user: null,
+              masterKey: null,
+              wrappedMasterKey: null,
+              isUnlocked: false,
               isLoading: false,
             });
           } else {
             set({ isLoading: false });
           }
-        } catch (error) {
-          console.error("Hydration error:", error);
+          return;
+        }
+
+        // 2. Refresh User Data if needed (keep existing if matching)
+        if (!state.user || state.user.id !== session.user.id) {
+          set({
+            user: { id: session.user.id, email: session.user.email! },
+            isLoading: false,
+            // Reset security state on user mismatch
+            masterKey: null,
+            wrappedMasterKey: null,
+            isUnlocked: false,
+          });
+          return;
+        }
+
+        // 3. Handle Auto-Lock & Key Restoration
+        if (state.isUnlocked && state.wrappedMasterKey) {
+          const timeSince = Date.now() - state.lastActivity;
+          const autoLockMs = state.autoLockMinutes * 60 * 1000;
+
+          if (timeSince > autoLockMs) {
+            console.log("Auto-lock triggered on hydration");
+            get().lock();
+          } else {
+            // Attempt to restore master key
+            try {
+              const masterKey = await SecureMemoryService.unwrapMasterKey(
+                state.wrappedMasterKey
+              );
+              await IntegrityCheckerService.initialize(masterKey);
+              IndexedDBService.setMasterKey(masterKey);
+
+              // Restore memory state
+              set({ masterKey, isLoading: false });
+            } catch (error) {
+              console.warn("Failed to restore master key on hydration:", error);
+              get().lock();
+            }
+          }
+        } else {
+          // Not unlocked or missing key data
+          if (state.isUnlocked) {
+            // Inconsistent state
+            get().lock();
+          }
           set({ isLoading: false });
         }
       },
