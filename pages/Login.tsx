@@ -232,11 +232,18 @@ const Login: React.FC = () => {
     setError("");
   };
 
+  const [oauthLoading, setOauthLoading] = useState<"google" | "github" | null>(null);
+
   const handleOAuth = async (provider: "google" | "github") => {
+    console.log("[Login] OAuth button clicked:", provider);
+    setOauthLoading(provider);
     try {
       await signInWithOAuth(provider);
+      console.log("[Login] OAuth redirect initiated");
     } catch (err: any) {
+      console.error("[Login] OAuth error:", err);
       setError(err.message || "OAuth failed");
+      setOauthLoading(null);
     }
   };
 
@@ -424,17 +431,27 @@ const Login: React.FC = () => {
             <button
               type="button"
               onClick={() => handleOAuth("google")}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-gray-900 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+              disabled={oauthLoading !== null}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-gray-900 rounded-lg font-medium hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Mail size={20} />
+              {oauthLoading === "google" ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : (
+                <Mail size={20} />
+              )}
               Google
             </button>
             <button
               type="button"
               onClick={() => handleOAuth("github")}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors"
+              disabled={oauthLoading !== null}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Github size={20} />
+              {oauthLoading === "github" ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : (
+                <Github size={20} />
+              )}
               GitHub
             </button>
           </div>

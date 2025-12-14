@@ -47,6 +47,7 @@ import Trash from "./pages/Trash";
 import ShareAccess from "./pages/ShareAccess";
 import Shares from "./pages/Shares";
 import ImportData from "./pages/ImportData";
+import OAuthCallback from "./pages/OAuthCallback";
 import AppLayout from "./components/Layout";
 
 // --- Color Palettes ---
@@ -706,6 +707,17 @@ const AppRoutes = () => {
     return (
       <Routes>
         <Route path="/share/:token" element={<ShareAccess />} />
+      </Routes>
+    );
+  }
+
+  // Allow OAuth callback route
+  console.log("[AppRoutes] Current pathname:", location.pathname);
+  if (location.pathname === "/oauth-callback") {
+    console.log("[AppRoutes] Rendering OAuthCallback component");
+    return (
+      <Routes>
+        <Route path="/oauth-callback" element={<OAuthCallback />} />
       </Routes>
     );
   }

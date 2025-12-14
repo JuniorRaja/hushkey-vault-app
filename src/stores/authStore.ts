@@ -41,6 +41,7 @@ interface AuthActions {
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithOAuth: (provider: "google" | "github") => Promise<void>;
+  handleOAuthCallback: () => Promise<void>;
   signOut: () => Promise<void>;
   lock: () => void;
   setupMasterPin: (pin: string) => Promise<void>;
@@ -81,7 +82,12 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           password,
         });
 
-        if (error) throw error;
+        if (error) {
+          if (error.message.includes("already registered") || error.message.includes("already been registered")) {
+            throw new Error("An account with this email already exists");
+          }
+          throw error;
+        }
         if (!data.user) throw new Error("Signup failed");
 
         if (!data.session) {
@@ -172,11 +178,94 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const { error } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
-            redirectTo: import.meta.env.VITE_APP_URL || window.location.origin,
+            redirectTo: `${window.location.origin}/#/oauth-callback`,
           },
         });
 
         if (error) throw error;
+      },
+
+      async handleOAuthCallback() {
+        console.log("[OAuth] handleOAuthCallback started");
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("[OAuth] Session error:", error);
+          throw error;
+        }
+        if (!session?.user) {
+          console.error("[OAuth] No session found");
+          throw new Error("No session found");
+        }
+
+        const userId = session.user.id;
+        const email = session.user.email!;
+        console.log("[OAuth] User authenticated:", { userId, email });
+
+        // Check if profile exists
+        console.log("[OAuth] Checking if profile exists...");
+        let profile = await DatabaseService.getUserProfile(userId);
+        
+        if (!profile) {
+          console.log("[OAuth] New user - creating profile and settings");
+          // New OAuth user - create profile and settings FIRST
+          const salt = EncryptionService.generateSalt();
+          await DatabaseService.createUserProfile(userId, salt);
+          await IndexedDBService.saveUserProfile(userId, salt);
+          console.log("[OAuth] Profile created");
+
+          const defaultSettings = {
+            auto_lock_minutes: 5,
+            clipboard_clear_seconds: 30,
+            theme: "dark",
+            allow_screenshots: false,
+          };
+          await DatabaseService.saveUserSettings(userId, defaultSettings);
+          await IndexedDBService.saveSettings(userId, defaultSettings);
+          console.log("[OAuth] Settings created");
+
+          const deviceId = EncryptionService.generateRandomString();
+          const deviceName = navigator.userAgent.substring(0, 50);
+          await DatabaseService.saveDevice(userId, deviceId, deviceName);
+          await IndexedDBService.saveDevice(userId, deviceId, deviceName);
+          console.log("[OAuth] Device registered");
+
+          await DatabaseService.logActivity(userId, "SIGNUP", "User account created via OAuth");
+          await IndexedDBService.logActivity(userId, "SIGNUP", "User account created via OAuth");
+          console.log("[OAuth] Activity logged");
+
+          set({
+            user: { id: userId, email },
+            deviceId,
+            isLoading: false,
+            isUnlocked: false,
+            hasPinSet: false,
+            autoLockMinutes: 5,
+          });
+          console.log("[OAuth] State updated - hasPinSet: false");
+        } else {
+          console.log("[OAuth] Existing user - loading profile");
+          // Existing user
+          const deviceName = navigator.userAgent.substring(0, 50);
+          await IndexedDBService.logActivity(userId, "LOGIN", `User signed in via OAuth from ${deviceName}`);
+          if (navigator.onLine) {
+            try {
+              await DatabaseService.logActivity(userId, "LOGIN", `User signed in via OAuth from ${deviceName}`);
+            } catch (error) {
+              console.log("Failed to log to server");
+            }
+          }
+
+          set({
+            user: { id: userId, email },
+            isLoading: false,
+            isUnlocked: false,
+            hasPinSet: !!profile.pin_verification,
+            autoLockMinutes: 5,
+          });
+          console.log("[OAuth] State updated - hasPinSet:", !!profile.pin_verification);
+        }
+        console.log("[OAuth] handleOAuthCallback completed");
       },
 
       async signOut() {
