@@ -4,23 +4,20 @@ import { Loader2 } from "lucide-react";
 import { useAuthStore } from "../src/stores/authStore";
 
 const OAuthCallback: React.FC = () => {
-  const [error, setError] = useState("");
   const navigate = useNavigate();
   const { handleOAuthCallback } = useAuthStore();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const processCallback = async () => {
-      console.log("[OAuthCallback] Component mounted");
       try {
-        console.log("[OAuthCallback] Calling handleOAuthCallback...");
         await handleOAuthCallback();
-        console.log("[OAuthCallback] Callback processed successfully");
-        // Navigation handled by Login component based on hasPinSet
-        navigate("/", { replace: true });
+        navigate("/vaults", { replace: true });
       } catch (err: any) {
-        console.error("[OAuthCallback] Error:", err);
-        setError(err.message || "OAuth authentication failed");
-        setTimeout(() => navigate("/", { replace: true }), 2000);
+        setError(err.message || "Failed to authenticate.");
+        setTimeout(() => {
+          navigate("/login", { replace: true });
+        }, 3000);
       }
     };
 
@@ -29,19 +26,20 @@ const OAuthCallback: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4">
-      <div className="flex flex-col items-center gap-4">
-        {error ? (
-          <>
-            <p className="text-red-400 text-center">{error}</p>
-            <p className="text-gray-400 text-sm">Redirecting...</p>
-          </>
-        ) : (
-          <>
-            <Loader2 className="animate-spin text-primary-500" size={48} />
-            <p className="text-gray-400">Completing sign in...</p>
-          </>
-        )}
-      </div>
+      {error ? (
+        <div className="text-center">
+          <p className="text-red-500 font-medium mb-2">Authentication Failed</p>
+          <p className="text-gray-400 text-sm">{error}</p>
+          <p className="text-gray-500 text-xs mt-4">Redirecting to login...</p>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="animate-spin text-primary-500" size={32} />
+          <p className="text-gray-400 font-medium">
+            Completing secure sign in...
+          </p>
+        </div>
+      )}
     </div>
   );
 };

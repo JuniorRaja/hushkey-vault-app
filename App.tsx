@@ -32,6 +32,7 @@ import {
   requestNotificationPermission,
   requestClipboardPermission,
 } from "./src/services/pwa";
+import { supabase } from "./src/supabaseClient";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Items from "./pages/Items";
@@ -48,6 +49,7 @@ import ShareAccess from "./pages/ShareAccess";
 import Shares from "./pages/Shares";
 import ImportData from "./pages/ImportData";
 import OAuthCallback from "./pages/OAuthCallback";
+import Onboarding from "./pages/Onboarding";
 import AppLayout from "./components/Layout";
 
 // --- Color Palettes ---
@@ -699,7 +701,8 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 // --- Main App Logic ---
 
 const AppRoutes = () => {
-  const { user, isUnlocked } = useAuthStore();
+  const { user, isUnlocked, onboardingStep, hasPinSet, isLoading } =
+    useAuthStore();
   const location = useLocation();
 
   // Allow share route without authentication
@@ -712,9 +715,7 @@ const AppRoutes = () => {
   }
 
   // Allow OAuth callback route
-  console.log("[AppRoutes] Current pathname:", location.pathname);
   if (location.pathname === "/oauth-callback") {
-    console.log("[AppRoutes] Rendering OAuthCallback component");
     return (
       <Routes>
         <Route path="/oauth-callback" element={<OAuthCallback />} />
@@ -722,8 +723,12 @@ const AppRoutes = () => {
     );
   }
 
-  // If not authenticated or not unlocked, show Login
+  // If not authenticated or not unlocked, show Login or Onboarding
   if (!user || !isUnlocked) {
+    // Check if user is in onboarding flow
+    if (user && onboardingStep !== null) {
+      return <Onboarding />;
+    }
     return <Login />;
   }
 
@@ -754,18 +759,49 @@ const AppRoutes = () => {
 
 const App: React.FC = () => {
   const { hydrate, isLoading, user, isUnlocked } = useAuthStore();
+  // Use ref to prevent double-execution in React Strict Mode
+  const isHydratingRef = React.useRef(false);
 
   useEffect(() => {
-    hydrate();
+    const initializeAuth = async () => {
+      if (isHydratingRef.current) return;
+      isHydratingRef.current = true;
+      try {
+        await hydrate();
+      } finally {
+        isHydratingRef.current = false;
+      }
+    };
+
+    initializeAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Skip INITIAL_SESSION as it fires on page load and hydrate already ran
+      if (event === "INITIAL_SESSION") return;
+
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        if (!isHydratingRef.current) {
+          isHydratingRef.current = true;
+          try {
+            await hydrate();
+          } finally {
+            isHydratingRef.current = false;
+          }
+        }
+      } else if (event === "SIGNED_OUT") {
+        useAuthStore.getState().clearState();
+      }
+    });
 
     // Request PWA permissions
     requestNotificationPermission();
     requestClipboardPermission();
 
-    // Register service worker for offline support
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    }
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [hydrate]);
 
   // Sync on app start and online events

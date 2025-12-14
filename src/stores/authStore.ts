@@ -35,6 +35,7 @@ interface AuthState {
   autoLockMinutes: number;
   hasPinSet: boolean;
   biometricEnabled: boolean;
+  onboardingStep: number | null;
 }
 
 interface AuthActions {
@@ -45,6 +46,7 @@ interface AuthActions {
   signOut: () => Promise<void>;
   lock: () => void;
   setupMasterPin: (pin: string) => Promise<void>;
+  setupMasterPinForOnboarding: (pin: string) => Promise<void>;
   unlockWithPin: (pin: string) => Promise<void>;
   unlockWithBiometrics: () => Promise<void>;
   setUnlockMethod: (method: "pin" | "biometric" | "password") => void;
@@ -54,6 +56,8 @@ interface AuthActions {
   updateActivity: () => void;
   hydrate: () => Promise<void>;
   setHasPinSet: (value: boolean) => void;
+  clearState: () => Promise<void>;
+  setOnboardingStep: (step: number | null) => void;
 }
 
 export const useAuthStore = create<AuthState & AuthActions>()(
@@ -71,9 +75,48 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       autoLockMinutes: 5,
       hasPinSet: false,
       biometricEnabled: false,
+      onboardingStep: null,
 
       setHasPinSet(value: boolean) {
         set({ hasPinSet: value });
+      },
+
+      setOnboardingStep(step: number | null) {
+        set({ onboardingStep: step });
+      },
+
+      async clearState() {
+        const { user, masterKey } = get();
+
+        // Securely wipe master key from memory
+        if (masterKey) {
+          SecureMemoryService.secureWipe(masterKey);
+        }
+
+        // Clear all security services
+        IntegrityCheckerService.clear();
+        await SecureMemoryService.clearSecureStorage();
+        RateLimiterService.clearAll();
+        IndexedDBService.clearMasterKey();
+
+        if (user) {
+          // Log local logout if needed, but this is triggered by Supabase event
+          await IndexedDBService.logActivity(
+            user.id,
+            "LOGOUT",
+            "Session improved cleared"
+          );
+        }
+
+        await IndexedDBService.clearAll();
+
+        set({
+          user: null,
+          masterKey: null,
+          wrappedMasterKey: null,
+          isUnlocked: false,
+          isLoading: false,
+        });
       },
 
       async signUp(email: string, password: string) {
@@ -83,7 +126,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         });
 
         if (error) {
-          if (error.message.includes("already registered") || error.message.includes("already been registered")) {
+          if (
+            error.message.includes("already registered") ||
+            error.message.includes("already been registered")
+          ) {
             throw new Error("An account with this email already exists");
           }
           throw error;
@@ -147,13 +193,56 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         if (error) throw error;
         if (!data.user) throw new Error("Login failed");
 
-        // Log signin event with session details
+        // Log signin event
         const deviceName = navigator.userAgent.substring(0, 50);
         await IndexedDBService.logActivity(
           data.user.id,
           "LOGIN",
           `User signed in from ${deviceName}`
         );
+
+        // Check if profile exists; if not, create it (Email Confirmation Flow)
+        try {
+          const profile = await DatabaseService.getUserProfile(data.user.id);
+          if (!profile) {
+            console.log(
+              "User profile missing (likely email verified) - Creating now..."
+            );
+            const salt = EncryptionService.generateSalt();
+            await DatabaseService.createUserProfile(data.user.id, salt);
+            await IndexedDBService.saveUserProfile(data.user.id, salt);
+
+            const defaultSettings = {
+              auto_lock_minutes: 5,
+              clipboard_clear_seconds: 30,
+              theme: "dark",
+              allow_screenshots: false,
+            };
+            await DatabaseService.saveUserSettings(
+              data.user.id,
+              defaultSettings
+            );
+
+            // Create device entry
+            const deviceId = EncryptionService.generateRandomString();
+            await DatabaseService.saveDevice(
+              data.user.id,
+              deviceId,
+              deviceName
+            );
+            await IndexedDBService.saveDevice(
+              data.user.id,
+              deviceId,
+              deviceName
+            );
+
+            set({ deviceId });
+          }
+        } catch (err) {
+          console.error("Error ensuring profile exists:", err);
+          // Don't block login, but subsequent actions might fail
+        }
+
         if (navigator.onLine) {
           try {
             await DatabaseService.logActivity(
@@ -178,7 +267,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const { error } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
-            redirectTo: `${window.location.origin}/#/oauth-callback`,
+            redirectTo: window.location.origin,
           },
         });
 
@@ -186,9 +275,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       async handleOAuthCallback() {
-        console.log("[OAuth] handleOAuthCallback started");
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
         if (error) {
           console.error("[OAuth] Session error:", error);
           throw error;
@@ -200,19 +291,14 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
         const userId = session.user.id;
         const email = session.user.email!;
-        console.log("[OAuth] User authenticated:", { userId, email });
 
         // Check if profile exists
-        console.log("[OAuth] Checking if profile exists...");
         let profile = await DatabaseService.getUserProfile(userId);
-        
+
         if (!profile) {
-          console.log("[OAuth] New user - creating profile and settings");
-          // New OAuth user - create profile and settings FIRST
           const salt = EncryptionService.generateSalt();
           await DatabaseService.createUserProfile(userId, salt);
           await IndexedDBService.saveUserProfile(userId, salt);
-          console.log("[OAuth] Profile created");
 
           const defaultSettings = {
             auto_lock_minutes: 5,
@@ -222,17 +308,22 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           };
           await DatabaseService.saveUserSettings(userId, defaultSettings);
           await IndexedDBService.saveSettings(userId, defaultSettings);
-          console.log("[OAuth] Settings created");
 
           const deviceId = EncryptionService.generateRandomString();
           const deviceName = navigator.userAgent.substring(0, 50);
           await DatabaseService.saveDevice(userId, deviceId, deviceName);
           await IndexedDBService.saveDevice(userId, deviceId, deviceName);
-          console.log("[OAuth] Device registered");
 
-          await DatabaseService.logActivity(userId, "SIGNUP", "User account created via OAuth");
-          await IndexedDBService.logActivity(userId, "SIGNUP", "User account created via OAuth");
-          console.log("[OAuth] Activity logged");
+          await DatabaseService.logActivity(
+            userId,
+            "SIGNUP",
+            "User account created via OAuth"
+          );
+          await IndexedDBService.logActivity(
+            userId,
+            "SIGNUP",
+            "User account created via OAuth"
+          );
 
           set({
             user: { id: userId, email },
@@ -242,15 +333,21 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             hasPinSet: false,
             autoLockMinutes: 5,
           });
-          console.log("[OAuth] State updated - hasPinSet: false");
         } else {
-          console.log("[OAuth] Existing user - loading profile");
           // Existing user
           const deviceName = navigator.userAgent.substring(0, 50);
-          await IndexedDBService.logActivity(userId, "LOGIN", `User signed in via OAuth from ${deviceName}`);
+          await IndexedDBService.logActivity(
+            userId,
+            "LOGIN",
+            `User signed in via OAuth from ${deviceName}`
+          );
           if (navigator.onLine) {
             try {
-              await DatabaseService.logActivity(userId, "LOGIN", `User signed in via OAuth from ${deviceName}`);
+              await DatabaseService.logActivity(
+                userId,
+                "LOGIN",
+                `User signed in via OAuth from ${deviceName}`
+              );
             } catch (error) {
               console.log("Failed to log to server");
             }
@@ -263,9 +360,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             hasPinSet: !!profile.pin_verification,
             autoLockMinutes: 5,
           });
-          console.log("[OAuth] State updated - hasPinSet:", !!profile.pin_verification);
         }
-        console.log("[OAuth] handleOAuthCallback completed");
       },
 
       async signOut() {
@@ -401,6 +496,67 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           lastActivity: Date.now(),
           autoLockMinutes: settings?.auto_lock_minutes ?? 5,
           user: userName ? { ...user, name: userName } : user,
+        });
+
+        await DatabaseService.logActivity(
+          user.id,
+          "CREATE",
+          "Master PIN created"
+        );
+        await IndexedDBService.logActivity(
+          user.id,
+          "CREATE",
+          "Master PIN created"
+        );
+        await get().checkNewDevice();
+      },
+
+      // For onboarding: sets up PIN but does NOT unlock vault
+      async setupMasterPinForOnboarding(pin: string) {
+        const { user } = get();
+        if (!user) throw new Error("No user logged in");
+
+        const profile = await DatabaseService.getUserProfile(user.id);
+        if (!profile?.salt) throw new Error("User profile not found");
+
+        const masterKey = await EncryptionService.deriveMasterKey(
+          pin,
+          profile.salt
+        );
+        const pinVerification = await EncryptionService.createPinVerification(
+          masterKey
+        );
+        await DatabaseService.updatePinVerification(user.id, pinVerification);
+
+        await SecureMemoryService.initializeWrappingKey();
+        const wrappedMasterKey = await SecureMemoryService.wrapMasterKey(
+          masterKey
+        );
+
+        await IntegrityCheckerService.initialize(masterKey);
+        IndexedDBService.setMasterKey(masterKey);
+
+        // Load and cache settings
+        let settings = await DatabaseService.getUserSettings(user.id);
+        if (!settings) {
+          const defaultSettings = {
+            auto_lock_minutes: 5,
+            clipboard_clear_seconds: 30,
+            theme: "dark",
+            allow_screenshots: false,
+          };
+          await DatabaseService.saveUserSettings(user.id, defaultSettings);
+          settings = defaultSettings;
+        }
+        await IndexedDBService.saveSettings(user.id, settings);
+
+        // Store masterKey and wrappedMasterKey but do NOT unlock yet
+        set({
+          masterKey,
+          wrappedMasterKey,
+          hasPinSet: true,
+          lastActivity: Date.now(),
+          autoLockMinutes: settings?.auto_lock_minutes ?? 5,
         });
 
         await DatabaseService.logActivity(
@@ -750,6 +906,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const {
           data: { session },
         } = await supabase.auth.getSession();
+
         if (!session || !session.user) {
           // No active session or expired
           if (state.user) {
@@ -768,9 +925,60 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
         // 2. Refresh User Data if needed (keep existing if matching)
         if (!state.user || state.user.id !== session.user.id) {
+          // Check if profile exists; if not, create it (Fix for OAuth/Email Confirm)
+          let profileHasPin = false;
+          try {
+            let profile = await DatabaseService.getUserProfile(session.user.id);
+            if (!profile) {
+              const salt = EncryptionService.generateSalt();
+              await DatabaseService.createUserProfile(session.user.id, salt);
+              await IndexedDBService.saveUserProfile(session.user.id, salt);
+
+              const defaultSettings = {
+                auto_lock_minutes: 5,
+                clipboard_clear_seconds: 30,
+                theme: "dark",
+                allow_screenshots: false,
+              };
+              await DatabaseService.saveUserSettings(
+                session.user.id,
+                defaultSettings
+              );
+
+              // Create device entry
+              const deviceId = EncryptionService.generateRandomString();
+              const deviceName = navigator.userAgent.substring(0, 50);
+              await DatabaseService.saveDevice(
+                session.user.id,
+                deviceId,
+                deviceName
+              );
+              await IndexedDBService.saveDevice(
+                session.user.id,
+                deviceId,
+                deviceName
+              );
+
+              set({ deviceId });
+              profileHasPin = false;
+            } else {
+              // Profile exists, check if PIN is set
+              profileHasPin = !!profile.pin_verification;
+            }
+          } catch (err) {
+            console.error("Hydrate: Error ensuring profile exists:", err);
+          }
+
+          // Determine if user needs onboarding
+          const needsOnboarding =
+            !profileHasPin && state.onboardingStep === null;
+
           set({
             user: { id: session.user.id, email: session.user.email! },
             isLoading: false,
+            hasPinSet: profileHasPin,
+            // Trigger onboarding for new users without PIN
+            onboardingStep: needsOnboarding ? 0 : state.onboardingStep,
             // Reset security state on user mismatch
             masterKey: null,
             wrappedMasterKey: null,
@@ -785,7 +993,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           const autoLockMs = state.autoLockMinutes * 60 * 1000;
 
           if (timeSince > autoLockMs) {
-            console.log("Auto-lock triggered on hydration");
             get().lock();
           } else {
             // Attempt to restore master key
@@ -824,6 +1031,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         autoLockMinutes: state.autoLockMinutes,
         hasPinSet: state.hasPinSet,
         biometricEnabled: state.biometricEnabled,
+        onboardingStep: state.onboardingStep,
       }),
     }
   )
