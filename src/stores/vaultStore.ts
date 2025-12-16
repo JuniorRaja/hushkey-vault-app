@@ -154,17 +154,16 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       updatedAt: timestamp
     });
 
-    // 3. Queue for sync
-    await IndexedDBService.queueChange('CREATE', 'vault', vaultId, { name, icon, description, notes });
-
-    // 4. Sync to server if online
+    // 3. Sync to server if online, otherwise queue for later
     if (navigator.onLine) {
       try {
         await DatabaseService.createVault(user.id, name, icon, masterKey, description, notes);
-        await IndexedDBService.clearSyncQueueItem(vaultId);
       } catch (error) {
-        console.log('Vault queued for sync');
+        console.log('Vault creation failed, queuing for sync');
+        await IndexedDBService.queueChange('CREATE', 'vault', vaultId, { name, icon, description, notes });
       }
+    } else {
+      await IndexedDBService.queueChange('CREATE', 'vault', vaultId, { name, icon, description, notes });
     }
   },
 
@@ -199,17 +198,16 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       });
     }
 
-    // 3. Queue for sync
-    await IndexedDBService.queueChange('UPDATE', 'vault', vaultId, updates);
-
-    // 4. Sync to server if online
+    // 3. Sync to server if online, otherwise queue for later
     if (navigator.onLine) {
       try {
         await DatabaseService.updateVault(vaultId, updates, masterKey);
-        await IndexedDBService.clearSyncQueueItem(vaultId);
       } catch (error) {
-        console.log('Vault update queued for sync');
+        console.log('Vault update failed, queuing for sync');
+        await IndexedDBService.queueChange('UPDATE', 'vault', vaultId, updates);
       }
+    } else {
+      await IndexedDBService.queueChange('UPDATE', 'vault', vaultId, updates);
     }
   },
 
@@ -242,22 +240,21 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       });
     }
 
-    // 3. Queue for sync only once
-    const existingQueue = await IndexedDBService.getSyncQueue();
-    const alreadyQueued = existingQueue.some(q => q.entityId === vaultId && q.action === 'DELETE');
-    if (!alreadyQueued) {
-      await IndexedDBService.queueChange('DELETE', 'vault', vaultId, {});
-    }
-
-    // 4. Sync to server if online
+    // 3. Sync to server if online, otherwise queue for later
     if (navigator.onLine && user) {
       try {
         await DatabaseService.deleteVault(vaultId);
         await supabase.from('items').update({ is_deleted: true, deleted_at: timestamp }).eq('vault_id', vaultId);
         await DatabaseService.logActivity(user.id, 'DELETE', 'Moved vault to trash');
-        await IndexedDBService.clearSyncQueueItem(vaultId);
       } catch (error) {
-        console.log('Vault deletion queued for sync');
+        console.log('Vault deletion failed, queuing for sync');
+        await IndexedDBService.queueChange('DELETE', 'vault', vaultId, {});
+      }
+    } else {
+      const existingQueue = await IndexedDBService.getSyncQueue();
+      const alreadyQueued = existingQueue.some(q => q.entityId === vaultId && q.action === 'DELETE');
+      if (!alreadyQueued) {
+        await IndexedDBService.queueChange('DELETE', 'vault', vaultId, {});
       }
     }
   },
@@ -403,17 +400,16 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       updatedAt: timestamp
     });
 
-    // 3. Queue for sync
-    await IndexedDBService.queueChange('CREATE', 'item', itemId, { vaultId, ...itemData });
-
-    // 4. Sync to server if online
+    // 3. Sync to server if online, otherwise queue for later
     if (navigator.onLine) {
       try {
         await DatabaseService.createItem(vaultId, itemData, masterKey);
-        await IndexedDBService.clearSyncQueueItem(itemId);
       } catch (error) {
-        console.log('Item queued for sync');
+        console.log('Item creation failed, queuing for sync');
+        await IndexedDBService.queueChange('CREATE', 'item', itemId, { vaultId, ...itemData });
       }
+    } else {
+      await IndexedDBService.queueChange('CREATE', 'item', itemId, { vaultId, ...itemData });
     }
   },
 
@@ -449,17 +445,16 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       });
     }
 
-    // 3. Queue for sync
-    await IndexedDBService.queueChange('UPDATE', 'item', itemId, updates);
-
-    // 4. Sync to server if online
+    // 3. Sync to server if online, otherwise queue for later
     if (navigator.onLine) {
       try {
         await DatabaseService.updateItem(itemId, updates, masterKey);
-        await IndexedDBService.clearSyncQueueItem(itemId);
       } catch (error) {
-        console.log('Item update queued for sync');
+        console.log('Item update failed, queuing for sync');
+        await IndexedDBService.queueChange('UPDATE', 'item', itemId, updates);
       }
+    } else {
+      await IndexedDBService.queueChange('UPDATE', 'item', itemId, updates);
     }
   },
 
@@ -506,21 +501,20 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       });
     }
 
-    // 3. Queue for sync only once
-    const existingQueue = await IndexedDBService.getSyncQueue();
-    const alreadyQueued = existingQueue.some(q => q.entityId === itemId && q.action === 'DELETE');
-    if (!alreadyQueued) {
-      await IndexedDBService.queueChange('DELETE', 'item', itemId, {});
-    }
-
-    // 4. Sync to server if online
+    // 3. Sync to server if online, otherwise queue for later
     if (navigator.onLine && user) {
       try {
         await DatabaseService.deleteItem(itemId);
         await DatabaseService.logActivity(user.id, 'DELETE', 'Moved item to trash');
-        await IndexedDBService.clearSyncQueueItem(itemId);
       } catch (error) {
-        console.log('Item deletion queued for sync');
+        console.log('Item deletion failed, queuing for sync');
+        await IndexedDBService.queueChange('DELETE', 'item', itemId, {});
+      }
+    } else {
+      const existingQueue = await IndexedDBService.getSyncQueue();
+      const alreadyQueued = existingQueue.some(q => q.entityId === itemId && q.action === 'DELETE');
+      if (!alreadyQueued) {
+        await IndexedDBService.queueChange('DELETE', 'item', itemId, {});
       }
     }
   },
