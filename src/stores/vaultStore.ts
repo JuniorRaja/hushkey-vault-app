@@ -260,35 +260,76 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
   },
 
   async restoreVault(vaultId: string) {
-    try {
-      await DatabaseService.restoreVault(vaultId);
-      
-      // Restore all items in this vault
-      await supabase
-        .from('items')
-        .update({ is_deleted: false, deleted_at: null })
-        .eq('vault_id', vaultId);
-      
-      // Reload vaults and items
-      await get().loadVaults();
-      await get().loadItems();
-    } catch (error) {
-      console.error('Failed to restore vault:', error);
-      throw error;
+    const { user, masterKey } = useAuthStore.getState();
+    if (!masterKey) return;
+
+    // 1. Update local state - restore vault
+    const cachedVault = await IndexedDBService.getVault(vaultId);
+    if (cachedVault) {
+      const vault: Vault = {
+        id: cachedVault.id,
+        name: await EncryptionService.decrypt(cachedVault.nameEncrypted, masterKey),
+        description: cachedVault.descriptionEncrypted ? await EncryptionService.decrypt(cachedVault.descriptionEncrypted, masterKey) : undefined,
+        icon: cachedVault.icon,
+        createdAt: cachedVault.createdAt,
+        itemCount: 0,
+        isShared: cachedVault.isShared,
+        sharedWith: cachedVault.sharedWith,
+        notes: cachedVault.notesEncrypted ? await EncryptionService.decrypt(cachedVault.notesEncrypted, masterKey) : undefined
+      };
+      set({ vaults: [...get().vaults, vault] });
+
+      // 2. Update IndexedDB - remove deletedAt
+      await IndexedDBService.saveVault({
+        ...cachedVault,
+        deletedAt: undefined,
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    // 3. Sync to server if online, otherwise queue for later
+    if (navigator.onLine && user) {
+      try {
+        await DatabaseService.restoreVault(vaultId);
+        await supabase
+          .from('items')
+          .update({ is_deleted: false, deleted_at: null })
+          .eq('vault_id', vaultId);
+      } catch (error) {
+        console.log('Vault restore failed, queuing for sync');
+        await IndexedDBService.queueChange('UPDATE', 'vault', vaultId, { deletedAt: null });
+      }
+    } else {
+      await IndexedDBService.queueChange('UPDATE', 'vault', vaultId, { deletedAt: null });
     }
   },
 
   async permanentlyDeleteVault(vaultId: string) {
-    try {
-      await DatabaseService.permanentlyDeleteVault(vaultId);
-      await IndexedDBService.deleteVault(vaultId);
-      
-      // Remove from local state
-      const vaults = get().vaults.filter(v => v.id !== vaultId);
-      set({ vaults });
-    } catch (error) {
-      console.error('Failed to permanently delete vault:', error);
-      throw error;
+    const { user } = useAuthStore.getState();
+
+    // 1. Remove from local state
+    const vaults = get().vaults.filter(v => v.id !== vaultId);
+    const items = get().items.filter(i => i.vaultId !== vaultId);
+    set({ vaults, items });
+
+    // 2. Delete from IndexedDB
+    await IndexedDBService.deleteVault(vaultId);
+    // Also delete all items in this vault from IndexedDB
+    const vaultItems = await IndexedDBService.getVaultItems(vaultId);
+    for (const item of vaultItems) {
+      await IndexedDBService.deleteItem(item.id);
+    }
+
+    // 3. Sync to server if online, otherwise queue for later
+    if (navigator.onLine && user) {
+      try {
+        await DatabaseService.permanentlyDeleteVault(vaultId);
+      } catch (error) {
+        console.log('Vault permanent deletion failed, queuing for sync');
+        await IndexedDBService.queueChange('DELETE', 'vault', vaultId, { permanent: true });
+      }
+    } else {
+      await IndexedDBService.queueChange('DELETE', 'vault', vaultId, { permanent: true });
     }
   },
 
@@ -331,7 +372,7 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
         
         const items = await Promise.all(
           cachedItems.filter(i => i.dataEncrypted && !i.deletedAt).map(async (i) => {
-            const decryptedData = await EncryptionService.decryptObject(i.dataEncrypted, masterKey);
+            const decryptedData = await EncryptionService.decryptObject<Partial<Item>>(i.dataEncrypted, masterKey);
             return {
               id: i.id,
               vaultId: i.vaultId,
@@ -341,7 +382,7 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
               folder: i.folder,
               lastUpdated: i.updatedAt,
               deletedAt: i.deletedAt,
-              ...decryptedData
+              ...(decryptedData || {})
             } as Item;
           })
         );
@@ -520,31 +561,66 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
   },
 
   async restoreItem(itemId: string) {
-    try {
-      await DatabaseService.restoreItem(itemId);
-      
-      // Update local state
-      const items = get().items.map(i => 
-        i.id === itemId ? { ...i, deletedAt: undefined } : i
-      );
-      set({ items });
-    } catch (error) {
-      console.error('Failed to restore item:', error);
-      throw error;
+    const { user, masterKey } = useAuthStore.getState();
+    if (!masterKey) return;
+
+    // 1. Get item from IndexedDB and restore to local state
+    const cachedItem = await IndexedDBService.getItem(itemId);
+    if (cachedItem && cachedItem.dataEncrypted) {
+      const decryptedData = await EncryptionService.decryptObject(cachedItem.dataEncrypted, masterKey);
+      const item: Item = {
+        id: cachedItem.id,
+        vaultId: cachedItem.vaultId,
+        categoryId: cachedItem.categoryId,
+        type: cachedItem.type,
+        isFavorite: cachedItem.isFavorite,
+        folder: cachedItem.folder,
+        lastUpdated: cachedItem.updatedAt,
+        ...(decryptedData as Partial<Item>)
+      } as Item;
+      set({ items: [...get().items, item] });
+
+      // 2. Update IndexedDB - remove deletedAt
+      await IndexedDBService.saveVaultItem({
+        ...cachedItem,
+        deletedAt: undefined,
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    // 3. Sync to server if online, otherwise queue for later
+    if (navigator.onLine && user) {
+      try {
+        await DatabaseService.restoreItem(itemId);
+      } catch (error) {
+        console.log('Item restore failed, queuing for sync');
+        await IndexedDBService.queueChange('UPDATE', 'item', itemId, { deletedAt: null });
+      }
+    } else {
+      await IndexedDBService.queueChange('UPDATE', 'item', itemId, { deletedAt: null });
     }
   },
 
   async permanentlyDeleteItem(itemId: string) {
-    try {
-      await DatabaseService.permanentlyDeleteItem(itemId);
-      await IndexedDBService.deleteItem(itemId);
-      
-      // Remove from local state
-      const items = get().items.filter(i => i.id !== itemId);
-      set({ items });
-    } catch (error) {
-      console.error('Failed to permanently delete item:', error);
-      throw error;
+    const { user } = useAuthStore.getState();
+
+    // 1. Remove from local state
+    const items = get().items.filter(i => i.id !== itemId);
+    set({ items });
+
+    // 2. Delete from IndexedDB
+    await IndexedDBService.deleteItem(itemId);
+
+    // 3. Sync to server if online, otherwise queue for later
+    if (navigator.onLine && user) {
+      try {
+        await DatabaseService.permanentlyDeleteItem(itemId);
+      } catch (error) {
+        console.log('Item permanent deletion failed, queuing for sync');
+        await IndexedDBService.queueChange('DELETE', 'item', itemId, { permanent: true });
+      }
+    } else {
+      await IndexedDBService.queueChange('DELETE', 'item', itemId, { permanent: true });
     }
   },
 
@@ -553,8 +629,34 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     if (!user || !masterKey) return;
 
     try {
-      const categories = await DatabaseService.getCategories(user.id, masterKey);
-      set({ categories });
+      if (navigator.onLine) {
+        // Online: Fetch from server and rebuild IndexedDB
+        const categories = await DatabaseService.getCategories(user.id, masterKey);
+        
+        // Save to IndexedDB
+        const categoryRecords = await Promise.all(
+          categories.map(async (c) => ({
+            id: c.id,
+            userId: user.id,
+            nameEncrypted: await EncryptionService.encrypt(c.name, masterKey),
+            color: c.color,
+            createdAt: new Date().toISOString()
+          }))
+        );
+        await IndexedDBService.bulkSaveCategories(categoryRecords);
+        set({ categories });
+      } else {
+        // Offline: Load from IndexedDB
+        const cachedCategories = await IndexedDBService.getCategories(user.id);
+        const categories = await Promise.all(
+          cachedCategories.map(async (c) => ({
+            id: c.id,
+            name: await EncryptionService.decrypt(c.nameEncrypted, masterKey),
+            color: c.color
+          }))
+        );
+        set({ categories });
+      }
     } catch (error) {
       console.error('Failed to load categories:', error);
       throw error;
@@ -565,25 +667,61 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     const { user, masterKey } = useAuthStore.getState();
     if (!user || !masterKey) throw new Error('Not authenticated');
 
-    try {
-      const category = await DatabaseService.createCategory(user.id, name, color, masterKey);
-      set({ categories: [...get().categories, category] });
-    } catch (error) {
-      console.error('Failed to create category:', error);
-      throw error;
+    const categoryId = crypto.randomUUID();
+    const timestamp = new Date().toISOString();
+
+    const category: Category = {
+      id: categoryId,
+      name,
+      color
+    };
+
+    // 1. Update local state immediately
+    set({ categories: [...get().categories, category] });
+
+    // 2. Save to IndexedDB
+    const nameEncrypted = await EncryptionService.encrypt(name, masterKey);
+    await IndexedDBService.saveCategory({
+      id: categoryId,
+      userId: user.id,
+      nameEncrypted,
+      color,
+      createdAt: timestamp
+    });
+
+    // 3. Sync to server if online, otherwise queue for later
+    if (navigator.onLine) {
+      try {
+        await DatabaseService.createCategory(user.id, name, color, masterKey);
+      } catch (error) {
+        console.log('Category creation failed, queuing for sync');
+        await IndexedDBService.queueChange('CREATE', 'category', categoryId, { name, color });
+      }
+    } else {
+      await IndexedDBService.queueChange('CREATE', 'category', categoryId, { name, color });
     }
   },
 
   async deleteCategory(categoryId: string) {
-    try {
-      await DatabaseService.deleteCategory(categoryId);
-      
-      // Remove from local state
-      const categories = get().categories.filter(c => c.id !== categoryId);
-      set({ categories });
-    } catch (error) {
-      console.error('Failed to delete category:', error);
-      throw error;
+    const { user } = useAuthStore.getState();
+
+    // 1. Remove from local state
+    const categories = get().categories.filter(c => c.id !== categoryId);
+    set({ categories });
+
+    // 2. Delete from IndexedDB
+    await IndexedDBService.deleteCategory(categoryId);
+
+    // 3. Sync to server if online, otherwise queue for later
+    if (navigator.onLine && user) {
+      try {
+        await DatabaseService.deleteCategory(categoryId);
+      } catch (error) {
+        console.log('Category deletion failed, queuing for sync');
+        await IndexedDBService.queueChange('DELETE', 'category', categoryId, {});
+      }
+    } else {
+      await IndexedDBService.queueChange('DELETE', 'category', categoryId, {});
     }
   },
 
