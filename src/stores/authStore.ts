@@ -927,6 +927,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         if (!state.user || state.user.id !== session.user.id) {
           // Check if profile exists; if not, create it (Fix for OAuth/Email Confirm)
           let profileHasPin = false;
+          let biometricEnabled = false;
           try {
             let profile = await DatabaseService.getUserProfile(session.user.id);
             if (!profile) {
@@ -965,6 +966,20 @@ export const useAuthStore = create<AuthState & AuthActions>()(
               // Profile exists, check if PIN is set
               profileHasPin = !!profile.pin_verification;
             }
+
+            // Load biometric preference from settings (try cache first, then server)
+            let settings = await IndexedDBService.getSettings(session.user.id);
+            if (!settings && navigator.onLine) {
+              try {
+                settings = await DatabaseService.getUserSettings(session.user.id);
+                if (settings) {
+                  await IndexedDBService.saveSettings(session.user.id, settings);
+                }
+              } catch (error) {
+                console.log("Failed to load settings from server");
+              }
+            }
+            biometricEnabled = settings?.biometric_enabled || false;
           } catch (err) {
             console.error("Hydrate: Error ensuring profile exists:", err);
           }
@@ -977,6 +992,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             user: { id: session.user.id, email: session.user.email! },
             isLoading: false,
             hasPinSet: profileHasPin,
+            biometricEnabled,
             // Trigger onboarding for new users without PIN
             onboardingStep: needsOnboarding ? 0 : state.onboardingStep,
             // Reset security state on user mismatch
