@@ -207,13 +207,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
       updatedAt: timestamp,
     });
 
-    // 3. Queue for sync
-    await IndexedDBService.queueChange("CREATE", "item", itemId, {
-      vaultId,
-      ...itemData,
-    });
-
-    // 4. Sync to server if online
+    // 3. Sync to server if online, otherwise queue for later
     if (navigator.onLine) {
       try {
         await DatabaseService.createItem(vaultId, itemData, masterKey);
@@ -222,10 +216,18 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
           "CREATE",
           `Created ${item.type} item: ${item.name}`
         );
-        await IndexedDBService.clearSyncQueueItem(itemId);
       } catch (error) {
-        console.log("Item queued for sync");
+        console.log("Item creation failed, queuing for sync");
+        await IndexedDBService.queueChange("CREATE", "item", itemId, {
+          vaultId,
+          ...itemData,
+        });
       }
+    } else {
+      await IndexedDBService.queueChange("CREATE", "item", itemId, {
+        vaultId,
+        ...itemData,
+      });
     }
 
     return item;
@@ -263,10 +265,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
       });
     }
 
-    // 3. Queue for sync
-    await IndexedDBService.queueChange("UPDATE", "item", itemId, updates);
-
-    // 4. Sync to server if online
+    // 3. Sync to server if online, otherwise queue for later
     if (navigator.onLine && user) {
       try {
         await DatabaseService.updateItem(itemId, updates, masterKey);
@@ -275,10 +274,12 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
           "UPDATE",
           `Updated item: ${updates.name || itemId}`
         );
-        await IndexedDBService.clearSyncQueueItem(itemId);
       } catch (error) {
-        console.log("Item update queued for sync");
+        console.log("Item update failed, queuing for sync");
+        await IndexedDBService.queueChange("UPDATE", "item", itemId, updates);
       }
+    } else {
+      await IndexedDBService.queueChange("UPDATE", "item", itemId, updates);
     }
   },
 
@@ -311,16 +312,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
       });
     }
 
-    // 3. Queue for sync only once
-    const existingQueue = await IndexedDBService.getSyncQueue();
-    const alreadyQueued = existingQueue.some(
-      (q) => q.entityId === itemId && q.action === "DELETE"
-    );
-    if (!alreadyQueued) {
-      await IndexedDBService.queueChange("DELETE", "item", itemId, {});
-    }
-
-    // 4. Sync to server if online
+    // 3. Sync to server if online, otherwise queue for later
     if (navigator.onLine && user) {
       try {
         await DatabaseService.deleteItem(itemId);
@@ -329,9 +321,17 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
           "DELETE",
           `Moved item to trash: ${itemId}`
         );
-        await IndexedDBService.clearSyncQueueItem(itemId);
       } catch (error) {
-        console.log("Item deletion queued for sync");
+        console.log("Item deletion failed, queuing for sync");
+        await IndexedDBService.queueChange("DELETE", "item", itemId, {});
+      }
+    } else {
+      const existingQueue = await IndexedDBService.getSyncQueue();
+      const alreadyQueued = existingQueue.some(
+        (q) => q.entityId === itemId && q.action === "DELETE"
+      );
+      if (!alreadyQueued) {
+        await IndexedDBService.queueChange("DELETE", "item", itemId, {});
       }
     }
   },
