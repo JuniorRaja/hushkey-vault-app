@@ -96,7 +96,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
           cachedItems
             .filter((i) => i.dataEncrypted)
             .map(async (i) => {
-              const decryptedData = await EncryptionService.decryptObject(
+              const decryptedData = await EncryptionService.decryptObject<Partial<Item>>(
                 i.dataEncrypted,
                 masterKey
               );
@@ -109,7 +109,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
                 folder: i.folder,
                 lastUpdated: i.updatedAt,
                 deletedAt: i.deletedAt,
-                ...decryptedData,
+                ...(decryptedData || {}),
               } as Item;
             })
         );
@@ -144,7 +144,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
 
       const EncryptionService = (await import("../services/encryption"))
         .default;
-      const decryptedData = await EncryptionService.decryptObject(
+      const decryptedData = await EncryptionService.decryptObject<Partial<Item>>(
         data.data_encrypted,
         masterKey
       );
@@ -158,7 +158,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
         folder: data.folder,
         lastUpdated: data.updated_at,
         deletedAt: data.deleted_at,
-        ...decryptedData,
+        ...(decryptedData || {}),
       } as Item;
 
       await DatabaseService.updateLastAccessed(itemId);
@@ -349,17 +349,36 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
 
     set({ isLoading: true });
     try {
-      const vaults = await DatabaseService.getVaults(user.id, masterKey);
+      if (navigator.onLine) {
+        const vaults = await DatabaseService.getVaults(user.id, masterKey);
 
-      // Get actual item counts
-      const vaultsWithCounts = await Promise.all(
-        vaults.map(async (v) => ({
-          ...v,
-          itemCount: await DatabaseService.getVaultItemCount(v.id),
-        }))
-      );
+        // Get actual item counts
+        const vaultsWithCounts = await Promise.all(
+          vaults.map(async (v) => ({
+            ...v,
+            itemCount: await DatabaseService.getVaultItemCount(v.id),
+          }))
+        );
 
-      set({ vaults: vaultsWithCounts, isLoading: false });
+        set({ vaults: vaultsWithCounts, isLoading: false });
+      } else {
+        // Offline: Load from IndexedDB
+        const cachedVaults = await IndexedDBService.getVaults(user.id);
+        const vaults = await Promise.all(
+          cachedVaults.filter(v => v.nameEncrypted && !v.deletedAt).map(async (v) => ({
+            id: v.id,
+            name: await EncryptionService.decrypt(v.nameEncrypted, masterKey),
+            description: v.descriptionEncrypted ? await EncryptionService.decrypt(v.descriptionEncrypted, masterKey) : undefined,
+            icon: v.icon,
+            createdAt: v.createdAt,
+            itemCount: 0,
+            isShared: v.isShared,
+            sharedWith: v.sharedWith,
+            notes: v.notesEncrypted ? await EncryptionService.decrypt(v.notesEncrypted, masterKey) : undefined,
+          }))
+        );
+        set({ vaults, isLoading: false });
+      }
     } catch (error) {
       console.error("Failed to load vaults:", error);
       set({ isLoading: false });
@@ -380,11 +399,24 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
     if (!user || !masterKey) return;
 
     try {
-      const categories = await DatabaseService.getCategories(
-        user.id,
-        masterKey
-      );
-      set({ categories });
+      if (navigator.onLine) {
+        const categories = await DatabaseService.getCategories(
+          user.id,
+          masterKey
+        );
+        set({ categories });
+      } else {
+        // Offline: Load from IndexedDB
+        const cachedCategories = await IndexedDBService.getCategories(user.id);
+        const categories = await Promise.all(
+          cachedCategories.map(async (c) => ({
+            id: c.id,
+            name: await EncryptionService.decrypt(c.nameEncrypted, masterKey),
+            color: c.color
+          }))
+        );
+        set({ categories });
+      }
     } catch (error) {
       console.error("Failed to load categories:", error);
     }
