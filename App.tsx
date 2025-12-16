@@ -51,6 +51,7 @@ import ImportData from "./pages/ImportData";
 import OAuthCallback from "./pages/OAuthCallback";
 import Onboarding from "./pages/Onboarding";
 import AppLayout from "./components/Layout";
+import PWAUpdater from "./components/PWAUpdater";
 
 // --- Color Palettes ---
 const COLOR_PALETTES: Record<AccentColor, Record<string, string>> = {
@@ -867,6 +868,7 @@ const App: React.FC = () => {
     <HashRouter>
       <DataProvider>
         <AuthProvider>
+          <PWAUpdater />
           <AppRoutes />
         </AuthProvider>
       </DataProvider>
