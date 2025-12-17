@@ -44,7 +44,7 @@ interface AuthActions {
   signInWithOAuth: (provider: "google" | "github") => Promise<void>;
   handleOAuthCallback: () => Promise<void>;
   signOut: () => Promise<void>;
-  lock: () => void;
+  lock: () => Promise<void>;
   setupMasterPin: (pin: string) => Promise<void>;
   setupMasterPinForOnboarding: (pin: string) => Promise<void>;
   unlockWithPin: (pin: string) => Promise<void>;
