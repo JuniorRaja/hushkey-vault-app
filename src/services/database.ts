@@ -41,13 +41,17 @@ class DatabaseService {
   /**
    * Update PIN verification hash
    */
-  async updatePinVerification(userId: string, pinVerification: string): Promise<void> {
-    const { error } = await supabase.from("user_profiles").update(
-      {
+  async updatePinVerification(
+    userId: string,
+    pinVerification: string
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("user_profiles")
+      .update({
         pin_verification: pinVerification,
         updated_at: new Date().toISOString(),
-      }
-    ).eq("user_id", userId);
+      })
+      .eq("user_id", userId);
 
     if (error) throw error;
   }
@@ -55,14 +59,19 @@ class DatabaseService {
   /**
    * Update user profile name (encrypted)
    */
-  async updateUserProfileName(userId: string, name: string, masterKey: Uint8Array): Promise<void> {
+  async updateUserProfileName(
+    userId: string,
+    name: string,
+    masterKey: Uint8Array
+  ): Promise<void> {
     const nameEncrypted = await EncryptionService.encrypt(name, masterKey);
-    const { error } = await supabase.from("user_profiles").update(
-      {
+    const { error } = await supabase
+      .from("user_profiles")
+      .update({
         name_encrypted: nameEncrypted,
         updated_at: new Date().toISOString(),
-      }
-    ).eq("user_id", userId);
+      })
+      .eq("user_id", userId);
 
     if (error) throw error;
   }
@@ -94,7 +103,6 @@ class DatabaseService {
       console.error("Profile creation error:", error);
       throw error;
     }
-
   }
 
   /**
@@ -114,7 +122,10 @@ class DatabaseService {
   /**
    * Get user profile name (decrypted)
    */
-  async getUserProfileName(userId: string, masterKey: Uint8Array): Promise<string | null> {
+  async getUserProfileName(
+    userId: string,
+    masterKey: Uint8Array
+  ): Promise<string | null> {
     const profile = await this.getUserProfile(userId);
     if (!profile?.name_encrypted) return null;
     return await EncryptionService.decrypt(profile.name_encrypted, masterKey);
@@ -179,12 +190,20 @@ class DatabaseService {
   /**
    * Get all vaults for a user (decrypt names)
    */
-  async getVaults(userId: string, masterKey: Uint8Array): Promise<Vault[]> {
-    const { data, error } = await supabase
-      .from("vaults")
-      .select("*")
-      .eq("user_id", userId)
-      .is("deleted_at", null);
+  async getVaults(
+    userId: string,
+    masterKey: Uint8Array,
+    since?: string
+  ): Promise<Vault[]> {
+    let query = supabase.from("vaults").select("*").eq("user_id", userId);
+
+    if (since) {
+      query = query.gt("updated_at", since);
+    } else {
+      query = query.is("deleted_at", null);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
@@ -265,9 +284,10 @@ class DatabaseService {
   async deleteVault(vaultId: string): Promise<void> {
     const { error } = await supabase
       .from("vaults")
-      .update({ 
+      .update({
         is_deleted: true,
-        deleted_at: new Date().toISOString() 
+        deleted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .eq("id", vaultId);
 
@@ -280,9 +300,9 @@ class DatabaseService {
   async restoreVault(vaultId: string): Promise<void> {
     const { error } = await supabase
       .from("vaults")
-      .update({ 
+      .update({
         is_deleted: false,
-        deleted_at: null 
+        deleted_at: null,
       })
       .eq("id", vaultId);
 
@@ -351,13 +371,20 @@ class DatabaseService {
   /**
    * Get all items for a vault (decrypt data)
    */
-  async getItems(vaultId: string, masterKey: Uint8Array): Promise<Item[]> {
-    const { data, error } = await supabase
-      .from("items")
-      .select("*")
-      .eq("vault_id", vaultId)
-      .eq("is_deleted", false)
-      .is("deleted_at", null);
+  async getItems(
+    vaultId: string,
+    masterKey: Uint8Array,
+    since?: string
+  ): Promise<Item[]> {
+    let query = supabase.from("items").select("*").eq("vault_id", vaultId);
+
+    if (since) {
+      query = query.gt("updated_at", since);
+    } else {
+      query = query.eq("is_deleted", false).is("deleted_at", null);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
@@ -385,21 +412,32 @@ class DatabaseService {
     // Sort: favorites first (alphabetically), then non-favorites (alphabetically)
     return items.sort((a, b) => {
       if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
-      return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+      return (a.name || "").localeCompare(b.name || "", undefined, {
+        sensitivity: "base",
+      });
     });
   }
 
   /**
    * Get all items across all vaults for a user
    */
-  async getAllItems(userId: string, masterKey: Uint8Array): Promise<Item[]> {
-    const { data, error } = await supabase
+  async getAllItems(
+    userId: string,
+    masterKey: Uint8Array,
+    since?: string
+  ): Promise<Item[]> {
+    let query = supabase
       .from("items")
       .select("*, vaults!inner(user_id)")
-      .eq("vaults.user_id", userId)
-      .eq("is_deleted", false)
-      .is("deleted_at", null);
+      .eq("vaults.user_id", userId);
 
+    if (since) {
+      query = query.gt("updated_at", since);
+    } else {
+      query = query.eq("is_deleted", false).is("deleted_at", null);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
 
     const items = await Promise.all(
@@ -425,14 +463,20 @@ class DatabaseService {
     // Sort: favorites first (alphabetically), then non-favorites (alphabetically)
     return items.sort((a, b) => {
       if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
-      return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+      return (a.name || "").localeCompare(b.name || "", undefined, {
+        sensitivity: "base",
+      });
     });
   }
 
   /**
    * Get favorite items for quick access
    */
-  async getFavoriteItems(userId: string, masterKey: Uint8Array, limit: number = 10): Promise<Item[]> {
+  async getFavoriteItems(
+    userId: string,
+    masterKey: Uint8Array,
+    limit: number = 10
+  ): Promise<Item[]> {
     const { data, error } = await supabase
       .from("items")
       .select("*, vaults!inner(user_id)")
@@ -559,9 +603,10 @@ class DatabaseService {
   async deleteItem(itemId: string): Promise<void> {
     const { error } = await supabase
       .from("items")
-      .update({ 
+      .update({
         is_deleted: true,
-        deleted_at: new Date().toISOString() 
+        deleted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .eq("id", itemId);
 
@@ -574,9 +619,9 @@ class DatabaseService {
   async restoreItem(itemId: string): Promise<void> {
     const { error } = await supabase
       .from("items")
-      .update({ 
+      .update({
         is_deleted: false,
-        deleted_at: null 
+        deleted_at: null,
       })
       .eq("id", itemId);
 
@@ -772,7 +817,7 @@ class DatabaseService {
     await supabase.from("devices").delete().eq("user_id", userId);
     await supabase.from("user_settings").delete().eq("user_id", userId);
     await supabase.from("user_profiles").delete().eq("user_id", userId);
-    
+
     // Delete the auth user account
     const { error } = await supabase.auth.admin.deleteUser(userId);
     if (error) throw error;
@@ -783,19 +828,31 @@ class DatabaseService {
    */
   async clearAllUserData(userId: string): Promise<void> {
     // Get all vaults to find items
-    const { data: vaults } = await supabase.from("vaults").select("id").eq("user_id", userId);
-    const vaultIds = vaults?.map(v => v.id) || [];
+    const { data: vaults } = await supabase
+      .from("vaults")
+      .select("id")
+      .eq("user_id", userId);
+    const vaultIds = vaults?.map((v) => v.id) || [];
 
     // Delete file attachments from storage
     if (vaultIds.length > 0) {
-      const { data: items } = await supabase.from("items").select("id").in("vault_id", vaultIds);
-      const itemIds = items?.map(i => i.id) || [];
-      
+      const { data: items } = await supabase
+        .from("items")
+        .select("id")
+        .in("vault_id", vaultIds);
+      const itemIds = items?.map((i) => i.id) || [];
+
       if (itemIds.length > 0) {
-        const { data: files } = await supabase.from("file_attachments").select("id").in("item_id", itemIds);
+        const { data: files } = await supabase
+          .from("file_attachments")
+          .select("id")
+          .in("item_id", itemIds);
         if (files && files.length > 0) {
           await supabase.storage.from("hushkey-vault").remove([`${userId}/*`]);
-          await supabase.from("file_attachments").delete().in("item_id", itemIds);
+          await supabase
+            .from("file_attachments")
+            .delete()
+            .in("item_id", itemIds);
         }
       }
 
