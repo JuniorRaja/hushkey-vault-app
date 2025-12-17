@@ -1108,9 +1108,48 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
             </>
         )
       case ItemType.DATABASE:
+          const generateConnectionString = () => {
+              const { dbType, host, port, username, password, databaseName } = formData.data || {};
+              if (!dbType || dbType === 'other') return null;
+              
+              const user = username || '';
+              const pass = password || '';
+              const h = host || 'localhost';
+              const db = databaseName || '';
+              
+              const defaultPorts: Record<string, string> = {
+                  mysql: '3306',
+                  postgres: '5432',
+                  oracle: '1521',
+                  mssql: '1433',
+                  mongo: '27017',
+                  redis: '6379'
+              };
+              const p = port || defaultPorts[dbType] || '';
+              
+              switch (dbType) {
+                  case 'mysql':
+                      return `mysql://${user}${pass ? ':' + pass : ''}@${h}:${p}/${db}`;
+                  case 'postgres':
+                      return `postgresql://${user}${pass ? ':' + pass : ''}@${h}:${p}/${db}`;
+                  case 'oracle':
+                      return `oracle://${user}${pass ? ':' + pass : ''}@${h}:${p}/${db}`;
+                  case 'mssql':
+                      return `Server=${h},${p};Database=${db};User Id=${user};Password=${pass};`;
+                  case 'mongo':
+                      return `mongodb://${user}${pass ? ':' + pass : ''}@${h}:${p}/${db}`;
+                  case 'redis':
+                      return pass ? `redis://:${pass}@${h}:${p}` : `redis://${h}:${p}`;
+                  default:
+                      return null;
+              }
+          };
+          
+          const connectionString = generateConnectionString();
+          
           return (
               <>
-                 <div className="space-y-1">
+                 {(isEditing || formData.data?.dbType) && <div className="space-y-1">
                     <label className={labelClass}>Database Type</label>
                     {isEditing ? (
                          <div className="flex flex-wrap gap-2">
@@ -1130,10 +1169,10 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                              <span className="text-white text-lg font-medium">{formData.data?.dbType?.toUpperCase() || '—'}</span>
                          </div>
                     )}
-                 </div>
+                 </div>}
                  
-                 <div className="grid grid-cols-3 gap-4">
-                     <div className="col-span-2 space-y-1 group">
+                 {(isEditing || formData.data?.host || formData.data?.port) && <div className="grid grid-cols-3 gap-4">
+                     {(isEditing || formData.data?.host) && <div className="col-span-2 space-y-1 group">
                         <label className={labelClass}>Host</label>
                         <div className="flex items-center">
                             <input 
@@ -1145,13 +1184,13 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 placeholder="localhost"
                             />
                              {!isEditing && (
-                                <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.host || '')}>
+                                <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.host || '', 'db-host')}>
                                     <Copy size={16}/>
                                 </button>
                             )}
                         </div>
-                     </div>
-                     <div className="space-y-1">
+                     </div>}
+                     {(isEditing || formData.data?.port) && <div className="space-y-1">
                         <label className={labelClass}>Port</label>
                         <input 
                             {...autoCompleteProps}
@@ -1161,10 +1200,10 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             onChange={(e) => updateDataField('port', e.target.value)}
                             placeholder="3306"
                         />
-                     </div>
-                 </div>
+                     </div>}
+                 </div>}
 
-                 <div className="space-y-1">
+                 {(isEditing || formData.data?.databaseName) && <div className="space-y-1">
                     <label className={labelClass}>Database Name</label>
                     <input 
                         {...autoCompleteProps}
@@ -1174,9 +1213,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         onChange={(e) => updateDataField('databaseName', e.target.value)}
                         placeholder="my_app_db"
                     />
-                 </div>
+                 </div>}
 
-                 <div className="space-y-1 group">
+                 {(isEditing || formData.data?.username) && <div className="space-y-1 group">
                     <label className={labelClass}>Username</label>
                     <div className="flex items-center">
                          <input 
@@ -1188,14 +1227,14 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             placeholder="root"
                         />
                         {!isEditing && (
-                             <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.username || '')}>
+                             <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.username || '', 'db-username')}>
                                 <Copy size={16}/>
                             </button>
                         )}
                     </div>
-                 </div>
+                 </div>}
 
-                 <div className="space-y-1 group">
+                 {(isEditing || formData.data?.password) && <div className="space-y-1 group">
                     <label className={labelClass}>Password</label>
                     <div className="relative flex items-center">
                          <input 
@@ -1211,21 +1250,43 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
                             </button>
                              {!isEditing && (
-                                <button className="p-2 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.password || '')}>
+                                <button className="p-2 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.password || '', 'db-password')}>
                                     <Copy size={18}/>
                                 </button>
                             )}
                          </div>
                     </div>
-                 </div>
+                 </div>}
                  {renderExpiryDropdown()}
+                 
+                 {/* Connection String Generator */}
+                 {!isEditing && connectionString && (
+                     <div className="space-y-2 pt-3 mt-3 border-t border-gray-800">
+                         <label className={labelClass}>Connection String</label>
+                         <div className="relative group">
+                             <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 font-mono text-sm text-gray-300 break-all pr-12">
+                                 {connectionString}
+                             </div>
+                             <button 
+                                 className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-500 hover:text-white transition-colors"
+                                 onClick={() => copyToClipboard(connectionString, 'connection-string')}
+                             >
+                                 {copiedField === 'connection-string' ? (
+                                     <Check size={16} className="text-green-500" />
+                                 ) : (
+                                     <Copy size={16} />
+                                 )}
+                             </button>
+                         </div>
+                     </div>
+                 )}
               </>
           )
       case ItemType.SERVER:
           return (
               <>
-                <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1 group">
+                {(isEditing || formData.data?.ip || formData.data?.os) && <div className="grid grid-cols-2 gap-4">
+                     {(isEditing || formData.data?.ip) && <div className="space-y-1 group">
                         <label className={labelClass}>IP Address</label>
                         <div className="flex items-center">
                              <input 
@@ -1237,13 +1298,13 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 placeholder="192.168.1.1"
                             />
                             {!isEditing && (
-                                <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.ip || '')}>
+                                <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.ip || '', 'server-ip')}>
                                     <Copy size={16}/>
                                 </button>
                             )}
                         </div>
-                     </div>
-                     <div className="space-y-1">
+                     </div>}
+                     {(isEditing || formData.data?.os) && <div className="space-y-1">
                         <label className={labelClass}>OS / Distro</label>
                         <input 
                             {...autoCompleteProps}
@@ -1253,10 +1314,10 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             onChange={(e) => updateDataField('os', e.target.value)}
                             placeholder="Ubuntu 22.04"
                         />
-                     </div>
-                </div>
+                     </div>}
+                </div>}
 
-                <div className="space-y-1">
+                {(isEditing || formData.data?.hostname) && <div className="space-y-1">
                     <label className={labelClass}>Hostname</label>
                     <div className="flex items-center">
                          <input 
@@ -1268,14 +1329,14 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             placeholder="web-server-01"
                         />
                          {!isEditing && (
-                             <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.hostname || '')}>
+                             <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.hostname || '', 'server-hostname')}>
                                 <Copy size={16}/>
                             </button>
                         )}
                     </div>
-                 </div>
+                 </div>}
 
-                 <div className="space-y-1">
+                 {(isEditing || formData.data?.hostingProvider) && <div className="space-y-1">
                     <label className={labelClass}>Hosting Provider</label>
                     <input 
                         {...autoCompleteProps}
@@ -1285,10 +1346,10 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         onChange={(e) => updateDataField('hostingProvider', e.target.value)}
                         placeholder="AWS / DigitalOcean"
                     />
-                 </div>
+                 </div>}
                  
-                 <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-1 group">
+                 {(isEditing || formData.data?.username || formData.data?.password) && <div className="grid grid-cols-2 gap-4">
+                     {(isEditing || formData.data?.username) && <div className="space-y-1 group">
                         <label className={labelClass}>Username</label>
                         <div className="flex items-center">
                              <input 
@@ -1300,13 +1361,13 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 placeholder="root"
                             />
                             {!isEditing && (
-                                <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.username || '')}>
+                                <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.username || '', 'server-username')}>
                                     <Copy size={16}/>
                                 </button>
                             )}
                         </div>
-                     </div>
-                     <div className="space-y-1 group">
+                     </div>}
+                     {(isEditing || formData.data?.password) && <div className="space-y-1 group">
                         <label className={labelClass}>Password</label>
                          <div className="relative flex items-center">
                             <input 
@@ -1322,14 +1383,14 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                     {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
                                 </button>
                                 {!isEditing && (
-                                    <button className="p-2 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.password || '')}>
+                                    <button className="p-2 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.password || '', 'server-password')}>
                                         <Copy size={18}/>
                                     </button>
                                 )}
                             </div>
                         </div>
-                     </div>
-                 </div>
+                     </div>}
+                 </div>}
                  {renderExpiryDropdown()}
               </>
           );
@@ -1348,7 +1409,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             placeholder="hostname or IP"
                         />
                          {!isEditing && (
-                            <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.host || '')}>
+                            <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.host || '', 'ssh-host')}>
                                 <Copy size={16}/>
                             </button>
                         )}
@@ -1366,7 +1427,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             placeholder="root"
                         />
                          {!isEditing && (
-                            <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.username || '')}>
+                            <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.username || '', 'ssh-username')}>
                                 <Copy size={16}/>
                             </button>
                         )}
@@ -1388,7 +1449,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
                             </button>
                              {!isEditing && (
-                                <button className="p-2 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.passphrase || '')}>
+                                <button className="p-2 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.passphrase || '', 'ssh-passphrase')}>
                                     <Copy size={18}/>
                                 </button>
                             )}
@@ -1565,7 +1626,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                             </div>
                         )}
                         {!isEditing && !formData.data?.provider && (
-                            <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.number || '')}>
+                            <button className="text-gray-600 hover:text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => copyToClipboard(formData.data?.number || '', 'card-number')}>
                                 <Copy size={16}/>
                             </button>
                         )}
