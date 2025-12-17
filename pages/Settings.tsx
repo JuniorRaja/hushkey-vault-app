@@ -1389,7 +1389,7 @@ const NOTIFICATION_CONFIGS = [
 
 const Settings: React.FC = () => {
   const { user: oldUser, logout: oldLogout } = useAuth();
-  const { user: authUser, lock, signOut: authSignOut, setUnlockMethod, unlockMethod: authUnlockMethod, autoLockMinutes } = useAuthStore();
+  const { user: authUser, lock, signOut: authSignOut, setUnlockMethod, unlockMethod: authUnlockMethod, autoLockMinutes, setAutoLockMinutes } = useAuthStore();
   const navigate = useNavigate();
   const { items, vaults, logs, settings, updateSettings, addLog } = useData();
   const { items: storeItems } = useItemStore();
@@ -1480,6 +1480,11 @@ const Settings: React.FC = () => {
     const newSettings = { ...userSettings, [dbKey]: value };
     await saveSettingsToDB(newSettings);
     updateSettings({ ...settings, [key]: value });
+    
+    // Update authStore for auto lock setting to reflect immediately
+    if (key === 'auto_lock_minutes') {
+      setAutoLockMinutes(value);
+    }
     
     // Dispatch event for screenshot setting changes
     if (key === 'allow_screenshots') {

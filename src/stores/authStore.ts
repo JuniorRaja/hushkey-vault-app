@@ -58,6 +58,7 @@ interface AuthActions {
   setHasPinSet: (value: boolean) => void;
   clearState: () => Promise<void>;
   setOnboardingStep: (step: number | null) => void;
+  setAutoLockMinutes: (minutes: number) => void;
 }
 
 export const useAuthStore = create<AuthState & AuthActions>()(
@@ -83,6 +84,10 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
       setOnboardingStep(step: number | null) {
         set({ onboardingStep: step });
+      },
+
+      setAutoLockMinutes(minutes: number) {
+        set({ autoLockMinutes: minutes });
       },
 
       async clearState() {
