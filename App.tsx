@@ -51,6 +51,8 @@ import ImportData from "./pages/ImportData";
 import OAuthCallback from "./pages/OAuthCallback";
 import Onboarding from "./pages/Onboarding";
 import AppLayout from "./components/Layout";
+import PWAUpdater from "./components/PWAUpdater";
+import ScreenshotProtection from "./components/ScreenshotProtection";
 
 // --- Color Palettes ---
 const COLOR_PALETTES: Record<AccentColor, Record<string, string>> = {
@@ -352,8 +354,7 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       (type === NotificationType.SECURITY || type === NotificationType.ALERT)
     ) {
       console.log(
-        `[EMAIL SENT to ${
-          storageService.getUser().email
+        `[EMAIL SENT to ${storageService.getUser().email
         }]: ${title} - ${message}`
       );
     }
@@ -614,7 +615,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<UserProfile>(storageService.getUser());
   const { triggerNotification } = useData() || {
-    triggerNotification: () => {},
+    triggerNotification: () => { },
   }; // Handle context not ready initial render
   const navigate = useNavigate();
 
@@ -867,6 +868,8 @@ const App: React.FC = () => {
     <HashRouter>
       <DataProvider>
         <AuthProvider>
+          <PWAUpdater />
+          <ScreenshotProtection />
           <AppRoutes />
         </AuthProvider>
       </DataProvider>

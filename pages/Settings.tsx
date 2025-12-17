@@ -1480,6 +1480,13 @@ const Settings: React.FC = () => {
     const newSettings = { ...userSettings, [dbKey]: value };
     await saveSettingsToDB(newSettings);
     updateSettings({ ...settings, [key]: value });
+    
+    // Dispatch event for screenshot setting changes
+    if (key === 'allow_screenshots') {
+      window.dispatchEvent(new CustomEvent('screenshotSettingChanged', { 
+        detail: { allow_screenshots: value } 
+      }));
+    }
   };
 
   // Map UI notification keys to database column names
@@ -1582,12 +1589,18 @@ const Settings: React.FC = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-white group-hover:text-primary-400 transition-colors">
-              <span className="hidden md:inline">{authUser?.name || authUser?.email}</span>
-              <span className="md:hidden">{truncateText(authUser?.name || authUser?.email || '', 12)}</span>
+              <span className="hidden md:inline">
+                {authUser?.name || authUser?.email}
+              </span>
+              <span className="md:hidden">
+                {truncateText(authUser?.name || authUser?.email || "", 12)}
+              </span>
             </h2>
             <p className="text-gray-400">
               <span className="hidden md:inline">{authUser?.email}</span>
-              <span className="md:hidden">{truncateText(authUser?.email || '', 12)}</span>
+              <span className="md:hidden">
+                {truncateText(authUser?.email || "", 12)}
+              </span>
             </p>
             <div className="flex gap-4 mt-2 text-xs font-medium text-gray-500">
               <span className="bg-gray-800 px-2 py-0.5 rounded">
@@ -1662,7 +1675,10 @@ const Settings: React.FC = () => {
               <span className="text-gray-200 font-medium">Clear Clipboard</span>
             </div>
             <CustomDropdown
-              value={userSettings?.clipboard_clear_seconds ?? settings.clipboardClearSeconds}
+              value={
+                userSettings?.clipboard_clear_seconds ??
+                settings.clipboardClearSeconds
+              }
               onChange={(val) =>
                 handleSettingChange("clipboard_clear_seconds", val)
               }
@@ -1684,11 +1700,15 @@ const Settings: React.FC = () => {
                 <span className="text-gray-200 font-medium">
                   Allow Screenshots
                 </span>
-                <span className="text-xs text-gray-500">Android/iOS only</span>
+                <span className="text-xs text-gray-500">
+                  Android/iOS only. Hides content when app loses focus.
+                </span>
               </div>
             </div>
             <ToggleSwitch
-              checked={userSettings?.allow_screenshots ?? settings.allowScreenshots}
+              checked={
+                userSettings?.allow_screenshots ?? settings.allowScreenshots
+              }
               onChange={(val) => handleSettingChange("allow_screenshots", val)}
             />
           </div>
@@ -1699,8 +1719,12 @@ const Settings: React.FC = () => {
                 <Trash2 size={18} />
               </div>
               <div className="flex flex-col">
-                <span className="text-gray-200 font-medium">Auto-Delete Trash</span>
-                <span className="text-xs text-gray-500">Permanently delete after</span>
+                <span className="text-gray-200 font-medium">
+                  Auto-Delete Trash
+                </span>
+                <span className="text-xs text-gray-500">
+                  Permanently delete after
+                </span>
               </div>
             </div>
             <CustomDropdown
@@ -1762,8 +1786,12 @@ const Settings: React.FC = () => {
                 <Bell size={18} />
               </div>
               <div>
-                <span className="text-gray-200 font-medium block">Notifications</span>
-                <span className="text-[10px] text-gray-500">Configure alert preferences</span>
+                <span className="text-gray-200 font-medium block">
+                  Notifications
+                </span>
+                <span className="text-[10px] text-gray-500">
+                  Configure alert preferences
+                </span>
               </div>
             </div>
             <ChevronRight
@@ -1787,7 +1815,10 @@ const Settings: React.FC = () => {
               </div>
             </div>
             <ToggleSwitch
-              checked={userSettings?.group_items_by_category ?? settings.groupItemsByCategory}
+              checked={
+                userSettings?.group_items_by_category ??
+                settings.groupItemsByCategory
+              }
               onChange={(val) =>
                 handleSettingChange("groupItemsByCategory", val)
               }
@@ -1797,7 +1828,10 @@ const Settings: React.FC = () => {
           <div
             onClick={() => navigate("/settings/categories")}
             className={`p-4 flex items-center justify-between hover:bg-gray-850/50 transition-colors cursor-pointer group ${
-              !(userSettings?.group_items_by_category ?? settings.groupItemsByCategory)
+              !(
+                userSettings?.group_items_by_category ??
+                settings.groupItemsByCategory
+              )
                 ? "opacity-50 cursor-not-allowed pointer-events-none"
                 : ""
             }`}
@@ -1927,8 +1961,6 @@ const Settings: React.FC = () => {
         <span>Version 2.5.0 (Build 2024.10.15)</span>
         <span>© 2024 Hushkey Security Inc.</span>
       </div>
-
-
     </div>
   );
 };
