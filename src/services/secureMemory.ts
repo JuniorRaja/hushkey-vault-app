@@ -112,11 +112,14 @@ class SecureMemoryService {
    */
   private async storeWrappingKey(key: CryptoKey): Promise<void> {
     const db = await this.openSecureDB();
-    const tx = db.transaction("keys", "readwrite");
-    const store = tx.objectStore("keys");
-
-    await store.put({ id: this.WRAPPING_KEY_NAME, key });
-    await tx.done;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("keys", "readwrite");
+      const store = tx.objectStore("keys");
+      const request = store.put({ id: this.WRAPPING_KEY_NAME, key });
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
   }
 
   /**
@@ -125,11 +128,14 @@ class SecureMemoryService {
   private async getStoredWrappingKey(): Promise<CryptoKey | null> {
     try {
       const db = await this.openSecureDB();
-      const tx = db.transaction("keys", "readonly");
-      const store = tx.objectStore("keys");
-      const result = await store.get(this.WRAPPING_KEY_NAME);
-
-      return result?.key || null;
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction("keys", "readonly");
+        const store = tx.objectStore("keys");
+        const request = store.get(this.WRAPPING_KEY_NAME);
+        
+        request.onsuccess = () => resolve(request.result?.key || null);
+        request.onerror = () => reject(request.error);
+      });
     } catch {
       return null;
     }
@@ -160,9 +166,13 @@ class SecureMemoryService {
   async clearSecureStorage(): Promise<void> {
     try {
       const db = await this.openSecureDB();
-      const tx = db.transaction("keys", "readwrite");
-      await tx.objectStore("keys").clear();
-      await tx.done;
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction("keys", "readwrite");
+        const request = tx.objectStore("keys").clear();
+        
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
       this.wrappingKey = null;
     } catch (error) {
       console.error("Failed to clear secure storage:", error);
