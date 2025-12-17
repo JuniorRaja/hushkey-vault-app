@@ -211,3 +211,52 @@ kbd {
 .animate-shake {
   animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both;
 }
+
+
+/* Screenshot Protection Styles */
+.screenshot-protected {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection in input fields even when protected */
+.screenshot-protected input,
+.screenshot-protected textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Sensitive content protection - applied to password fields and sensitive data */
+.screenshot-protected .sensitive-content {
+  -webkit-filter: blur(0);
+  filter: blur(0);
+  transition: filter 0.1s ease;
+}
+
+/* Additional protection: prevent drag operations on sensitive content */
+.screenshot-protected img,
+.screenshot-protected .sensitive-content {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+/* Print protection - hide content when printing */
+@media print {
+  .screenshot-protected {
+    visibility: hidden !important;
+  }
+  
+  .screenshot-protected::after {
+    content: "Content protected - printing disabled";
+    visibility: visible;
+    display: block;
+    text-align: center;
+    padding: 2rem;
+    font-size: 1.5rem;
+    color: #666;
+  }
+}

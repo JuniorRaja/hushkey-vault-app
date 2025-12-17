@@ -52,6 +52,7 @@ import OAuthCallback from "./pages/OAuthCallback";
 import Onboarding from "./pages/Onboarding";
 import AppLayout from "./components/Layout";
 import PWAUpdater from "./components/PWAUpdater";
+import ScreenshotProtection from "./components/ScreenshotProtection";
 
 // --- Color Palettes ---
 const COLOR_PALETTES: Record<AccentColor, Record<string, string>> = {
@@ -869,6 +870,7 @@ const App: React.FC = () => {
       <DataProvider>
         <AuthProvider>
           <PWAUpdater />
+          <ScreenshotProtection />
           <AppRoutes />
         </AuthProvider>
       </DataProvider>
