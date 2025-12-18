@@ -42,6 +42,7 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
     null
   );
   const [viewingFile, setViewingFile] = useState<string | null>(null);
+  const [viewingMimeType, setViewingMimeType] = useState<string | null>(null);
   const [showDownloadWarning, setShowDownloadWarning] = useState<string | null>(
     null
   );
@@ -94,7 +95,7 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
     onAttachmentsChange();
   };
 
-  const handleView = async (fileId: string) => {
+  const handleView = async (fileId: string, mimeType: string) => {
     if (!masterKey) return;
 
     if (itemType === ItemType.FILE) {
@@ -105,6 +106,7 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
     try {
       const url = await AttachmentsService.viewFile(fileId, masterKey);
       setViewingFile(url);
+      setViewingMimeType(mimeType);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cannot view file");
     }
@@ -213,7 +215,7 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
                     file.mimeType === "application/pdf" ||
                     file.mimeType === "text/plain") && (
                     <button
-                      onClick={() => handleView(file.id)}
+                      onClick={() => handleView(file.id, file.mimeType)}
                       className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
                       title="View"
                     >
@@ -257,6 +259,7 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
                 onClick={() => {
                   URL.revokeObjectURL(viewingFile);
                   setViewingFile(null);
+                  setViewingMimeType(null);
                 }}
                 className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
               >
@@ -264,11 +267,31 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
               </button>
             </div>
             <div className="p-4">
-              <iframe
-                src={viewingFile}
-                className="w-full h-[70vh] rounded-lg"
-                sandbox="allow-same-origin"
-              />
+              {viewingMimeType?.startsWith("image/") ? (
+                <img
+                  src={viewingFile}
+                  alt="File preview"
+                  className="w-full h-auto max-h-[70vh] object-contain rounded-lg"
+                />
+              ) : viewingMimeType === "text/plain" ? (
+                <iframe
+                  src={viewingFile}
+                  className="w-full h-[70vh] rounded-lg bg-white"
+                  sandbox="allow-same-origin"
+                  title="File preview"
+                />
+              ) : viewingMimeType === "application/pdf" ? (
+                <iframe
+                  src={viewingFile}
+                  className="w-full h-[70vh] rounded-lg bg-white"
+                  sandbox="allow-same-origin"
+                  title="PDF preview"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[70vh] text-gray-400">
+                  <p>Cannot render this file type</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

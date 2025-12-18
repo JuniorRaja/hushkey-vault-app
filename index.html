@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#3b82f6" />
-    <meta http-equiv="Content-Security-Policy"
-      content="
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#3b82f6" />
+  <meta http-equiv="Content-Security-Policy" content="
         default-src 'self';
         script-src 'self' 'unsafe-inline' 'unsafe-eval';
         style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
@@ -16,70 +16,91 @@
           wss://*.supabase.co
           https://lookup.binlist.net
           https://fonts.googleapis.com;
-        img-src 'self' data: https:;
+          img-src 'self' data: https: blob:;
+          frame-src blob:;
         manifest-src 'self';
         frame-ancestors 'none';
         base-uri 'self';
         form-action 'self';
       " />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/AppImages/ios/32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/AppImages/ios/16.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/AppImages/ios/180.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/AppImages/ios/152.png" />
-    <link rel="apple-touch-icon" sizes="120x120" href="/AppImages/ios/120.png" />
-    <title>Hushkey</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/AppImages/ios/32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/AppImages/ios/16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/AppImages/ios/180.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="/AppImages/ios/152.png" />
+  <link rel="apple-touch-icon" sizes="120x120" href="/AppImages/ios/120.png" />
+  <title>Hushkey</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Encode+Sans:wght@100..900&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Encode+Sans:wght@100..900&display=swap" rel="stylesheet">
 
-    <style>
-      :root {
-        /* Default Violet Palette - will be overridden by JS */
-        --color-primary-50: #f5f3ff;
-        --color-primary-100: #ede9fe;
-        --color-primary-200: #ddd6fe;
-        --color-primary-300: #c4b5fd;
-        --color-primary-400: #a78bfa;
-        --color-primary-500: #8b5cf6;
-        --color-primary-600: #7c3aed;
-        --color-primary-700: #6d28d9;
-        --color-primary-800: #5b21b6;
-        --color-primary-900: #4c1d95;
+  <style>
+    :root {
+      /* Default Violet Palette - will be overridden by JS */
+      --color-primary-50: #f5f3ff;
+      --color-primary-100: #ede9fe;
+      --color-primary-200: #ddd6fe;
+      --color-primary-300: #c4b5fd;
+      --color-primary-400: #a78bfa;
+      --color-primary-500: #8b5cf6;
+      --color-primary-600: #7c3aed;
+      --color-primary-700: #6d28d9;
+      --color-primary-800: #5b21b6;
+      --color-primary-900: #4c1d95;
+    }
+
+    body {
+      background-color: #030712;
+      /* gray-950 */
+      color: #f3f4f6;
+      /* gray-100 */
+    }
+
+    /* Custom scrollbar for webkit */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #111827;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+
+    @keyframes wiggle {
+
+      0%,
+      100% {
+        transform: rotate(0deg);
       }
-      body {
-        background-color: #030712; /* gray-950 */
-        color: #f3f4f6; /* gray-100 */
+
+      25% {
+        transform: rotate(-10deg);
       }
-      /* Custom scrollbar for webkit */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+
+      75% {
+        transform: rotate(10deg);
       }
-      ::-webkit-scrollbar-track {
-        background: #111827; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #374151; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #4b5563; 
-      }
-      @keyframes wiggle {
-        0%, 100% { transform: rotate(0deg); }
-        25% { transform: rotate(-10deg); }
-        75% { transform: rotate(10deg); }
-      }
-    </style>
- 
+    }
+  </style>
+
 
 </head>
-  <body>
-    <div id="root"></div>
+
+<body>
+  <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
+
 </html>
