@@ -171,15 +171,6 @@ const TotpSetupModal: React.FC<TotpSetupModalProps> = ({
     };
   }, [mode, isScanning, scanFrame]);
 
-  // Handle mode changes
-  useEffect(() => {
-    if (mode === "camera") {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-  }, [mode, startCamera, stopCamera]);
-
   // Cleanup on close/unmount
   useEffect(() => {
     if (!isOpen) {
@@ -257,6 +248,13 @@ const TotpSetupModal: React.FC<TotpSetupModalProps> = ({
     onClose();
   };
 
+  const handleStartCamera = () => {
+    setMode("camera");
+    setError("");
+    setCameraError("");
+    startCamera(); // Call directly
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl">
@@ -273,7 +271,10 @@ const TotpSetupModal: React.FC<TotpSetupModalProps> = ({
           {/* Mode Selector */}
           <div className="flex gap-2">
             <button
-              onClick={() => setMode("manual")}
+              onClick={() => {
+                setMode("manual");
+                stopCamera();
+              }}
               className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
                 mode === "manual"
                   ? "bg-primary-600 text-white"
@@ -284,11 +285,7 @@ const TotpSetupModal: React.FC<TotpSetupModalProps> = ({
             </button>
             {hasCamera ? (
               <button
-                onClick={() => {
-                  setMode("camera");
-                  setError("");
-                  setCameraError("");
-                }}
+                onClick={handleStartCamera}
                 className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
                   mode === "camera"
                     ? "bg-primary-600 text-white"
@@ -301,6 +298,7 @@ const TotpSetupModal: React.FC<TotpSetupModalProps> = ({
             <button
               onClick={() => {
                 setMode("upload");
+                stopCamera();
                 setError("");
               }}
               className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
