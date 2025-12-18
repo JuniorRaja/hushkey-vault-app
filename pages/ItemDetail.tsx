@@ -175,6 +175,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const { attachments: fileAttachments, refresh: refreshAttachments } = useAttachments(itemId || '');
 
   const [isEditing, setIsEditing] = useState(!!isNew);
+  const [scrolled, setScrolled] = useState(false);
   const [formData, setFormData] = useState<Partial<Item>>({
     type: ItemType.LOGIN,
     vaultId: vaults[0]?.id || '',
@@ -224,6 +225,49 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const toggleIdentitySection = (key: keyof typeof identitySections) => {
       setIdentitySections(prev => ({...prev, [key]: !prev[key]}));
   };
+
+  // Scroll handler to hide app header and stick item header
+  useEffect(() => {
+    if (!isEditing) return; // Only apply in edit mode
+
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY;
+      setScrolled(scrollPosition > 50);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isEditing]);
+
+  // Hide/show app header based on scroll
+  useEffect(() => {
+    if (!isEditing) {
+      // Reset when not editing
+      const appHeader = document.querySelector('header') as HTMLElement;
+      if (appHeader) {
+        appHeader.style.transform = 'translateY(0)';
+        appHeader.style.transition = 'transform 0.3s ease-in-out';
+      }
+      return;
+    }
+
+    const appHeader = document.querySelector('header') as HTMLElement;
+    if (appHeader) {
+      if (scrolled) {
+        appHeader.style.transform = 'translateY(-100%)';
+      } else {
+        appHeader.style.transform = 'translateY(0)';
+      }
+      appHeader.style.transition = 'transform 0.3s ease-in-out';
+    }
+
+    return () => {
+      // Cleanup: reset header position when component unmounts
+      if (appHeader) {
+        appHeader.style.transform = 'translateY(0)';
+      }
+    };
+  }, [scrolled, isEditing]);
 
   // Load vaults and categories on mount
   useEffect(() => {
@@ -2008,7 +2052,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const expiryStatus = getExpiryText();
 
   return (
-    <div className="max-w-4xl mx-auto pb-20">
+    <div className="max-w-4xl mx-auto pb-20" style={isEditing && scrolled ? { paddingTop: '80px' } : {}}>
       
       <ShareModal 
         isOpen={isShareModalOpen} 
@@ -2043,7 +2087,14 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       />
 
       {/* Header Actions */}
-      <div className="flex items-center justify-between mb-6">
+      <div 
+        className={`flex items-center justify-between mb-6 transition-all duration-300 ${
+          isEditing && scrolled 
+            ? 'fixed top-0 left-0 right-0 z-50 bg-gray-950/95 backdrop-blur-md border-b border-gray-850 px-4 md:px-8 py-4 shadow-lg' 
+            : ''
+        }`}
+        style={isEditing && scrolled ? { marginLeft: 'auto', marginRight: 'auto', maxWidth: '896px' } : {}}
+      >
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors group">
           <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
           Back
