@@ -200,6 +200,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const [descriptionError, setDescriptionError] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [idCardError, setIdCardError] = useState('');
   const [urlInputValue, setUrlInputValue] = useState('');
   const [showDomainSuggestions, setShowDomainSuggestions] = useState(false);
   const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
@@ -387,6 +388,44 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       return true;
   };
 
+  const validateIdCard = () => {
+      if (formData.type !== ItemType.ID_CARD) {
+          setIdCardError('');
+          return true;
+      }
+      
+      // At least ID Name or Full Name must be provided
+      const hasIdName = formData.data?.idName && formData.data.idName.trim() !== '';
+      const hasFullName = formData.data?.fullName && formData.data.fullName.trim() !== '';
+      
+      if (!hasIdName && !hasFullName) {
+          setIdCardError('Please provide at least ID Name or Full Name');
+          return false;
+      }
+      
+      // Validate date format if provided
+      if (formData.data?.validTill) {
+          const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+          if (!dateRegex.test(formData.data.validTill)) {
+              setIdCardError('Valid Till date must be in YYYY-MM-DD format');
+              return false;
+          }
+          
+          // Check if date is in the past
+          const validTillDate = new Date(formData.data.validTill);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          if (validTillDate < today) {
+              setIdCardError('Warning: This ID has expired');
+              // Don't return false, just warn
+          }
+      }
+      
+      setIdCardError('');
+      return true;
+  };
+
   const handleSave = async () => {
     if (!formData.name || !formData.vaultId) {
         alert("Please enter a name and select a vault.");
@@ -410,6 +449,11 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
 
     if (!validatePassword(formData.data?.password || '')) {
         alert("Please enter a password.");
+        return;
+    }
+
+    if (!validateIdCard()) {
+        alert(idCardError || "Please fix the ID Card errors before saving.");
         return;
     }
 
@@ -479,6 +523,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
         setDescriptionError('');
         setUsernameError('');
         setPasswordError('');
+        setIdCardError('');
     }
   };
 
@@ -876,17 +921,6 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
       case ItemType.ID_CARD:
           return (
               <>
-                 {hasValue(formData.data?.cardTitle) && <div className="space-y-1">
-                    <label className={labelClass}>Title</label>
-                    <input 
-                        {...autoCompleteProps}
-                        readOnly={!isEditing}
-                        className={inputBaseClass}
-                        value={formData.data?.cardTitle || ''}
-                        onChange={(e) => updateDataField('cardTitle', e.target.value)}
-                        placeholder={!isEditing ? "—" : "e.g. Work ID"}
-                    />
-                </div>}
                 {hasValue(formData.data?.idName) && <div className="space-y-1">
                     <label className={labelClass}>ID Name</label>
                     <input 
@@ -894,8 +928,11 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.idName || ''}
-                        onChange={(e) => updateDataField('idName', e.target.value)}
-                        placeholder={!isEditing ? "—" : "e.g. National ID"}
+                        onChange={(e) => {
+                            updateDataField('idName', e.target.value);
+                            if (isEditing) validateIdCard();
+                        }}
+                        placeholder={!isEditing ? "—" : "e.g. National ID, Passport, Driver's License"}
                     />
                 </div>}
                  {hasValue(formData.data?.fullName) && <div className="space-y-1">
@@ -905,8 +942,11 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.fullName || ''}
-                        onChange={(e) => updateDataField('fullName', e.target.value)}
-                        placeholder={!isEditing ? "—" : "Name on ID"}
+                        onChange={(e) => {
+                            updateDataField('fullName', e.target.value);
+                            if (isEditing) validateIdCard();
+                        }}
+                        placeholder={!isEditing ? "—" : "Name as it appears on ID"}
                     />
                 </div>}
                  {hasValue(formData.data?.validTill) && <div className="space-y-1">
@@ -917,7 +957,10 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         readOnly={!isEditing}
                         className={inputBaseClass}
                         value={formData.data?.validTill || ''}
-                        onChange={(e) => updateDataField('validTill', e.target.value)}
+                        onChange={(e) => {
+                            updateDataField('validTill', e.target.value);
+                            if (isEditing) validateIdCard();
+                        }}
                         placeholder={!isEditing ? "—" : ""}
                     />
                 </div>}
@@ -945,6 +988,12 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                          <div className="text-white text-lg font-medium py-2 whitespace-pre-wrap">{formData.data?.address || '—'}</div>
                      )}
                 </div>}
+                {isEditing && idCardError && (
+                    <div className="flex items-center gap-2 text-amber-500 text-sm p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                        <AlertCircle size={16} />
+                        <span>{idCardError}</span>
+                    </div>
+                )}
               </>
           )
       case ItemType.FILE:
