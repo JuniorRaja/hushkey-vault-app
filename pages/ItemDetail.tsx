@@ -168,7 +168,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const typeParam = searchParams.get('type') as ItemType;
-  const { items, vaults, categories, getItem, createItem, updateItem, deleteItem } = useItemStore();
+  const { items, vaults, categories, getItem, createItem, updateItem, deleteItem, loadVaults, loadCategories } = useItemStore();
   const { masterKey } = useAuthStore();
   const { settings } = useData();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -222,6 +222,12 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const toggleIdentitySection = (key: keyof typeof identitySections) => {
       setIdentitySections(prev => ({...prev, [key]: !prev[key]}));
   };
+
+  // Load vaults and categories on mount
+  useEffect(() => {
+    loadVaults();
+    loadCategories();
+  }, [loadVaults, loadCategories]);
 
   // Load data
   useEffect(() => {
