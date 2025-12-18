@@ -97,29 +97,30 @@ DROP POLICY IF EXISTS "Allow users to update their own shares" ON shares;
 CREATE POLICY "Allow users to update their own shares" ON shares
     FOR UPDATE USING (auth.uid() = user_id);
 
--- Allow public to update ONLY tracking columns
+-- Allow public to update ONLY tracking columns (view_count, last_accessed_at, revoked, revoked_at)
 DROP POLICY IF EXISTS "Allow public to update share tracking" ON shares;
 CREATE POLICY "Allow public to update share tracking" ON shares
     FOR UPDATE USING (true)
     WITH CHECK (
-        id = (SELECT id FROM shares WHERE id = shares.id) AND
-        user_id = (SELECT user_id FROM shares WHERE id = shares.id) AND
-        share_type = (SELECT share_type FROM shares WHERE id = shares.id) AND
-        item_id IS NOT DISTINCT FROM (SELECT item_id FROM shares WHERE id = shares.id) AND
-        vault_id IS NOT DISTINCT FROM (SELECT vault_id FROM shares WHERE id = shares.id) AND
-        share_method = (SELECT share_method FROM shares WHERE id = shares.id) AND
-        share_token = (SELECT share_token FROM shares WHERE id = shares.id) AND
-        encrypted_data = (SELECT encrypted_data FROM shares WHERE id = shares.id) AND
-        encrypted_share_key = (SELECT encrypted_share_key FROM shares WHERE id = shares.id) AND
-        encryption_key_hint IS NOT DISTINCT FROM (SELECT encryption_key_hint FROM shares WHERE id = shares.id) AND
-        expires_at IS NOT DISTINCT FROM (SELECT expires_at FROM shares WHERE id = shares.id) AND
-        max_views IS NOT DISTINCT FROM (SELECT max_views FROM shares WHERE id = shares.id) AND
-        one_time_access = (SELECT one_time_access FROM shares WHERE id = shares.id) AND
-        password_protected = (SELECT password_protected FROM shares WHERE id = shares.id) AND
-        password_hash IS NOT DISTINCT FROM (SELECT password_hash FROM shares WHERE id = shares.id) AND
-        recipient_user_id IS NOT DISTINCT FROM (SELECT recipient_user_id FROM shares WHERE id = shares.id) AND
-        recipient_email IS NOT DISTINCT FROM (SELECT recipient_email FROM shares WHERE id = shares.id) AND
-        created_at = (SELECT created_at FROM shares WHERE id = shares.id)
+        -- Ensure core immutable fields remain unchanged
+        user_id = (SELECT user_id FROM shares s WHERE s.id = shares.id) AND
+        share_type = (SELECT share_type FROM shares s WHERE s.id = shares.id) AND
+        item_id IS NOT DISTINCT FROM (SELECT item_id FROM shares s WHERE s.id = shares.id) AND
+        vault_id IS NOT DISTINCT FROM (SELECT vault_id FROM shares s WHERE s.id = shares.id) AND
+        share_method = (SELECT share_method FROM shares s WHERE s.id = shares.id) AND
+        share_token = (SELECT share_token FROM shares s WHERE s.id = shares.id) AND
+        encrypted_data = (SELECT encrypted_data FROM shares s WHERE s.id = shares.id) AND
+        encrypted_share_key IS NOT DISTINCT FROM (SELECT encrypted_share_key FROM shares s WHERE s.id = shares.id) AND
+        encryption_key_hint IS NOT DISTINCT FROM (SELECT encryption_key_hint FROM shares s WHERE s.id = shares.id) AND
+        expires_at IS NOT DISTINCT FROM (SELECT expires_at FROM shares s WHERE s.id = shares.id) AND
+        max_views IS NOT DISTINCT FROM (SELECT max_views FROM shares s WHERE s.id = shares.id) AND
+        one_time_access = (SELECT one_time_access FROM shares s WHERE s.id = shares.id) AND
+        password_protected = (SELECT password_protected FROM shares s WHERE s.id = shares.id) AND
+        password_hash IS NOT DISTINCT FROM (SELECT password_hash FROM shares s WHERE s.id = shares.id) AND
+        recipient_user_id IS NOT DISTINCT FROM (SELECT recipient_user_id FROM shares s WHERE s.id = shares.id) AND
+        recipient_email IS NOT DISTINCT FROM (SELECT recipient_email FROM shares s WHERE s.id = shares.id) AND
+        created_at = (SELECT created_at FROM shares s WHERE s.id = shares.id)
+        -- Note: view_count, last_accessed_at, revoked, and revoked_at are NOT checked, allowing them to be updated
     );
 
 -- Share access logs policies
