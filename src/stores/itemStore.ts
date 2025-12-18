@@ -19,6 +19,7 @@ interface ItemState {
   isLoading: boolean;
   error: string | null;
   isOnline: boolean;
+  typeFilter: string;
 }
 
 interface ItemActions {
@@ -40,6 +41,9 @@ interface ItemActions {
   // Sync
   syncWithServer: () => Promise<void>;
   setOnlineStatus: (status: boolean) => void;
+  
+  // UI State
+  setTypeFilter: (filter: string) => void;
 }
 
 export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
@@ -49,6 +53,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
   isLoading: false,
   error: null,
   isOnline: navigator.onLine,
+  typeFilter: 'ALL',
 
   async loadItems(vaultId?: string) {
     const { user, masterKey } = useAuthStore.getState();
@@ -445,6 +450,10 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
     if (status) {
       get().syncWithServer();
     }
+  },
+
+  setTypeFilter(filter: string) {
+    set({ typeFilter: filter });
   },
 }));
 
