@@ -187,6 +187,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
   const [showPin, setShowPin] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [cardProviderLocked, setCardProviderLocked] = useState(false);
+  const [showCardProviderManual, setShowCardProviderManual] = useState(false);
   const cardMockupRef = useRef<HTMLDivElement>(null);
   const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
@@ -1611,14 +1612,24 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                             if (['visa', 'mastercard', 'amex'].includes(scheme)) {
                                                 updateDataField('provider', scheme);
                                                 setCardProviderLocked(true);
+                                                setShowCardProviderManual(false);
                                             }
+                                        } else if (res.status === 429 || !res.ok) {
+                                            // Show manual selection on error or rate limit
+                                            setShowCardProviderManual(true);
+                                            setCardProviderLocked(false);
                                         }
-                                    } catch {}
+                                    } catch (error) {
+                                        // Show manual selection on network error
+                                        setShowCardProviderManual(true);
+                                        setCardProviderLocked(false);
+                                    }
                                 } else if (value.length < 8) {
                                     if (cardProviderLocked) {
                                         updateDataField('provider', '');
                                         setCardProviderLocked(false);
                                     }
+                                    setShowCardProviderManual(false);
                                 }
                             }}
                             placeholder="0000 0000 0000 0000"
@@ -1638,7 +1649,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                         )}
                     </div>
                 </div>
-                {isEditing && <div className="space-y-1">
+                {isEditing && showCardProviderManual && <div className="space-y-1">
                     <label className={labelClass}>Card Provider</label>
                     <div className="flex flex-wrap gap-2">
                         {['visa', 'mastercard', 'amex', 'rupay'].map(type => (
