@@ -5,7 +5,7 @@
 
 import { supabase } from "../supabaseClient";
 import EncryptionService from "./encryption";
-import type { Vault, Item, Category } from "../../types";
+import type { Vault, Item, Category, AppNotification } from "../../types";
 
 interface UserProfile {
   user_id: string;
@@ -41,13 +41,17 @@ class DatabaseService {
   /**
    * Update PIN verification hash
    */
-  async updatePinVerification(userId: string, pinVerification: string): Promise<void> {
-    const { error } = await supabase.from("user_profiles").update(
-      {
+  async updatePinVerification(
+    userId: string,
+    pinVerification: string
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("user_profiles")
+      .update({
         pin_verification: pinVerification,
         updated_at: new Date().toISOString(),
-      }
-    ).eq("user_id", userId);
+      })
+      .eq("user_id", userId);
 
     if (error) throw error;
   }
@@ -55,14 +59,19 @@ class DatabaseService {
   /**
    * Update user profile name (encrypted)
    */
-  async updateUserProfileName(userId: string, name: string, masterKey: Uint8Array): Promise<void> {
+  async updateUserProfileName(
+    userId: string,
+    name: string,
+    masterKey: Uint8Array
+  ): Promise<void> {
     const nameEncrypted = await EncryptionService.encrypt(name, masterKey);
-    const { error } = await supabase.from("user_profiles").update(
-      {
+    const { error } = await supabase
+      .from("user_profiles")
+      .update({
         name_encrypted: nameEncrypted,
         updated_at: new Date().toISOString(),
-      }
-    ).eq("user_id", userId);
+      })
+      .eq("user_id", userId);
 
     if (error) throw error;
   }
@@ -94,7 +103,6 @@ class DatabaseService {
       console.error("Profile creation error:", error);
       throw error;
     }
-
   }
 
   /**
@@ -114,7 +122,10 @@ class DatabaseService {
   /**
    * Get user profile name (decrypted)
    */
-  async getUserProfileName(userId: string, masterKey: Uint8Array): Promise<string | null> {
+  async getUserProfileName(
+    userId: string,
+    masterKey: Uint8Array
+  ): Promise<string | null> {
     const profile = await this.getUserProfile(userId);
     if (!profile?.name_encrypted) return null;
     return await EncryptionService.decrypt(profile.name_encrypted, masterKey);
@@ -265,9 +276,9 @@ class DatabaseService {
   async deleteVault(vaultId: string): Promise<void> {
     const { error } = await supabase
       .from("vaults")
-      .update({ 
+      .update({
         is_deleted: true,
-        deleted_at: new Date().toISOString() 
+        deleted_at: new Date().toISOString(),
       })
       .eq("id", vaultId);
 
@@ -280,9 +291,9 @@ class DatabaseService {
   async restoreVault(vaultId: string): Promise<void> {
     const { error } = await supabase
       .from("vaults")
-      .update({ 
+      .update({
         is_deleted: false,
-        deleted_at: null 
+        deleted_at: null,
       })
       .eq("id", vaultId);
 
@@ -385,7 +396,9 @@ class DatabaseService {
     // Sort: favorites first (alphabetically), then non-favorites (alphabetically)
     return items.sort((a, b) => {
       if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
-      return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+      return (a.name || "").localeCompare(b.name || "", undefined, {
+        sensitivity: "base",
+      });
     });
   }
 
@@ -425,14 +438,20 @@ class DatabaseService {
     // Sort: favorites first (alphabetically), then non-favorites (alphabetically)
     return items.sort((a, b) => {
       if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
-      return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+      return (a.name || "").localeCompare(b.name || "", undefined, {
+        sensitivity: "base",
+      });
     });
   }
 
   /**
    * Get favorite items for quick access
    */
-  async getFavoriteItems(userId: string, masterKey: Uint8Array, limit: number = 10): Promise<Item[]> {
+  async getFavoriteItems(
+    userId: string,
+    masterKey: Uint8Array,
+    limit: number = 10
+  ): Promise<Item[]> {
     const { data, error } = await supabase
       .from("items")
       .select("*, vaults!inner(user_id)")
@@ -559,9 +578,9 @@ class DatabaseService {
   async deleteItem(itemId: string): Promise<void> {
     const { error } = await supabase
       .from("items")
-      .update({ 
+      .update({
         is_deleted: true,
-        deleted_at: new Date().toISOString() 
+        deleted_at: new Date().toISOString(),
       })
       .eq("id", itemId);
 
@@ -574,9 +593,9 @@ class DatabaseService {
   async restoreItem(itemId: string): Promise<void> {
     const { error } = await supabase
       .from("items")
-      .update({ 
+      .update({
         is_deleted: false,
-        deleted_at: null 
+        deleted_at: null,
       })
       .eq("id", itemId);
 
@@ -665,19 +684,28 @@ class DatabaseService {
   }
 
   /**
-   * Save device information
+   * Save device info (upsert)
+   * Enhanced with fingerprinting support
    */
   async saveDevice(
     userId: string,
     deviceId: string,
-    deviceName?: string
+    deviceName: string = "Unknown Device",
+    metadata: {
+      fingerprint?: string;
+      userAgent?: string;
+      ipAddress?: string;
+    } = {}
   ): Promise<void> {
     const { error } = await supabase.from("devices").upsert(
       {
         user_id: userId,
         device_id: deviceId,
         device_name: deviceName,
-        last_seen: new Date().toISOString(),
+        fingerprint: metadata.fingerprint || "unknown",
+        user_agent: metadata.userAgent || navigator.userAgent,
+        ip_address: metadata.ipAddress,
+        last_active: new Date().toISOString(), // Standardized to last_active
       },
       {
         onConflict: "device_id",
@@ -685,6 +713,53 @@ class DatabaseService {
     );
 
     if (error) throw error;
+  }
+
+  /**
+   * Get active devices for user
+   */
+  async getDevices(userId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from("devices")
+      .select("*")
+      .eq("user_id", userId)
+      .order("last_active", { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Check if a fingerprint is trusted/known for this user
+   */
+  async isFingerprintKnown(
+    userId: string,
+    fingerprint: string
+  ): Promise<boolean> {
+    const { count, error } = await supabase
+      .from("devices")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("fingerprint", fingerprint);
+
+    if (error) {
+      console.warn("Failed to check fingerprint:", error);
+      return false;
+    }
+    return (count || 0) > 0;
+  }
+
+  /**
+   * Get device count for user
+   */
+  async getDeviceCount(userId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from("devices")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId);
+
+    if (error) throw error;
+    return count || 0;
   }
 
   /**
@@ -772,7 +847,7 @@ class DatabaseService {
     await supabase.from("devices").delete().eq("user_id", userId);
     await supabase.from("user_settings").delete().eq("user_id", userId);
     await supabase.from("user_profiles").delete().eq("user_id", userId);
-    
+
     // Delete the auth user account
     const { error } = await supabase.auth.admin.deleteUser(userId);
     if (error) throw error;
@@ -783,19 +858,31 @@ class DatabaseService {
    */
   async clearAllUserData(userId: string): Promise<void> {
     // Get all vaults to find items
-    const { data: vaults } = await supabase.from("vaults").select("id").eq("user_id", userId);
-    const vaultIds = vaults?.map(v => v.id) || [];
+    const { data: vaults } = await supabase
+      .from("vaults")
+      .select("id")
+      .eq("user_id", userId);
+    const vaultIds = vaults?.map((v) => v.id) || [];
 
     // Delete file attachments from storage
     if (vaultIds.length > 0) {
-      const { data: items } = await supabase.from("items").select("id").in("vault_id", vaultIds);
-      const itemIds = items?.map(i => i.id) || [];
-      
+      const { data: items } = await supabase
+        .from("items")
+        .select("id")
+        .in("vault_id", vaultIds);
+      const itemIds = items?.map((i) => i.id) || [];
+
       if (itemIds.length > 0) {
-        const { data: files } = await supabase.from("file_attachments").select("id").in("item_id", itemIds);
+        const { data: files } = await supabase
+          .from("file_attachments")
+          .select("id")
+          .in("item_id", itemIds);
         if (files && files.length > 0) {
           await supabase.storage.from("hushkey-vault").remove([`${userId}/*`]);
-          await supabase.from("file_attachments").delete().in("item_id", itemIds);
+          await supabase
+            .from("file_attachments")
+            .delete()
+            .in("item_id", itemIds);
         }
       }
 
@@ -807,7 +894,115 @@ class DatabaseService {
     await supabase.from("user_settings").delete().eq("user_id", userId);
     await supabase.from("devices").delete().eq("user_id", userId);
     await supabase.from("activity_logs").delete().eq("user_id", userId);
-    await supabase.from("notifications").delete().eq("user_id", userId);
+    await supabase.from("app_notifications").delete().eq("user_id", userId);
+  }
+
+  /**
+   * Create a notification
+   */
+  async createNotification(
+    userId: string,
+    notification: Partial<AppNotification>
+  ): Promise<AppNotification> {
+    const { data, error } = await supabase
+      .from("app_notifications")
+      .insert({
+        user_id: userId,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        read: notification.read || false,
+        created_at: new Date().toISOString(),
+        metadata: {}, // Can start empty
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      id: data.id,
+      title: data.title,
+      message: data.message,
+      type: data.type as any,
+      timestamp: data.created_at,
+      read: data.read,
+    };
+  }
+
+  /**
+   * Get notifications for a user
+   */
+  async getNotifications(
+    userId: string,
+    limit: number = 50
+  ): Promise<AppNotification[]> {
+    const { data, error } = await supabase
+      .from("app_notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+
+    return data.map((n) => ({
+      id: n.id,
+      title: n.title,
+      message: n.message,
+      type: n.type as any,
+      timestamp: n.created_at,
+      read: n.read,
+    }));
+  }
+
+  /**
+   * Mark notification as read
+   */
+  async markNotificationRead(notificationId: string): Promise<void> {
+    const { error } = await supabase
+      .from("app_notifications")
+      .update({ read: true })
+      .eq("id", notificationId);
+
+    if (error) throw error;
+  }
+
+  /**
+   * Mark all notifications as read
+   */
+  async markAllNotificationsRead(userId: string): Promise<void> {
+    const { error } = await supabase
+      .from("app_notifications")
+      .update({ read: true })
+      .eq("user_id", userId)
+      .eq("read", false);
+
+    if (error) throw error;
+  }
+
+  /**
+   * Delete notification
+   */
+  async deleteNotification(notificationId: string): Promise<void> {
+    const { error } = await supabase
+      .from("app_notifications")
+      .delete()
+      .eq("id", notificationId);
+
+    if (error) throw error;
+  }
+
+  /**
+   * Clear all notifications
+   */
+  async clearNotifications(userId: string): Promise<void> {
+    const { error } = await supabase
+      .from("app_notifications")
+      .delete()
+      .eq("user_id", userId);
+
+    if (error) throw error;
   }
 }
 

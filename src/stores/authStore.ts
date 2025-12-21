@@ -14,6 +14,8 @@ import RateLimiterService from "../services/rateLimiter";
 import IntegrityCheckerService from "../services/integrityChecker";
 import { BiometricService } from "../services/biometric";
 import { SoundService } from "../services/soundService";
+import notificationService from "../services/notificationService";
+import { NotificationType } from "../../types";
 
 interface User {
   id: string;
@@ -713,6 +715,18 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                 "FAILED_LOGIN",
                 `Failed PIN attempt #${newFailedAttempts} from ${deviceName}`
               );
+
+              // Notification Trigger: Failed Login
+              const settings = await DatabaseService.getUserSettings(user.id);
+              if (settings) {
+                notificationService.sendNotification(
+                  user.id,
+                  NotificationType.SECURITY,
+                  "Failed Login Attempt",
+                  `A failed login attempt was detected from ${deviceName}.`,
+                  settings.notifications
+                );
+              }
             } catch (error) {
               console.log("Failed to log to server (offline)");
             }
@@ -831,6 +845,18 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                 "FAILED_LOGIN",
                 `Failed biometric attempt #${newFailedAttempts} from ${deviceName}`
               );
+
+              // Notification Trigger: Failed Login
+              const settings = await DatabaseService.getUserSettings(user.id);
+              if (settings) {
+                notificationService.sendNotification(
+                  user.id,
+                  NotificationType.SECURITY,
+                  "Failed Login Attempt",
+                  `A failed biometric login attempt was detected from ${deviceName}.`,
+                  settings.notifications
+                );
+              }
             } catch (error) {
               console.log("Failed to log to server (offline)");
             }
@@ -858,14 +884,78 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
         let storedDeviceId = localStorage.getItem("hushkey_device_id");
 
+        // Generate Fingerprint
+        const screenRes = `${window.screen.width}x${window.screen.height}`;
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const lang = navigator.language;
+        const platform = navigator.platform;
+        const fingerprintBase = `${screenRes}-${timezone}-${lang}-${platform}-${
+          navigator.hardwareConcurrency || 1
+        }`;
+        // Simple hash (can be replaced with more robust hashing)
+        let hash = 0;
+        for (let i = 0; i < fingerprintBase.length; i++) {
+          const char = fingerprintBase.charCodeAt(i);
+          hash = (hash << 5) - hash + char;
+          hash = hash & hash;
+        }
+        const fingerprint = Math.abs(hash).toString(16);
+
+        // Metadata
+        const deviceName = navigator.userAgent.substring(0, 50);
+        const metadata = {
+          fingerprint,
+          userAgent: navigator.userAgent,
+          // IpAddress can be fetched via an Edge Function if needed, but omitted for client-side privacy
+        };
+
         if (!storedDeviceId) {
+          // Case 1: Browser has NO local storage ID
+          // Check if this fingerprint is known on server to prevent false alarms after cache clear
+          let knownFingerprint = false;
+          try {
+            if (navigator.onLine) {
+              knownFingerprint = await DatabaseService.isFingerprintKnown(
+                user.id,
+                fingerprint
+              );
+            }
+          } catch (err) {
+            console.warn("Failed to check fingerprint", err);
+          }
+
+          if (knownFingerprint) {
+            // It's a known device, user just cleared cache.
+            // We restore a new ID but don't alert "New Device".
+            storedDeviceId = EncryptionService.generateRandomString();
+            localStorage.setItem("hushkey_device_id", storedDeviceId);
+            set({ deviceId: storedDeviceId });
+            await DatabaseService.saveDevice(
+              user.id,
+              storedDeviceId,
+              deviceName,
+              metadata
+            );
+            await IndexedDBService.saveDevice(
+              user.id,
+              storedDeviceId,
+              deviceName
+            );
+            return false; // Suppress alert
+          }
+
+          // Truly New Device
           storedDeviceId = EncryptionService.generateRandomString();
           localStorage.setItem("hushkey_device_id", storedDeviceId);
           set({ deviceId: storedDeviceId });
 
           // Register device
-          const deviceName = navigator.userAgent.substring(0, 50);
-          await DatabaseService.saveDevice(user.id, storedDeviceId, deviceName);
+          await DatabaseService.saveDevice(
+            user.id,
+            storedDeviceId,
+            deviceName,
+            metadata
+          );
           await IndexedDBService.saveDevice(
             user.id,
             storedDeviceId,
@@ -876,7 +966,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           await DatabaseService.logActivity(
             user.id,
             "SECURITY",
-            "New device login detected"
+            "New device login detected (Fingerprint: " + fingerprint + ")"
           );
           await IndexedDBService.logActivity(
             user.id,
@@ -884,9 +974,35 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             "New device login detected"
           );
 
+          // Notification Trigger: New Device
+          try {
+            const settings = await DatabaseService.getUserSettings(user.id);
+            if (settings) {
+              notificationService.sendNotification(
+                user.id,
+                NotificationType.SECURITY,
+                "New Device Detected",
+                `Your account was accessed from a new device: ${deviceName}.`,
+                settings.notifications
+              );
+            }
+          } catch (e) {
+            console.error("Failed to send new device notif", e);
+          }
+
           return true;
         } else {
+          // Existing device ID found, just update keep-alive/metadata
           set({ deviceId: storedDeviceId });
+          // Update last seen
+          if (navigator.onLine) {
+            DatabaseService.saveDevice(
+              user.id,
+              storedDeviceId,
+              deviceName,
+              metadata
+            ).catch(console.error);
+          }
         }
 
         return false;
@@ -976,9 +1092,14 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             let settings = await IndexedDBService.getSettings(session.user.id);
             if (!settings && navigator.onLine) {
               try {
-                settings = await DatabaseService.getUserSettings(session.user.id);
+                settings = await DatabaseService.getUserSettings(
+                  session.user.id
+                );
                 if (settings) {
-                  await IndexedDBService.saveSettings(session.user.id, settings);
+                  await IndexedDBService.saveSettings(
+                    session.user.id,
+                    settings
+                  );
                 }
               } catch (error) {
                 console.log("Failed to load settings from server");

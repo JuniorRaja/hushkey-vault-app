@@ -114,7 +114,9 @@ const NotificationsSettings: React.FC = () => {
           </div>
           <ToggleSwitch
             checked={pushEnabled}
-            onChange={(val) => handleNotificationChange("pushNotifications", val)}
+            onChange={(val) =>
+              handleNotificationChange("pushNotifications", val)
+            }
           />
         </div>
 
@@ -134,9 +136,35 @@ const NotificationsSettings: React.FC = () => {
           </div>
           <ToggleSwitch
             checked={emailEnabled}
-            onChange={(val) => handleNotificationChange("emailNotifications", val)}
+            onChange={(val) =>
+              handleNotificationChange("emailNotifications", val)
+            }
           />
         </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={() => {
+            if (authUser) {
+              import("../src/services/notificationService").then((m) => {
+                m.default.sendNotification(
+                  authUser.id,
+                  "SECURITY" as any,
+                  "Test Notification",
+                  "This is a test notification from Hushkey Settings.",
+                  settings.notifications
+                );
+                alert(
+                  "Test notification sent! Check your notification bell and email (if enabled)."
+                );
+              });
+            }
+          }}
+          className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm font-medium"
+        >
+          Send Test Notification
+        </button>
       </div>
 
       {/* Application Alerts */}
@@ -156,7 +184,9 @@ const NotificationsSettings: React.FC = () => {
             </div>
             <ToggleSwitch
               checked={settings.notifications.weakPasswordAlerts}
-              onChange={(val) => handleNotificationChange("weakPasswordAlerts", val)}
+              onChange={(val) =>
+                handleNotificationChange("weakPasswordAlerts", val)
+              }
               disabled={!pushEnabled}
             />
           </div>
@@ -172,7 +202,9 @@ const NotificationsSettings: React.FC = () => {
             </div>
             <ToggleSwitch
               checked={settings.notifications.expiryReminders}
-              onChange={(val) => handleNotificationChange("expiryReminders", val)}
+              onChange={(val) =>
+                handleNotificationChange("expiryReminders", val)
+              }
               disabled={!pushEnabled}
             />
           </div>
@@ -204,7 +236,9 @@ const NotificationsSettings: React.FC = () => {
             </div>
             <ToggleSwitch
               checked={settings.notifications.sharedVaultUpdates}
-              onChange={(val) => handleNotificationChange("sharedVaultUpdates", val)}
+              onChange={(val) =>
+                handleNotificationChange("sharedVaultUpdates", val)
+              }
               disabled={!pushEnabled}
             />
           </div>
@@ -244,7 +278,9 @@ const NotificationsSettings: React.FC = () => {
             </div>
             <ToggleSwitch
               checked={settings.notifications.newDeviceLogin}
-              onChange={(val) => handleNotificationChange("newDeviceLogin", val)}
+              onChange={(val) =>
+                handleNotificationChange("newDeviceLogin", val)
+              }
               disabled={!pushEnabled}
             />
           </div>
@@ -260,7 +296,9 @@ const NotificationsSettings: React.FC = () => {
             </div>
             <ToggleSwitch
               checked={settings.notifications.failedLoginAttempts}
-              onChange={(val) => handleNotificationChange("failedLoginAttempts", val)}
+              onChange={(val) =>
+                handleNotificationChange("failedLoginAttempts", val)
+              }
               disabled={!pushEnabled}
             />
           </div>
