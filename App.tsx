@@ -32,6 +32,7 @@ import {
   requestNotificationPermission,
   requestClipboardPermission,
 } from "./src/services/pwa";
+import notificationService from "./src/services/notificationService";
 import { supabase } from "./src/supabaseClient";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -207,7 +208,19 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     setAllVaults(storageService.getVaults());
     setLogs(storageService.getLogs());
     setSettings(storageService.getSettings());
-    setNotifications(storageService.getNotifications());
+
+    // Sync notifications from remote if user exists
+    const { user } = useAuthStore.getState();
+    if (user && user.id) {
+      notificationService.syncNotifications(user.id).then((notifs) => {
+        setNotifications(notifs);
+      });
+    } else {
+      // Fallback to local only if absolutely no user yet (e.g. login screen)
+      // But getNotifications might return mock data if not careful.
+      // Better to clear if no user.
+      setNotifications([]);
+    }
   }, []);
 
   useEffect(() => {
@@ -322,54 +335,57 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
 
-    // Add to internal list
-    const newNotification: AppNotification = {
-      id: String((window.crypto as any).randomUUID()),
-      title,
-      message,
-      type,
-      timestamp: new Date().toISOString(),
-      read: false,
-    };
+    const { user } = useAuthStore.getState();
+    if (!user || !user.id) return;
 
-    const updatedList = [
-      newNotification,
-      ...storageService.getNotifications(),
-    ].slice(0, 50); // Keep last 50
-    setNotifications(updatedList);
-    storageService.saveNotifications(updatedList);
-
-    // Trigger Browser Push if enabled and supported
-    if (
-      currentSettings.notifications.pushNotifications &&
-      "Notification" in window &&
-      Notification.permission === "granted"
-    ) {
-      new Notification(title, { body: message, icon: "/favicon.ico" });
-    }
-
-    // Simulate Email if enabled
-    if (
-      currentSettings.notifications.emailNotifications &&
-      (type === NotificationType.SECURITY || type === NotificationType.ALERT)
-    ) {
-      console.log(
-        `[EMAIL SENT to ${
-          storageService.getUser().email
-        }]: ${title} - ${message}`
-      );
-    }
+    // Use Service
+    notificationService
+      .sendNotification(
+        user.id,
+        type,
+        title,
+        message,
+        currentSettings.notifications
+      )
+      .then((newNotif) => {
+        // Update local state immediately for UI responsiveness
+        if (newNotif) {
+          setNotifications((prev) => [newNotif, ...prev]);
+          // Sync to local storage for offline viewing if desired,
+          // reusing the service's sync logic or simple cache
+          const updated = [
+            newNotif,
+            ...storageService.getNotifications(),
+          ].slice(0, 50);
+          storageService.saveNotifications(updated);
+        }
+      });
   };
 
   const markNotificationsRead = () => {
     const updated = notifications.map((n) => ({ ...n, read: true }));
     setNotifications(updated);
     storageService.saveNotifications(updated);
+
+    // Sync mark read to server
+    const { user } = useAuthStore.getState();
+    if (user && user.id) {
+      updated
+        .filter((n) => !n.read)
+        .forEach((n) => {
+          notificationService.markAsRead(user.id, n.id);
+        });
+    }
   };
 
   const clearNotifications = () => {
     setNotifications([]);
     storageService.saveNotifications([]);
+    storageService.saveNotifications([]);
+    const { user } = useAuthStore.getState();
+    if (user && user.id) {
+      notificationService.clearAll(user.id);
+    }
   };
 
   // Derived state for consumers
@@ -858,8 +874,41 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-white text-lg">Loading...</div>
+      <div className="fixed inset-0 bg-gray-950 flex flex-col items-center justify-center z-[9999] transition-opacity duration-300">
+        <img
+          src="/hushkey-icon.png"
+          alt="HushKey"
+          className="w-20 h-20 mb-6 animate-[wiggle_2s_ease-in-out_infinite]"
+          style={{
+            animation: "wiggle 2s ease-in-out infinite",
+          }}
+        />
+        <div
+          className="text-gray-100 font-sans text-lg font-medium tracking-wide flex items-center gap-2 animate-[fadeIn_0.5s_ease-out_forwards_0.5s] opacity-0"
+          style={{
+            animation: "fadeIn 0.5s ease-out forwards 0.5s",
+          }}
+        >
+          Initializing
+          <span className="w-1 h-1 bg-violet-500 rounded-full animate-[pulse_1.5s_infinite]"></span>
+          <span className="w-1 h-1 bg-violet-500 rounded-full animate-[pulse_1.5s_infinite] delay-[0.2s]"></span>
+          <span className="w-1 h-1 bg-violet-500 rounded-full animate-[pulse_1.5s_infinite] delay-[0.4s]"></span>
+        </div>
+        <style>{`
+          @keyframes wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-10deg); }
+            75% { transform: rotate(10deg); }
+          }
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.5); }
+          }
+        `}</style>
       </div>
     );
   }
