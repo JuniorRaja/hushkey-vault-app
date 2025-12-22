@@ -180,10 +180,14 @@ const ModalLayout = ({
 
 const CategoriesModal = ({ onClose }: { onClose: () => void }) => {
   const { items } = useData();
-  const { categories, isLoading, loadCategories, addCategory, deleteCategory } = useCategoryStore();
+  const { categories, isLoading, loadCategories, addCategory, deleteCategory } =
+    useCategoryStore();
   const [newCatName, setNewCatName] = useState("");
   const [newCatColor, setNewCatColor] = useState("bg-purple-500");
-  const [deleteConfirm, setDeleteConfirm] = useState<{ category: Category; linkedItemsCount: number } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    category: Category;
+    linkedItemsCount: number;
+  } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
   const COLORS = [
@@ -218,7 +222,9 @@ const CategoriesModal = ({ onClose }: { onClose: () => void }) => {
   };
 
   const handleDeleteClick = (category: Category) => {
-    const linkedItemsCount = items.filter(item => item.categoryId === category.id).length;
+    const linkedItemsCount = items.filter(
+      (item) => item.categoryId === category.id
+    ).length;
     setDeleteConfirm({ category, linkedItemsCount });
   };
 
@@ -234,137 +240,175 @@ const CategoriesModal = ({ onClose }: { onClose: () => void }) => {
 
   return (
     <>
-    <ModalLayout
-      title="Categories"
-      onClose={onClose}
-      maxWidth="max-w-lg"
-    >
-      <div className="p-6 space-y-6">
-        {/* Add New Category Section */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-primary-900/20 to-purple-900/10 border border-primary-800/30 rounded-2xl p-6 space-y-4">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/5 rounded-full blur-3xl"></div>
-          <div className="relative">
-            <label className="text-xs font-bold text-primary-400 uppercase tracking-wider flex items-center gap-2">
-              <Plus size={14} /> New Category
-            </label>
-            <div className="mt-3 space-y-3">
-              <input
-                type="text"
-                placeholder="Enter category name..."
-                value={newCatName}
-                onChange={(e) => setNewCatName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAdd()}
-                className="w-full bg-gray-950/50 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all placeholder-gray-600"
-              />
-              <div className="flex flex-wrap gap-2">
-                {COLORS.map((color) => (
-                  <button
-                    key={color.class}
-                    onClick={() => setNewCatColor(color.class)}
-                    title={color.name}
-                    className={`w-8 h-8 rounded-lg ${color.class} transition-all ${
-                      newCatColor === color.class
-                        ? "scale-110 ring-2 ring-white shadow-lg"
-                        : "opacity-60 hover:opacity-100 hover:scale-105"
-                    }`}
-                  />
-                ))}
+      <ModalLayout title="Categories" onClose={onClose} maxWidth="max-w-lg">
+        <div className="p-6 space-y-6">
+          {/* Add New Category Section */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-primary-900/20 to-purple-900/10 border border-primary-800/30 rounded-2xl p-6 space-y-4">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/5 rounded-full blur-3xl"></div>
+            <div className="relative">
+              <label className="text-xs font-bold text-primary-400 uppercase tracking-wider flex items-center gap-2">
+                <Plus size={14} /> New Category
+              </label>
+              <div className="mt-3 space-y-3">
+                <input
+                  type="text"
+                  placeholder="Enter category name..."
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleAdd()}
+                  className="w-full bg-gray-950/50 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all placeholder-gray-600"
+                />
+                <div className="flex flex-wrap gap-2">
+                  {COLORS.map((color) => (
+                    <button
+                      key={color.class}
+                      onClick={() => setNewCatColor(color.class)}
+                      title={color.name}
+                      className={`w-8 h-8 rounded-lg ${
+                        color.class
+                      } transition-all ${
+                        newCatColor === color.class
+                          ? "scale-110 ring-2 ring-white shadow-lg"
+                          : "opacity-60 hover:opacity-100 hover:scale-105"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <button
+                  onClick={handleAdd}
+                  disabled={!newCatName.trim() || isAdding}
+                  className="w-full bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-primary-900/30"
+                >
+                  {isAdding ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} /> Create Category
+                    </>
+                  )}
+                </button>
               </div>
+            </div>
+          </div>
+
+          {/* Categories List */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                Your Categories
+              </label>
+              <span className="text-xs font-bold text-gray-600 bg-gray-800 px-2 py-1 rounded">
+                {categories.length}
+              </span>
+            </div>
+            <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-1">
+              {isLoading ? (
+                <div className="text-center py-12">
+                  <Loader2
+                    className="animate-spin mx-auto text-primary-500"
+                    size={24}
+                  />
+                  <p className="text-gray-500 text-sm mt-2">
+                    Loading categories...
+                  </p>
+                </div>
+              ) : categories.length === 0 ? (
+                <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-dashed border-gray-800">
+                  <Layers size={32} className="mx-auto text-gray-700 mb-3" />
+                  <p className="text-gray-500 text-sm">No categories yet</p>
+                  <p className="text-gray-600 text-xs mt-1">
+                    Create your first category above
+                  </p>
+                </div>
+              ) : (
+                categories.map((cat, idx) => {
+                  const linkedItemsCount = items.filter(
+                    (item) => item.categoryId === cat.id
+                  ).length;
+                  return (
+                    <div
+                      key={cat.id}
+                      className="flex items-center justify-between p-4 bg-gray-900/80 border border-gray-800 rounded-xl group hover:border-gray-700 hover:bg-gray-900 transition-all animate-fade-in"
+                      style={{ animationDelay: `${idx * 50}ms` }}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={`w-10 h-10 rounded-lg ${cat.color} flex items-center justify-center shadow-lg`}
+                        >
+                          <Layers size={18} className="text-white" />
+                        </div>
+                        <div>
+                          <span className="text-sm font-semibold text-gray-200 block">
+                            {cat.name}
+                          </span>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-gray-500">
+                              {linkedItemsCount}{" "}
+                              {linkedItemsCount === 1 ? "item" : "items"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteClick(cat)}
+                        className="text-gray-600 hover:text-red-400 hover:bg-red-500/10 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </ModalLayout>
+      {deleteConfirm && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+          onClick={() => setDeleteConfirm(null)}
+        >
+          <div
+            className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-6 space-y-4 animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center">
+              <div className="w-14 h-14 rounded-full bg-red-900/30 flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle size={28} className="text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">
+                Delete Category?
+              </h3>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                {deleteConfirm.linkedItemsCount > 0
+                  ? `This category has ${
+                      deleteConfirm.linkedItemsCount
+                    } linked ${
+                      deleteConfirm.linkedItemsCount === 1 ? "item" : "items"
+                    }. They will become uncategorized.`
+                  : `Are you sure you want to delete "${deleteConfirm.category.name}"?`}
+              </p>
+            </div>
+            <div className="flex gap-3 pt-2">
               <button
-                onClick={handleAdd}
-                disabled={!newCatName.trim() || isAdding}
-                className="w-full bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl text-sm font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-primary-900/30"
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-semibold transition-all active:scale-95"
               >
-                {isAdding ? (
-                  <><Loader2 size={16} className="animate-spin" /> Creating...</>
-                ) : (
-                  <><Plus size={16} /> Create Category</>
-                )}
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-semibold transition-all active:scale-95 shadow-lg shadow-red-900/30"
+              >
+                Delete
               </button>
             </div>
           </div>
         </div>
-
-        {/* Categories List */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-              Your Categories
-            </label>
-            <span className="text-xs font-bold text-gray-600 bg-gray-800 px-2 py-1 rounded">
-              {categories.length}
-            </span>
-          </div>
-          <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-1">
-            {isLoading ? (
-              <div className="text-center py-12">
-                <Loader2 className="animate-spin mx-auto text-primary-500" size={24} />
-                <p className="text-gray-500 text-sm mt-2">Loading categories...</p>
-              </div>
-            ) : categories.length === 0 ? (
-              <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-dashed border-gray-800">
-                <Layers size={32} className="mx-auto text-gray-700 mb-3" />
-                <p className="text-gray-500 text-sm">No categories yet</p>
-                <p className="text-gray-600 text-xs mt-1">Create your first category above</p>
-              </div>
-            ) : (
-              categories.map((cat, idx) => {
-                const linkedItemsCount = items.filter(item => item.categoryId === cat.id).length;
-                return (
-                  <div 
-                    key={cat.id} 
-                    className="flex items-center justify-between p-4 bg-gray-900/80 border border-gray-800 rounded-xl group hover:border-gray-700 hover:bg-gray-900 transition-all animate-fade-in"
-                    style={{ animationDelay: `${idx * 50}ms` }}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-lg ${cat.color} flex items-center justify-center shadow-lg`}>
-                        <Layers size={18} className="text-white" />
-                      </div>
-                      <div>
-                        <span className="text-sm font-semibold text-gray-200 block">{cat.name}</span>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-gray-500">
-                            {linkedItemsCount} {linkedItemsCount === 1 ? 'item' : 'items'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => handleDeleteClick(cat)} 
-                      className="text-gray-600 hover:text-red-400 hover:bg-red-500/10 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-    </ModalLayout>
-    {deleteConfirm && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in" onClick={() => setDeleteConfirm(null)}>
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-6 space-y-4 animate-scale-in" onClick={(e) => e.stopPropagation()}>
-          <div className="text-center">
-            <div className="w-14 h-14 rounded-full bg-red-900/30 flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle size={28} className="text-red-500" />
-            </div>
-            <h3 className="text-lg font-bold text-white mb-2">Delete Category?</h3>
-            <p className="text-gray-400 text-sm leading-relaxed">
-              {deleteConfirm.linkedItemsCount > 0
-                ? `This category has ${deleteConfirm.linkedItemsCount} linked ${deleteConfirm.linkedItemsCount === 1 ? 'item' : 'items'}. They will become uncategorized.`
-                : `Are you sure you want to delete "${deleteConfirm.category.name}"?`}
-            </p>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-semibold transition-all active:scale-95">Cancel</button>
-            <button onClick={handleDeleteConfirm} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-semibold transition-all active:scale-95 shadow-lg shadow-red-900/30">Delete</button>
-          </div>
-        </div>
-      </div>
-    )}
-  </>
+      )}
+    </>
   );
 };
 
@@ -518,7 +562,10 @@ const BackupModal = ({ onClose }: { onClose: () => void }) => {
 const BiometricModal = ({ onClose }: { onClose: () => void }) => {
   const { user: authUser } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    type: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [isAvailable, setIsAvailable] = useState(false);
 
@@ -527,7 +574,7 @@ const BiometricModal = ({ onClose }: { onClose: () => void }) => {
       if (!authUser) return;
       const available = await BiometricService.isAvailable();
       setIsAvailable(available);
-      
+
       const settings = await DatabaseService.getUserSettings(authUser.id);
       setBiometricEnabled(settings?.biometric_enabled || false);
     };
@@ -538,14 +585,22 @@ const BiometricModal = ({ onClose }: { onClose: () => void }) => {
     if (!authUser) return;
     setIsLoading(true);
     setMessage(null);
-    
+
     try {
       await BiometricService.register(authUser.id);
-      await DatabaseService.saveUserSettings(authUser.id, { biometric_enabled: true });
+      await DatabaseService.saveUserSettings(authUser.id, {
+        biometric_enabled: true,
+      });
       setBiometricEnabled(true);
-      setMessage({ type: 'success', text: 'Biometric authentication enabled successfully!' });
+      setMessage({
+        type: "success",
+        text: "Biometric authentication enabled successfully!",
+      });
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Failed to setup biometric authentication' });
+      setMessage({
+        type: "error",
+        text: err.message || "Failed to setup biometric authentication",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -555,61 +610,81 @@ const BiometricModal = ({ onClose }: { onClose: () => void }) => {
     if (!authUser) return;
     setIsLoading(true);
     setMessage(null);
-    
+
     try {
       const { error } = await supabase
-        .from('biometric_credentials')
+        .from("biometric_credentials")
         .delete()
-        .eq('user_id', authUser.id);
-      
+        .eq("user_id", authUser.id);
+
       if (error) throw error;
-      
-      await DatabaseService.saveUserSettings(authUser.id, { biometric_enabled: false });
+
+      await DatabaseService.saveUserSettings(authUser.id, {
+        biometric_enabled: false,
+      });
       setBiometricEnabled(false);
-      setMessage({ type: 'success', text: 'Biometric authentication removed successfully!' });
+      setMessage({
+        type: "success",
+        text: "Biometric authentication removed successfully!",
+      });
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.message || 'Failed to remove biometric authentication' });
+      setMessage({
+        type: "error",
+        text: err.message || "Failed to remove biometric authentication",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <ModalLayout title="Biometric Authentication" onClose={onClose} maxWidth="max-w-md">
+    <ModalLayout
+      title="Biometric Authentication"
+      onClose={onClose}
+      maxWidth="max-w-md"
+    >
       <div className="p-6 space-y-6">
         {/* Status */}
         <div className="bg-gray-950 border border-gray-800 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-medium text-gray-400">Status</span>
-            <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-              biometricEnabled 
-                ? 'bg-green-500/20 text-green-400' 
-                : 'bg-gray-800 text-gray-500'
-            }`}>
-              {biometricEnabled ? 'Enabled' : 'Disabled'}
+            <div
+              className={`px-3 py-1 rounded-full text-xs font-bold ${
+                biometricEnabled
+                  ? "bg-green-500/20 text-green-400"
+                  : "bg-gray-800 text-gray-500"
+              }`}
+            >
+              {biometricEnabled ? "Enabled" : "Disabled"}
             </div>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-400">Device Support</span>
-            <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-              isAvailable 
-                ? 'bg-blue-500/20 text-blue-400' 
-                : 'bg-red-500/20 text-red-400'
-            }`}>
-              {isAvailable ? 'Available' : 'Not Available'}
+            <span className="text-sm font-medium text-gray-400">
+              Device Support
+            </span>
+            <div
+              className={`px-3 py-1 rounded-full text-xs font-bold ${
+                isAvailable
+                  ? "bg-blue-500/20 text-blue-400"
+                  : "bg-red-500/20 text-red-400"
+              }`}
+            >
+              {isAvailable ? "Available" : "Not Available"}
             </div>
           </div>
         </div>
 
         {/* Message */}
         {message && (
-          <div className={`p-4 rounded-xl border animate-fade-in ${
-            message.type === 'success' 
-              ? 'bg-green-900/20 border-green-500/30 text-green-400' 
-              : message.type === 'error'
-              ? 'bg-red-900/20 border-red-500/30 text-red-400'
-              : 'bg-blue-900/20 border-blue-500/30 text-blue-400'
-          }`}>
+          <div
+            className={`p-4 rounded-xl border animate-fade-in ${
+              message.type === "success"
+                ? "bg-green-900/20 border-green-500/30 text-green-400"
+                : message.type === "error"
+                ? "bg-red-900/20 border-red-500/30 text-red-400"
+                : "bg-blue-900/20 border-blue-500/30 text-blue-400"
+            }`}
+          >
             <p className="text-sm font-medium">{message.text}</p>
           </div>
         )}
@@ -621,19 +696,28 @@ const BiometricModal = ({ onClose }: { onClose: () => void }) => {
               <Info size={18} />
             </div>
             <div className="flex-1">
-              <h4 className="text-sm font-bold text-white mb-2">About Biometric Authentication</h4>
+              <h4 className="text-sm font-bold text-white mb-2">
+                About Biometric Authentication
+              </h4>
               <ul className="space-y-2 text-xs text-gray-400">
                 <li className="flex items-start gap-2">
                   <span className="text-primary-500 mt-0.5">•</span>
-                  <span>PIN is the default unlock method. Biometric is optional for convenience.</span>
+                  <span>
+                    PIN is the default unlock method. Biometric is optional for
+                    convenience.
+                  </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-primary-500 mt-0.5">•</span>
-                  <span>You can always unlock with your PIN if biometric fails.</span>
+                  <span>
+                    You can always unlock with your PIN if biometric fails.
+                  </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-primary-500 mt-0.5">•</span>
-                  <span>Failed biometric attempts are tracked for security.</span>
+                  <span>
+                    Failed biometric attempts are tracked for security.
+                  </span>
                 </li>
               </ul>
             </div>
@@ -643,7 +727,9 @@ const BiometricModal = ({ onClose }: { onClose: () => void }) => {
         {/* Actions */}
         {!isAvailable ? (
           <div className="text-center py-4">
-            <p className="text-sm text-gray-500">Biometric authentication is not available on this device.</p>
+            <p className="text-sm text-gray-500">
+              Biometric authentication is not available on this device.
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -654,9 +740,13 @@ const BiometricModal = ({ onClose }: { onClose: () => void }) => {
                 className="w-full py-3 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-900/30"
               >
                 {isLoading ? (
-                  <><Loader2 size={16} className="animate-spin" /> Setting up...</>
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Setting up...
+                  </>
                 ) : (
-                  <><ScanFace size={16} /> Enable Biometric Authentication</>
+                  <>
+                    <ScanFace size={16} /> Enable Biometric Authentication
+                  </>
                 )}
               </button>
             ) : (
@@ -667,9 +757,13 @@ const BiometricModal = ({ onClose }: { onClose: () => void }) => {
                   className="w-full py-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-gray-300 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 border border-gray-700"
                 >
                   {isLoading ? (
-                    <><Loader2 size={16} className="animate-spin" /> Updating...</>
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Updating...
+                    </>
                   ) : (
-                    <><RefreshCw size={16} /> Update Biometric</>
+                    <>
+                      <RefreshCw size={16} /> Update Biometric
+                    </>
                   )}
                 </button>
                 <button
@@ -678,9 +772,13 @@ const BiometricModal = ({ onClose }: { onClose: () => void }) => {
                   className="w-full py-3 bg-red-900/20 hover:bg-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed text-red-400 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 border border-red-500/30"
                 >
                   {isLoading ? (
-                    <><Loader2 size={16} className="animate-spin" /> Removing...</>
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Removing...
+                    </>
                   ) : (
-                    <><X size={16} /> Remove Biometric</>
+                    <>
+                      <X size={16} /> Remove Biometric
+                    </>
                   )}
                 </button>
               </>
@@ -722,12 +820,15 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
         if (profile?.recovery_email_encrypted) {
           const masterKey = useAuthStore.getState().masterKey;
           if (masterKey) {
-            const decryptedEmail = await EncryptionService.decrypt(profile.recovery_email_encrypted, masterKey);
+            const decryptedEmail = await EncryptionService.decrypt(
+              profile.recovery_email_encrypted,
+              masterKey
+            );
             setRecoveryEmail(decryptedEmail);
           }
         }
       } catch (err) {
-        console.error('Failed to load recovery email:', err);
+        console.error("Failed to load recovery email:", err);
       }
     };
     loadRecoveryEmail();
@@ -744,17 +845,17 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
       alert('Please type "yes, delete" to confirm');
       return;
     }
-    
+
     setIsLoading(true);
     try {
       if (!authUser) throw new Error("User not authenticated");
-      
+
       await DatabaseService.clearAllUserData(authUser.id);
       storageService.clearDataOnly();
       await storageService.clearIndexedDB();
       await supabase.auth.signOut();
       localStorage.clear();
-      
+
       window.location.href = "/login";
     } catch (err: any) {
       alert("Error clearing data: " + err.message);
@@ -765,13 +866,13 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
 
   const handleSave = async () => {
     if (!authUser) return;
-    
+
     if (recoveryEmail && !validateEmail(recoveryEmail)) {
       setEmailError("Please enter a valid email address");
       return;
     }
     setEmailError("");
-    
+
     const masterKey = useAuthStore.getState().masterKey;
     if (!masterKey) {
       alert("Master key not available");
@@ -780,18 +881,21 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
     setIsLoading(true);
     try {
       await DatabaseService.updateUserProfileName(authUser.id, name, masterKey);
-      
-      const recoveryEmailEncrypted = recoveryEmail 
+
+      const recoveryEmailEncrypted = recoveryEmail
         ? await EncryptionService.encrypt(recoveryEmail, masterKey)
         : null;
-      
-      const { error } = await supabase.from("user_profiles").update({
-        recovery_email_encrypted: recoveryEmailEncrypted,
-        updated_at: new Date().toISOString(),
-      }).eq("user_id", authUser.id);
-      
+
+      const { error } = await supabase
+        .from("user_profiles")
+        .update({
+          recovery_email_encrypted: recoveryEmailEncrypted,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", authUser.id);
+
       if (error) throw error;
-      
+
       useAuthStore.getState().updateUserProfile({ name });
       setSaveSuccess(true);
       setTimeout(() => {
@@ -815,7 +919,9 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
     }
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
       if (error) throw error;
       alert("Password changed successfully");
       setShowPasswordModal(false);
@@ -862,7 +968,9 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
             {(authUser?.name || authUser?.email || "U").charAt(0).toUpperCase()}
           </div>
           <div>
-            <h4 className="text-xl font-bold text-white">{authUser?.name || authUser?.email}</h4>
+            <h4 className="text-xl font-bold text-white">
+              {authUser?.name || authUser?.email}
+            </h4>
             <p className="text-gray-400 text-sm">{authUser?.email}</p>
             <div className="flex gap-4 mt-2 text-xs font-medium text-gray-500">
               <span className="px-2 py-0.5 bg-gray-800 rounded">
@@ -909,9 +1017,13 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
                 setEmailError("");
               }}
               placeholder="recovery@example.com"
-              className={`w-full bg-gray-950 border rounded-lg p-3 text-white focus:border-primary-500 outline-none transition-colors ${emailError ? 'border-red-500' : 'border-gray-800'}`}
+              className={`w-full bg-gray-950 border rounded-lg p-3 text-white focus:border-primary-500 outline-none transition-colors ${
+                emailError ? "border-red-500" : "border-gray-800"
+              }`}
             />
-            {emailError && <p className="text-red-400 text-xs mt-1">{emailError}</p>}
+            {emailError && (
+              <p className="text-red-400 text-xs mt-1">{emailError}</p>
+            )}
           </div>
         </div>
 
@@ -931,11 +1043,19 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
         </div>
 
         {showPasswordModal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowPasswordModal(false)}>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowPasswordModal(false)}
+          >
+            <div
+              className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
               <h4 className="text-lg font-bold text-white">Change Password</h4>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">New Password</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">
+                  New Password
+                </label>
                 <input
                   type="password"
                   value={newPassword}
@@ -944,7 +1064,9 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Confirm Password</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">
+                  Confirm Password
+                </label>
                 <input
                   type="password"
                   value={confirmPassword}
@@ -953,19 +1075,40 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
                 />
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setShowPasswordModal(false)} className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors">Cancel</button>
-                <button onClick={handleChangePassword} disabled={isLoading} className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">{isLoading ? "Saving..." : "Save"}</button>
+                <button
+                  onClick={() => setShowPasswordModal(false)}
+                  className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleChangePassword}
+                  disabled={isLoading}
+                  className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {isLoading ? "Saving..." : "Save"}
+                </button>
               </div>
             </div>
           </div>
         )}
 
         {showPinModal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowPinModal(false)}>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-              <h4 className="text-lg font-bold text-white">Change Master PIN</h4>
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowPinModal(false)}
+          >
+            <div
+              className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h4 className="text-lg font-bold text-white">
+                Change Master PIN
+              </h4>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">New PIN (6 digits)</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">
+                  New PIN (6 digits)
+                </label>
                 <input
                   type="password"
                   maxLength={6}
@@ -975,37 +1118,64 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Confirm PIN</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">
+                  Confirm PIN
+                </label>
                 <input
                   type="password"
                   maxLength={6}
                   value={confirmPin}
-                  onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) =>
+                    setConfirmPin(e.target.value.replace(/\D/g, ""))
+                  }
                   className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-white focus:border-primary-500 outline-none"
                 />
               </div>
               <div className="flex gap-3">
-                <button onClick={() => setShowPinModal(false)} className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors">Cancel</button>
-                <button onClick={handleChangePin} disabled={isLoading} className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">{isLoading ? "Saving..." : "Save"}</button>
+                <button
+                  onClick={() => setShowPinModal(false)}
+                  className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleChangePin}
+                  disabled={isLoading}
+                  className="flex-1 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {isLoading ? "Saving..." : "Save"}
+                </button>
               </div>
             </div>
           </div>
         )}
 
         {showClearDataModal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowClearDataModal(false)}>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowClearDataModal(false)}
+          >
+            <div
+              className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="text-center">
                 <div className="w-12 h-12 rounded-full bg-red-900/30 flex items-center justify-center mx-auto mb-4">
                   <AlertTriangle size={24} className="text-red-500" />
                 </div>
-                <h4 className="text-lg font-bold text-white mb-2">Clear All Data</h4>
+                <h4 className="text-lg font-bold text-white mb-2">
+                  Clear All Data
+                </h4>
                 <p className="text-gray-400 text-sm mb-4">
-                  This will permanently delete all vaults, items, categories, file attachments, devices, and preferences. Auth and profile will be preserved.
+                  This will permanently delete all vaults, items, categories,
+                  file attachments, devices, and preferences. Auth and profile
+                  will be preserved.
                 </p>
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Type "yes, delete" to confirm</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">
+                  Type "yes, delete" to confirm
+                </label>
                 <input
                   type="text"
                   value={clearDataConfirmText}
@@ -1015,8 +1185,22 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
                 />
               </div>
               <div className="flex gap-3">
-                <button onClick={() => { setShowClearDataModal(false); setClearDataConfirmText(""); }} className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors">Cancel</button>
-                <button onClick={handleClearData} disabled={isLoading || clearDataConfirmText !== "yes, delete"} className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50">{isLoading ? "Clearing..." : "Clear Data"}</button>
+                <button
+                  onClick={() => {
+                    setShowClearDataModal(false);
+                    setClearDataConfirmText("");
+                  }}
+                  className="flex-1 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleClearData}
+                  disabled={isLoading || clearDataConfirmText !== "yes, delete"}
+                  className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {isLoading ? "Clearing..." : "Clear Data"}
+                </button>
               </div>
             </div>
           </div>
@@ -1030,7 +1214,12 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
             <span className="flex items-center gap-2">
               <AlertTriangle size={16} /> Danger Zone
             </span>
-            <ChevronDown size={16} className={`transition-transform ${isDangerZoneOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              size={16}
+              className={`transition-transform ${
+                isDangerZoneOpen ? "rotate-180" : ""
+              }`}
+            />
           </button>
           {isDangerZoneOpen && (
             <div className="space-y-3">
@@ -1041,7 +1230,8 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
                 Clear All Data
               </button>
               <p className="text-[10px] text-gray-600 text-center">
-                Deletes vaults, items, categories, file attachments, devices, and preferences. Auth and profile preserved.
+                Deletes vaults, items, categories, file attachments, devices,
+                and preferences. Auth and profile preserved.
               </p>
               <button
                 onClick={async () => {
@@ -1050,7 +1240,11 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
                       "CRITICAL WARNING: This will permanently delete your account and ALL data from the server. This cannot be undone. Are you absolutely sure?"
                     )
                   ) {
-                    if (window.confirm("Final confirmation: Delete account permanently?")) {
+                    if (
+                      window.confirm(
+                        "Final confirmation: Delete account permanently?"
+                      )
+                    ) {
                       try {
                         const userId = useAuthStore.getState().user?.id;
                         if (userId) {
@@ -1069,7 +1263,8 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
                 Delete Account Permanently
               </button>
               <p className="text-[10px] text-gray-600 text-center">
-                Deletes your account and all data from the server. Cannot be recovered.
+                Deletes your account and all data from the server. Cannot be
+                recovered.
               </p>
             </div>
           )}
@@ -1080,8 +1275,8 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
             onClick={handleSave}
             disabled={isLoading || saveSuccess}
             className={`w-full py-3 rounded-xl font-medium shadow-lg transition-all active:scale-95 disabled:opacity-50 ${
-              saveSuccess 
-                ? "bg-green-600 text-white" 
+              saveSuccess
+                ? "bg-green-600 text-white"
                 : "bg-primary-600 hover:bg-primary-500 text-white shadow-primary-900/20"
             }`}
           >
@@ -1122,7 +1317,12 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
     { label: "Create", value: "CREATE", icon: Plus, color: "text-green-400" },
     { label: "Update", value: "UPDATE", icon: Edit2, color: "text-yellow-400" },
     { label: "Delete", value: "DELETE", icon: Trash2, color: "text-red-400" },
-    { label: "Export", value: "EXPORT", icon: Download, color: "text-purple-400" },
+    {
+      label: "Export",
+      value: "EXPORT",
+      icon: Download,
+      color: "text-purple-400",
+    },
     { label: "Sync", value: "SYNC", icon: RefreshCw, color: "text-cyan-400" },
   ];
 
@@ -1143,7 +1343,8 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
   }, [authUser]);
 
   const filteredLogs = logs.filter((l) => {
-    const matchesSearch = l.details.toLowerCase().includes(search.toLowerCase()) ||
+    const matchesSearch =
+      l.details.toLowerCase().includes(search.toLowerCase()) ||
       l.action.toLowerCase().includes(search.toLowerCase());
     const matchesType = filterType === "ALL" || l.action === filterType;
     return matchesSearch && matchesType;
@@ -1169,19 +1370,23 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
 
   const handleDownload = () => {
     const csvContent = [
-      ['Timestamp', 'Action', 'Details'],
-      ...filteredLogs.map(log => [
+      ["Timestamp", "Action", "Details"],
+      ...filteredLogs.map((log) => [
         new Date(log.created_at).toISOString(),
         log.action,
-        log.details
-      ])
-    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+        log.details,
+      ]),
+    ]
+      .map((row) => row.map((cell) => `"${cell}"`).join(","))
+      .join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `hushkey_audit_logs_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `hushkey_audit_logs_${
+      new Date().toISOString().split("T")[0]
+    }.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1189,12 +1394,12 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
   };
 
   const getLogIcon = (action: string) => {
-    const type = LOG_TYPES.find(t => t.value === action);
+    const type = LOG_TYPES.find((t) => t.value === action);
     return type ? type.icon : Activity;
   };
 
   const getLogColor = (action: string) => {
-    const type = LOG_TYPES.find(t => t.value === action);
+    const type = LOG_TYPES.find((t) => t.value === action);
     return type ? type.color : "text-gray-400";
   };
 
@@ -1225,12 +1430,15 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
               <FileDown size={18} /> Export CSV
             </button>
           </div>
-          
+
           {/* Filter Chips */}
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {LOG_TYPES.map((type) => {
               const Icon = type.icon;
-              const count = type.value === "ALL" ? logs.length : logs.filter(l => l.action === type.value).length;
+              const count =
+                type.value === "ALL"
+                  ? logs.length
+                  : logs.filter((l) => l.action === type.value).length;
               return (
                 <button
                   key={type.value}
@@ -1243,9 +1451,11 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
                 >
                   <Icon size={14} />
                   {type.label}
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                    filterType === type.value ? "bg-white/20" : "bg-gray-900"
-                  }`}>
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                      filterType === type.value ? "bg-white/20" : "bg-gray-900"
+                    }`}
+                  >
                     {count}
                   </span>
                 </button>
@@ -1255,25 +1465,33 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
         </div>
 
         {/* Logs List */}
-        <div 
+        <div
           ref={logsContainerRef}
           onScroll={handleScroll}
           className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar"
         >
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="animate-spin text-primary-500 mb-4" size={40} />
+              <Loader2
+                className="animate-spin text-primary-500 mb-4"
+                size={40}
+              />
               <p className="text-gray-500 text-sm">Loading audit logs...</p>
             </div>
           ) : displayedLogs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 bg-gray-900/50 rounded-xl border border-dashed border-gray-800">
               <Activity size={48} className="text-gray-700 mb-4" />
               <p className="text-gray-500 text-sm">
-                {search || filterType !== "ALL" ? "No logs match your filters" : "No activity logs yet"}
+                {search || filterType !== "ALL"
+                  ? "No logs match your filters"
+                  : "No activity logs yet"}
               </p>
               {(search || filterType !== "ALL") && (
                 <button
-                  onClick={() => { setSearch(""); setFilterType("ALL"); }}
+                  onClick={() => {
+                    setSearch("");
+                    setFilterType("ALL");
+                  }}
                   className="mt-3 text-xs text-primary-400 hover:text-primary-300 underline"
                 >
                   Clear filters
@@ -1292,12 +1510,16 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
                     style={{ animationDelay: `${idx * 30}ms` }}
                   >
                     <div className="flex items-start gap-4 flex-1">
-                      <div className={`p-2.5 rounded-lg bg-gray-800 ${logColor}`}>
+                      <div
+                        className={`p-2.5 rounded-lg bg-gray-800 ${logColor}`}
+                      >
                         <LogIcon size={18} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${logColor} bg-gray-800`}>
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${logColor} bg-gray-800`}
+                          >
                             {log.action}
                           </span>
                           <span className="text-xs text-gray-600 font-mono">
@@ -1312,7 +1534,9 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
                     <button
                       className="text-gray-600 hover:text-white hover:bg-gray-800 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                       onClick={() => {
-                        navigator.clipboard.writeText(JSON.stringify(log, null, 2));
+                        navigator.clipboard.writeText(
+                          JSON.stringify(log, null, 2)
+                        );
                         alert("Log copied to clipboard");
                       }}
                       title="Copy log details"
@@ -1328,7 +1552,7 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
                     Showing {displayedLogs.length} of {filteredLogs.length} logs
                   </p>
                   <button
-                    onClick={() => setPage(prev => prev + 1)}
+                    onClick={() => setPage((prev) => prev + 1)}
                     className="text-primary-400 hover:text-primary-300 text-xs font-semibold underline"
                   >
                     Load more
@@ -1344,15 +1568,22 @@ const LogsModal = ({ onClose }: { onClose: () => void }) => {
           <div className="flex items-center gap-4 text-gray-500">
             <span className="flex items-center gap-1.5">
               <Activity size={12} />
-              Total: <span className="font-bold text-gray-400">{logs.length}</span>
+              Total:{" "}
+              <span className="font-bold text-gray-400">{logs.length}</span>
             </span>
             <span className="flex items-center gap-1.5">
               <Search size={12} />
-              Filtered: <span className="font-bold text-gray-400">{filteredLogs.length}</span>
+              Filtered:{" "}
+              <span className="font-bold text-gray-400">
+                {filteredLogs.length}
+              </span>
             </span>
           </div>
           <span className="text-gray-600 font-mono">
-            Last updated: {logs.length > 0 ? new Date(logs[0].created_at).toLocaleTimeString() : 'N/A'}
+            Last updated:{" "}
+            {logs.length > 0
+              ? new Date(logs[0].created_at).toLocaleTimeString()
+              : "N/A"}
           </span>
         </div>
       </div>
@@ -1377,19 +1608,59 @@ const TextModal = ({ title, onClose, content }: any) => (
 );
 
 const NOTIFICATION_CONFIGS = [
-  { key: "newDeviceLogin", label: "New Device Login Alert", desc: "When your account is accessed from a new browser." },
-  { key: "failedLoginAttempts", label: "Failed Login Attempts", desc: "Notify on incorrect PIN or biometric failures." },
-  { key: "weakPasswordAlerts", label: "Weak/Reused Passwords", desc: "Guardian analysis alerts for vulnerable credentials." },
-  { key: "expiryReminders", label: "Expiry Reminders", desc: "Notify before cards or IDs expire (30 days)." },
-  { key: "backupHealth", label: "Backup Health", desc: "Alert if backup is outdated or fails." },
-  { key: "monthlyReport", label: "Monthly Security Report", desc: "Regular summary of your vault health." },
-  { key: "sessionAlerts", label: "Session Monitoring", desc: "Alerts for unusual session activity." },
-  { key: "sharedVaultUpdates", label: "Shared Vault Updates", desc: "Notify when items are changed in shared vaults." },
+  {
+    key: "newDeviceLogin",
+    label: "New Device Login Alert",
+    desc: "When your account is accessed from a new browser.",
+  },
+  {
+    key: "failedLoginAttempts",
+    label: "Failed Login Attempts",
+    desc: "Notify on incorrect PIN or biometric failures.",
+  },
+  {
+    key: "weakPasswordAlerts",
+    label: "Weak/Reused Passwords",
+    desc: "Guardian analysis alerts for vulnerable credentials.",
+  },
+  {
+    key: "expiryReminders",
+    label: "Expiry Reminders",
+    desc: "Notify before cards or IDs expire (30 days).",
+  },
+  {
+    key: "backupHealth",
+    label: "Backup Health",
+    desc: "Alert if backup is outdated or fails.",
+  },
+  {
+    key: "monthlyReport",
+    label: "Monthly Security Report",
+    desc: "Regular summary of your vault health.",
+  },
+  {
+    key: "sessionAlerts",
+    label: "Session Monitoring",
+    desc: "Alerts for unusual session activity.",
+  },
+  {
+    key: "sharedVaultUpdates",
+    label: "Shared Vault Updates",
+    desc: "Notify when items are changed in shared vaults.",
+  },
 ];
 
 const Settings: React.FC = () => {
   const { user: oldUser, logout: oldLogout } = useAuth();
-  const { user: authUser, lock, signOut: authSignOut, setUnlockMethod, unlockMethod: authUnlockMethod, autoLockMinutes, setAutoLockMinutes } = useAuthStore();
+  const {
+    user: authUser,
+    lock,
+    signOut: authSignOut,
+    setUnlockMethod,
+    unlockMethod: authUnlockMethod,
+    autoLockMinutes,
+    setAutoLockMinutes,
+  } = useAuthStore();
   const navigate = useNavigate();
   const { items, vaults, logs, settings, updateSettings, addLog } = useData();
   const { items: storeItems } = useItemStore();
@@ -1398,8 +1669,10 @@ const Settings: React.FC = () => {
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
   const truncateText = (text: string, maxLength: number = 12) => {
-    if (!text) return '';
-    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+    if (!text) return "";
+    return text.length > maxLength
+      ? text.substring(0, maxLength) + "..."
+      : text;
   };
 
   useEffect(() => {
@@ -1412,24 +1685,50 @@ const Settings: React.FC = () => {
         if (dbSettings) {
           updateSettings({
             ...settings,
-            autoLockMinutes: dbSettings.auto_lock_minutes ?? settings.autoLockMinutes,
-            clipboardClearSeconds: dbSettings.clipboard_clear_seconds ?? settings.clipboardClearSeconds,
-            allowScreenshots: dbSettings.allow_screenshots ?? settings.allowScreenshots,
+            autoLockMinutes:
+              dbSettings.auto_lock_minutes ?? settings.autoLockMinutes,
+            clipboardClearSeconds:
+              dbSettings.clipboard_clear_seconds ??
+              settings.clipboardClearSeconds,
+            allowScreenshots:
+              dbSettings.allow_screenshots ?? settings.allowScreenshots,
             unlockMethod: dbSettings.unlock_method ?? settings.unlockMethod,
-            groupItemsByCategory: dbSettings.group_items_by_category ?? settings.groupItemsByCategory,
+            groupItemsByCategory:
+              dbSettings.group_items_by_category ??
+              settings.groupItemsByCategory,
             accentColor: dbSettings.accent_color ?? settings.accentColor,
             notifications: {
               ...settings.notifications,
-              newDeviceLogin: dbSettings.notify_new_device_login ?? settings.notifications.newDeviceLogin,
-              failedLoginAttempts: dbSettings.notify_failed_login_attempts ?? settings.notifications.failedLoginAttempts,
-              weakPasswordAlerts: dbSettings.notify_weak_password_alerts ?? settings.notifications.weakPasswordAlerts,
-              expiryReminders: dbSettings.notify_expiry_reminders ?? settings.notifications.expiryReminders,
-              backupHealth: dbSettings.notify_backup_health ?? settings.notifications.backupHealth,
-              monthlyReport: dbSettings.notify_monthly_report ?? settings.notifications.monthlyReport,
-              sessionAlerts: dbSettings.notify_session_alerts ?? settings.notifications.sessionAlerts,
-              sharedVaultUpdates: dbSettings.notify_shared_vault_updates ?? settings.notifications.sharedVaultUpdates,
-              pushNotifications: dbSettings.notify_push_notifications ?? settings.notifications.pushNotifications,
-              emailNotifications: dbSettings.notify_email_notifications ?? settings.notifications.emailNotifications,
+              newDeviceLogin:
+                dbSettings.notify_new_device_login ??
+                settings.notifications.newDeviceLogin,
+              failedLoginAttempts:
+                dbSettings.notify_failed_login_attempts ??
+                settings.notifications.failedLoginAttempts,
+              weakPasswordAlerts:
+                dbSettings.notify_weak_password_alerts ??
+                settings.notifications.weakPasswordAlerts,
+              expiryReminders:
+                dbSettings.notify_expiry_reminders ??
+                settings.notifications.expiryReminders,
+              backupHealth:
+                dbSettings.notify_backup_health ??
+                settings.notifications.backupHealth,
+              monthlyReport:
+                dbSettings.notify_monthly_report ??
+                settings.notifications.monthlyReport,
+              sessionAlerts:
+                dbSettings.notify_session_alerts ??
+                settings.notifications.sessionAlerts,
+              sharedVaultUpdates:
+                dbSettings.notify_shared_vault_updates ??
+                settings.notifications.sharedVaultUpdates,
+              pushNotifications:
+                dbSettings.notify_push_notifications ??
+                settings.notifications.pushNotifications,
+              emailNotifications:
+                dbSettings.notify_email_notifications ??
+                settings.notifications.emailNotifications,
             },
           });
         }
@@ -1454,7 +1753,14 @@ const Settings: React.FC = () => {
 
   // Modals
   const [activeModal, setActiveModal] = useState<
-    "profile" | "logs" | "categories" | "backup" | "privacy" | "terms" | "biometric" | null
+    | "profile"
+    | "logs"
+    | "categories"
+    | "backup"
+    | "privacy"
+    | "terms"
+    | "biometric"
+    | null
   >(null);
 
   // Notification Drawer
@@ -1473,45 +1779,44 @@ const Settings: React.FC = () => {
   // Handlers
   const handleSettingChange = async (key: string, value: any) => {
     const keyMapping: Record<string, string> = {
-      groupItemsByCategory: 'group_items_by_category',
-      accentColor: 'accent_color',
+      groupItemsByCategory: "group_items_by_category",
+      accentColor: "accent_color",
     };
     const dbKey = keyMapping[key] || key;
     const newSettings = { ...userSettings, [dbKey]: value };
     await saveSettingsToDB(newSettings);
     updateSettings({ ...settings, [key]: value });
-    
+
     // Update authStore for auto lock setting to reflect immediately
-    if (key === 'auto_lock_minutes') {
+    if (key === "auto_lock_minutes") {
       setAutoLockMinutes(value);
     }
-    
+
     // Dispatch event for screenshot setting changes
-    if (key === 'allow_screenshots') {
-      window.dispatchEvent(new CustomEvent('screenshotSettingChanged', { 
-        detail: { allow_screenshots: value } 
-      }));
+    if (key === "allow_screenshots") {
+      window.dispatchEvent(
+        new CustomEvent("screenshotSettingChanged", {
+          detail: { allow_screenshots: value },
+        })
+      );
     }
   };
 
   // Map UI notification keys to database column names
   const notificationKeyMap: Record<string, string> = {
-    newDeviceLogin: 'notify_new_device_login',
-    failedLoginAttempts: 'notify_failed_login_attempts',
-    weakPasswordAlerts: 'notify_weak_password_alerts',
-    expiryReminders: 'notify_expiry_reminders',
-    backupHealth: 'notify_backup_health',
-    monthlyReport: 'notify_monthly_report',
-    sessionAlerts: 'notify_session_alerts',
-    sharedVaultUpdates: 'notify_shared_vault_updates',
-    pushNotifications: 'notify_push_notifications',
-    emailNotifications: 'notify_email_notifications',
+    newDeviceLogin: "notify_new_device_login",
+    failedLoginAttempts: "notify_failed_login_attempts",
+    weakPasswordAlerts: "notify_weak_password_alerts",
+    expiryReminders: "notify_expiry_reminders",
+    backupHealth: "notify_backup_health",
+    monthlyReport: "notify_monthly_report",
+    sessionAlerts: "notify_session_alerts",
+    sharedVaultUpdates: "notify_shared_vault_updates",
+    pushNotifications: "notify_push_notifications",
+    emailNotifications: "notify_email_notifications",
   };
 
-  const handleNotificationChange = async (
-    key: string,
-    value: boolean
-  ) => {
+  const handleNotificationChange = async (key: string, value: boolean) => {
     const dbKey = notificationKeyMap[key] || key;
     const newSettings = { ...userSettings, [dbKey]: value };
     await saveSettingsToDB(newSettings);
@@ -1702,9 +2007,7 @@ const Settings: React.FC = () => {
                 <Monitor size={18} />
               </div>
               <div className="flex flex-col">
-                <span className="text-gray-200 font-medium">
-                  Allow Screenshots
-                </span>
+                <span className="text-gray-200 font-medium">Privacy Mode</span>
                 <span className="text-xs text-gray-500">
                   Android/iOS only. Hides content when app loses focus.
                 </span>
