@@ -2,9 +2,9 @@
  * Sync Service for offline/online data synchronization
  */
 
-import IndexedDBService from './indexedDB';
-import DatabaseService from './database';
-import { useAuthStore } from '../stores/authStore';
+import IndexedDBService from "./indexedDB";
+import DatabaseService from "./database";
+import { useAuthStore } from "../stores/authStore";
 
 class SyncService {
   private isSyncing = false;
@@ -17,7 +17,7 @@ class SyncService {
    */
   async processSyncQueue(): Promise<void> {
     if (this.isSyncing || !navigator.onLine) return;
-    
+
     const { user, masterKey } = useAuthStore.getState();
     if (!user || !masterKey) return;
 
@@ -26,12 +26,14 @@ class SyncService {
     try {
       const queue = await IndexedDBService.getSyncQueue();
       console.log(`Processing ${queue.length} queued changes...`);
-      
+
       for (const item of queue) {
         const retries = this.retryAttempts.get(item.id) || 0;
-        
+
         if (retries >= this.maxRetries) {
-          console.error(`Max retries reached for ${item.entityType} ${item.entityId}`);
+          console.error(
+            `Max retries reached for ${item.entityType} ${item.entityId}`
+          );
           await IndexedDBService.clearSyncQueueItem(item.id);
           this.retryAttempts.delete(item.id);
           continue;
@@ -39,27 +41,30 @@ class SyncService {
 
         try {
           switch (item.entityType) {
-            case 'vault':
+            case "vault":
               await this.syncVault(item, masterKey);
               break;
-            case 'item':
+            case "item":
               await this.syncItem(item, masterKey);
               break;
-            case 'category':
+            case "category":
               await this.syncCategory(item, masterKey);
               break;
           }
-          
+
           await IndexedDBService.clearSyncQueueItem(item.id);
           this.retryAttempts.delete(item.id);
           console.log(`Synced ${item.entityType} ${item.entityId}`);
         } catch (error) {
-          console.error(`Failed to sync ${item.entityType} ${item.entityId}:`, error);
+          console.error(
+            `Failed to sync ${item.entityType} ${item.entityId}:`,
+            error
+          );
           this.retryAttempts.set(item.id, retries + 1);
-          
+
           // Exponential backoff
           const delay = this.baseDelay * Math.pow(2, retries);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
     } finally {
@@ -72,20 +77,21 @@ class SyncService {
     if (!user) return;
 
     switch (item.action) {
-      case 'CREATE':
+      case "CREATE":
         await DatabaseService.createVault(
           user.id,
           item.data.name,
           item.data.icon,
           masterKey,
           item.data.description,
-          item.data.notes
+          item.data.notes,
+          item.entityId
         );
         break;
-      case 'UPDATE':
+      case "UPDATE":
         await DatabaseService.updateVault(item.entityId, item.data, masterKey);
         break;
-      case 'DELETE':
+      case "DELETE":
         await DatabaseService.deleteVault(item.entityId);
         break;
     }
@@ -93,13 +99,18 @@ class SyncService {
 
   private async syncItem(item: any, masterKey: Uint8Array): Promise<void> {
     switch (item.action) {
-      case 'CREATE':
-        await DatabaseService.createItem(item.data.vaultId, item.data, masterKey);
+      case "CREATE":
+        await DatabaseService.createItem(
+          item.data.vaultId,
+          item.data,
+          masterKey,
+          item.entityId
+        );
         break;
-      case 'UPDATE':
+      case "UPDATE":
         await DatabaseService.updateItem(item.entityId, item.data, masterKey);
         break;
-      case 'DELETE':
+      case "DELETE":
         await DatabaseService.deleteItem(item.entityId);
         break;
     }
@@ -110,10 +121,16 @@ class SyncService {
     if (!user) return;
 
     switch (item.action) {
-      case 'CREATE':
-        await DatabaseService.createCategory(user.id, item.data.name, item.data.color, masterKey);
+      case "CREATE":
+        await DatabaseService.createCategory(
+          user.id,
+          item.data.name,
+          item.data.color,
+          masterKey,
+          item.entityId
+        );
         break;
-      case 'DELETE':
+      case "DELETE":
         await DatabaseService.deleteCategory(item.entityId);
         break;
     }
@@ -132,7 +149,7 @@ class SyncService {
    */
   async forceSyncNow(): Promise<void> {
     if (!navigator.onLine) {
-      throw new Error('Cannot sync while offline');
+      throw new Error("Cannot sync while offline");
     }
     await this.processSyncQueue();
   }
