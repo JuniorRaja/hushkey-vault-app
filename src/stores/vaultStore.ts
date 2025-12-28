@@ -68,12 +68,13 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       if (navigator.onLine) {
         // Online: Fetch from server and rebuild IndexedDB
         const vaults = await DatabaseService.getVaults(user.id, masterKey);
-        const vaultsWithCounts = await Promise.all(
-          vaults.map(async (v) => ({
-            ...v,
-            itemCount: await DatabaseService.getVaultItemCount(v.id),
-          }))
-        );
+        // Optimize: Fetch all counts in one go
+        const countsMap = await DatabaseService.getVaultItemCounts(user.id);
+
+        const vaultsWithCounts = vaults.map((v) => ({
+          ...v,
+          itemCount: countsMap[v.id] || 0,
+        }));
 
         // Rebuild IndexedDB cache with encrypted data
         const vaultRecords = await Promise.all(
