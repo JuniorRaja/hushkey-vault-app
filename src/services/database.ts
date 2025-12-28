@@ -140,7 +140,8 @@ class DatabaseService {
     icon: string,
     masterKey: Uint8Array,
     description?: string,
-    notes?: string
+    notes?: string,
+    id?: string
   ): Promise<Vault> {
     const nameEncrypted = await EncryptionService.encrypt(name, masterKey);
     const descriptionEncrypted = description
@@ -150,19 +151,25 @@ class DatabaseService {
       ? await EncryptionService.encrypt(notes, masterKey)
       : undefined;
 
+    const payload: any = {
+      user_id: userId,
+      name_encrypted: nameEncrypted,
+      description_encrypted: descriptionEncrypted,
+      icon: icon,
+      is_shared: false,
+      shared_with: [],
+      notes_encrypted: notesEncrypted,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (id) {
+      payload.id = id;
+    }
+
     const { data, error } = await supabase
       .from("vaults")
-      .insert({
-        user_id: userId,
-        name_encrypted: nameEncrypted,
-        description_encrypted: descriptionEncrypted,
-        icon: icon,
-        is_shared: false,
-        shared_with: [],
-        notes_encrypted: notesEncrypted,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .insert(payload)
       .select()
       .single();
 
@@ -315,7 +322,8 @@ class DatabaseService {
   async createItem(
     vaultId: string,
     itemData: Partial<Item>,
-    masterKey: Uint8Array
+    masterKey: Uint8Array,
+    id?: string
   ): Promise<Item> {
     // Encrypt the entire item data as JSON
     const dataEncrypted = await EncryptionService.encryptObject(
@@ -323,18 +331,24 @@ class DatabaseService {
       masterKey
     );
 
+    const payload: any = {
+      vault_id: vaultId,
+      category_id: itemData.categoryId || null,
+      type: itemData.type,
+      data_encrypted: dataEncrypted,
+      is_favorite: itemData.isFavorite || false,
+      folder: itemData.folder || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (id) {
+      payload.id = id;
+    }
+
     const { data, error } = await supabase
       .from("items")
-      .insert({
-        vault_id: vaultId,
-        category_id: itemData.categoryId || null,
-        type: itemData.type,
-        data_encrypted: dataEncrypted,
-        is_favorite: itemData.isFavorite || false,
-        folder: itemData.folder || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .insert(payload)
       .select()
       .single();
 
@@ -618,18 +632,25 @@ class DatabaseService {
     userId: string,
     name: string,
     color: string,
-    masterKey: Uint8Array
+    masterKey: Uint8Array,
+    id?: string
   ): Promise<Category> {
     const nameEncrypted = await EncryptionService.encrypt(name, masterKey);
 
+    const payload: any = {
+      user_id: userId,
+      name_encrypted: nameEncrypted,
+      color: color,
+      created_at: new Date().toISOString(),
+    };
+
+    if (id) {
+      payload.id = id;
+    }
+
     const { data, error } = await supabase
       .from("categories")
-      .insert({
-        user_id: userId,
-        name_encrypted: nameEncrypted,
-        color: color,
-        created_at: new Date().toISOString(),
-      })
+      .insert(payload)
       .select()
       .single();
 

@@ -41,7 +41,7 @@ interface ItemActions {
   // Sync
   syncWithServer: () => Promise<void>;
   setOnlineStatus: (status: boolean) => void;
-  
+
   // UI State
   setTypeFilter: (filter: string) => void;
 }
@@ -53,7 +53,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
   isLoading: false,
   error: null,
   isOnline: navigator.onLine,
-  typeFilter: 'ALL',
+  typeFilter: "ALL",
 
   async loadItems(vaultId?: string) {
     const { user, masterKey } = useAuthStore.getState();
@@ -101,10 +101,9 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
           cachedItems
             .filter((i) => i.dataEncrypted)
             .map(async (i) => {
-              const decryptedData = await EncryptionService.decryptObject<Partial<Item>>(
-                i.dataEncrypted,
-                masterKey
-              );
+              const decryptedData = await EncryptionService.decryptObject<
+                Partial<Item>
+              >(i.dataEncrypted, masterKey);
               return {
                 id: i.id,
                 vaultId: i.vaultId,
@@ -149,10 +148,9 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
 
       const EncryptionService = (await import("../services/encryption"))
         .default;
-      const decryptedData = await EncryptionService.decryptObject<Partial<Item>>(
-        data.data_encrypted,
-        masterKey
-      );
+      const decryptedData = await EncryptionService.decryptObject<
+        Partial<Item>
+      >(data.data_encrypted, masterKey);
 
       const item: Item = {
         id: data.id,
@@ -212,22 +210,23 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
       updatedAt: timestamp,
     });
 
-    // 3. Sync to server if online, otherwise queue for later
+    // 3. Sync to server in background (fire and forget)
     if (navigator.onLine) {
-      try {
-        await DatabaseService.createItem(vaultId, itemData, masterKey);
-        await DatabaseService.logActivity(
-          user.id,
-          "CREATE",
-          `Created ${item.type} item: ${item.name}`
-        );
-      } catch (error) {
-        console.log("Item creation failed, queuing for sync");
-        await IndexedDBService.queueChange("CREATE", "item", itemId, {
-          vaultId,
-          ...itemData,
+      DatabaseService.createItem(vaultId, itemData, masterKey, itemId)
+        .then(() => {
+          DatabaseService.logActivity(
+            user.id,
+            "CREATE",
+            `Created ${item.type} item: ${item.name}`
+          );
+        })
+        .catch(async (error) => {
+          console.log("Item creation failed, queuing for sync");
+          await IndexedDBService.queueChange("CREATE", "item", itemId, {
+            vaultId,
+            ...itemData,
+          });
         });
-      }
     } else {
       await IndexedDBService.queueChange("CREATE", "item", itemId, {
         vaultId,
@@ -270,19 +269,20 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
       });
     }
 
-    // 3. Sync to server if online, otherwise queue for later
+    // 3. Sync to server in background
     if (navigator.onLine && user) {
-      try {
-        await DatabaseService.updateItem(itemId, updates, masterKey);
-        await DatabaseService.logActivity(
-          user.id,
-          "UPDATE",
-          `Updated item: ${updates.name || itemId}`
-        );
-      } catch (error) {
-        console.log("Item update failed, queuing for sync");
-        await IndexedDBService.queueChange("UPDATE", "item", itemId, updates);
-      }
+      DatabaseService.updateItem(itemId, updates, masterKey)
+        .then(() => {
+          DatabaseService.logActivity(
+            user.id,
+            "UPDATE",
+            `Updated item: ${updates.name || itemId}`
+          );
+        })
+        .catch(async (error) => {
+          console.log("Item update failed, queuing for sync");
+          await IndexedDBService.queueChange("UPDATE", "item", itemId, updates);
+        });
     } else {
       await IndexedDBService.queueChange("UPDATE", "item", itemId, updates);
     }
@@ -317,19 +317,20 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
       });
     }
 
-    // 3. Sync to server if online, otherwise queue for later
+    // 3. Sync to server in background
     if (navigator.onLine && user) {
-      try {
-        await DatabaseService.deleteItem(itemId);
-        await DatabaseService.logActivity(
-          user.id,
-          "DELETE",
-          `Moved item to trash: ${itemId}`
-        );
-      } catch (error) {
-        console.log("Item deletion failed, queuing for sync");
-        await IndexedDBService.queueChange("DELETE", "item", itemId, {});
-      }
+      DatabaseService.deleteItem(itemId)
+        .then(() => {
+          DatabaseService.logActivity(
+            user.id,
+            "DELETE",
+            `Moved item to trash: ${itemId}`
+          );
+        })
+        .catch(async (error) => {
+          console.log("Item deletion failed, queuing for sync");
+          await IndexedDBService.queueChange("DELETE", "item", itemId, {});
+        });
     } else {
       const existingQueue = await IndexedDBService.getSyncQueue();
       const alreadyQueued = existingQueue.some(
@@ -370,17 +371,26 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
         // Offline: Load from IndexedDB
         const cachedVaults = await IndexedDBService.getVaults(user.id);
         const vaults = await Promise.all(
-          cachedVaults.filter(v => v.nameEncrypted && !v.deletedAt).map(async (v) => ({
-            id: v.id,
-            name: await EncryptionService.decrypt(v.nameEncrypted, masterKey),
-            description: v.descriptionEncrypted ? await EncryptionService.decrypt(v.descriptionEncrypted, masterKey) : undefined,
-            icon: v.icon,
-            createdAt: v.createdAt,
-            itemCount: 0,
-            isShared: v.isShared,
-            sharedWith: v.sharedWith,
-            notes: v.notesEncrypted ? await EncryptionService.decrypt(v.notesEncrypted, masterKey) : undefined,
-          }))
+          cachedVaults
+            .filter((v) => v.nameEncrypted && !v.deletedAt)
+            .map(async (v) => ({
+              id: v.id,
+              name: await EncryptionService.decrypt(v.nameEncrypted, masterKey),
+              description: v.descriptionEncrypted
+                ? await EncryptionService.decrypt(
+                    v.descriptionEncrypted,
+                    masterKey
+                  )
+                : undefined,
+              icon: v.icon,
+              createdAt: v.createdAt,
+              itemCount: 0,
+              isShared: v.isShared,
+              sharedWith: v.sharedWith,
+              notes: v.notesEncrypted
+                ? await EncryptionService.decrypt(v.notesEncrypted, masterKey)
+                : undefined,
+            }))
         );
         set({ vaults, isLoading: false });
       }
@@ -417,7 +427,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
           cachedCategories.map(async (c) => ({
             id: c.id,
             name: await EncryptionService.decrypt(c.nameEncrypted, masterKey),
-            color: c.color
+            color: c.color,
           }))
         );
         set({ categories });

@@ -3,13 +3,13 @@
  * Manages vaults, items, and categories with encryption
  */
 
-import { create } from 'zustand';
-import { supabase } from '../supabaseClient';
-import DatabaseService from '../services/database';
-import IndexedDBService from '../services/indexedDB';
-import EncryptionService from '../services/encryption';
-import { useAuthStore } from './authStore';
-import type { Vault, Item, Category } from '../../types';
+import { create } from "zustand";
+import { supabase } from "../supabaseClient";
+import DatabaseService from "../services/database";
+import IndexedDBService from "../services/indexedDB";
+import EncryptionService from "../services/encryption";
+import { useAuthStore } from "./authStore";
+import type { Vault, Item, Category } from "../../types";
 
 interface VaultState {
   vaults: Vault[];
@@ -23,7 +23,12 @@ interface VaultState {
 
 interface VaultActions {
   loadVaults: () => Promise<void>;
-  createVault: (name: string, icon: string, description?: string, notes?: string) => Promise<void>;
+  createVault: (
+    name: string,
+    icon: string,
+    description?: string,
+    notes?: string
+  ) => Promise<void>;
   updateVault: (vaultId: string, updates: Partial<Vault>) => Promise<void>;
   deleteVault: (vaultId: string) => Promise<void>;
   restoreVault: (vaultId: string) => Promise<void>;
@@ -58,7 +63,7 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     if (!user || !masterKey) return;
 
     set({ isLoading: true });
-    
+
     try {
       if (navigator.onLine) {
         // Online: Fetch from server and rebuild IndexedDB
@@ -66,61 +71,82 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
         const vaultsWithCounts = await Promise.all(
           vaults.map(async (v) => ({
             ...v,
-            itemCount: await DatabaseService.getVaultItemCount(v.id)
+            itemCount: await DatabaseService.getVaultItemCount(v.id),
           }))
         );
-        
+
         // Rebuild IndexedDB cache with encrypted data
         const vaultRecords = await Promise.all(
           vaultsWithCounts.map(async (v) => ({
             id: v.id,
             userId: user.id,
             nameEncrypted: await EncryptionService.encrypt(v.name, masterKey),
-            descriptionEncrypted: v.description ? await EncryptionService.encrypt(v.description, masterKey) : undefined,
+            descriptionEncrypted: v.description
+              ? await EncryptionService.encrypt(v.description, masterKey)
+              : undefined,
             icon: v.icon,
             isShared: v.isShared,
             sharedWith: v.sharedWith,
-            notesEncrypted: v.notes ? await EncryptionService.encrypt(v.notes, masterKey) : undefined,
+            notesEncrypted: v.notes
+              ? await EncryptionService.encrypt(v.notes, masterKey)
+              : undefined,
             createdAt: v.createdAt,
             updatedAt: v.createdAt,
-            deletedAt: v.deletedAt
+            deletedAt: v.deletedAt,
           }))
         );
-        
+
         await IndexedDBService.bulkSaveVaults(vaultRecords);
-        set({ vaults: vaultsWithCounts.filter(v => !v.deletedAt), isLoading: false });
+        set({
+          vaults: vaultsWithCounts.filter((v) => !v.deletedAt),
+          isLoading: false,
+        });
       } else {
         // Offline: Load from IndexedDB
         const cachedVaults = await IndexedDBService.getVaults(user.id);
         const vaults = await Promise.all(
-          cachedVaults.filter(v => v.nameEncrypted && !v.deletedAt).map(async (v) => ({
-            id: v.id,
-            name: await EncryptionService.decrypt(v.nameEncrypted, masterKey),
-            description: v.descriptionEncrypted ? await EncryptionService.decrypt(v.descriptionEncrypted, masterKey) : undefined,
-            icon: v.icon,
-            createdAt: v.createdAt,
-            itemCount: 0,
-            isShared: v.isShared,
-            sharedWith: v.sharedWith,
-            notes: v.notesEncrypted ? await EncryptionService.decrypt(v.notesEncrypted, masterKey) : undefined,
-            deletedAt: v.deletedAt
-          }))
+          cachedVaults
+            .filter((v) => v.nameEncrypted && !v.deletedAt)
+            .map(async (v) => ({
+              id: v.id,
+              name: await EncryptionService.decrypt(v.nameEncrypted, masterKey),
+              description: v.descriptionEncrypted
+                ? await EncryptionService.decrypt(
+                    v.descriptionEncrypted,
+                    masterKey
+                  )
+                : undefined,
+              icon: v.icon,
+              createdAt: v.createdAt,
+              itemCount: 0,
+              isShared: v.isShared,
+              sharedWith: v.sharedWith,
+              notes: v.notesEncrypted
+                ? await EncryptionService.decrypt(v.notesEncrypted, masterKey)
+                : undefined,
+              deletedAt: v.deletedAt,
+            }))
         );
         set({ vaults, isLoading: false });
       }
     } catch (error) {
-      console.error('Failed to load vaults:', error);
+      console.error("Failed to load vaults:", error);
       set({ isLoading: false });
     }
   },
 
-  async createVault(name: string, icon: string, description?: string, notes?: string) {
+  async createVault(
+    name: string,
+    icon: string,
+    description?: string,
+    notes?: string
+  ) {
     const { user, masterKey } = useAuthStore.getState();
-    if (!user || !masterKey) throw new Error('Not authenticated');
+    if (!user || !masterKey) throw new Error("Not authenticated");
 
     const vaultId = crypto.randomUUID();
     const timestamp = new Date().toISOString();
-    
+
     const vault = {
       id: vaultId,
       name,
@@ -130,7 +156,7 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       itemCount: 0,
       isShared: false,
       sharedWith: [],
-      notes
+      notes,
     };
 
     // 1. Update local state immediately
@@ -138,9 +164,13 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
 
     // 2. Save to IndexedDB
     const nameEncrypted = await EncryptionService.encrypt(name, masterKey);
-    const descriptionEncrypted = description ? await EncryptionService.encrypt(description, masterKey) : undefined;
-    const notesEncrypted = notes ? await EncryptionService.encrypt(notes, masterKey) : undefined;
-    
+    const descriptionEncrypted = description
+      ? await EncryptionService.encrypt(description, masterKey)
+      : undefined;
+    const notesEncrypted = notes
+      ? await EncryptionService.encrypt(notes, masterKey)
+      : undefined;
+
     await IndexedDBService.saveVault({
       id: vaultId,
       userId: user.id,
@@ -151,42 +181,64 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       sharedWith: [],
       notesEncrypted,
       createdAt: timestamp,
-      updatedAt: timestamp
+      updatedAt: timestamp,
     });
 
-    // 3. Sync to server if online, otherwise queue for later
+    // 3. Sync to server in background
     if (navigator.onLine) {
-      try {
-        await DatabaseService.createVault(user.id, name, icon, masterKey, description, notes);
-      } catch (error) {
-        console.log('Vault creation failed, queuing for sync');
-        await IndexedDBService.queueChange('CREATE', 'vault', vaultId, { name, icon, description, notes });
-      }
+      DatabaseService.createVault(
+        user.id,
+        name,
+        icon,
+        masterKey,
+        description,
+        notes,
+        vaultId
+      ).catch(async (error) => {
+        console.log("Vault creation failed, queuing for sync");
+        await IndexedDBService.queueChange("CREATE", "vault", vaultId, {
+          name,
+          icon,
+          description,
+          notes,
+        });
+      });
     } else {
-      await IndexedDBService.queueChange('CREATE', 'vault', vaultId, { name, icon, description, notes });
+      await IndexedDBService.queueChange("CREATE", "vault", vaultId, {
+        name,
+        icon,
+        description,
+        notes,
+      });
     }
   },
 
   async updateVault(vaultId: string, updates: Partial<Vault>) {
     const { masterKey } = useAuthStore.getState();
-    if (!masterKey) throw new Error('Not authenticated');
+    if (!masterKey) throw new Error("Not authenticated");
 
     // 1. Update local state immediately
-    const vaults = get().vaults.map(v => 
+    const vaults = get().vaults.map((v) =>
       v.id === vaultId ? { ...v, ...updates } : v
     );
     set({ vaults });
 
     // 2. Update IndexedDB
-    const vault = vaults.find(v => v.id === vaultId);
+    const vault = vaults.find((v) => v.id === vaultId);
     if (vault) {
-      const nameEncrypted = vault.name ? await EncryptionService.encrypt(vault.name, masterKey) : '';
-      const descriptionEncrypted = vault.description ? await EncryptionService.encrypt(vault.description, masterKey) : undefined;
-      const notesEncrypted = vault.notes ? await EncryptionService.encrypt(vault.notes, masterKey) : undefined;
-      
+      const nameEncrypted = vault.name
+        ? await EncryptionService.encrypt(vault.name, masterKey)
+        : "";
+      const descriptionEncrypted = vault.description
+        ? await EncryptionService.encrypt(vault.description, masterKey)
+        : undefined;
+      const notesEncrypted = vault.notes
+        ? await EncryptionService.encrypt(vault.notes, masterKey)
+        : undefined;
+
       await IndexedDBService.saveVault({
         id: vaultId,
-        userId: vault.isShared ? '' : vaultId,
+        userId: vault.isShared ? "" : vaultId,
         nameEncrypted,
         descriptionEncrypted,
         icon: vault.icon,
@@ -194,67 +246,86 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
         sharedWith: vault.sharedWith,
         notesEncrypted,
         createdAt: vault.createdAt,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
     }
 
-    // 3. Sync to server if online, otherwise queue for later
+    // 3. Sync to server in background
     if (navigator.onLine) {
-      try {
-        await DatabaseService.updateVault(vaultId, updates, masterKey);
-      } catch (error) {
-        console.log('Vault update failed, queuing for sync');
-        await IndexedDBService.queueChange('UPDATE', 'vault', vaultId, updates);
-      }
+      DatabaseService.updateVault(vaultId, updates, masterKey).catch(
+        async (error) => {
+          console.log("Vault update failed, queuing for sync");
+          await IndexedDBService.queueChange(
+            "UPDATE",
+            "vault",
+            vaultId,
+            updates
+          );
+        }
+      );
     } else {
-      await IndexedDBService.queueChange('UPDATE', 'vault', vaultId, updates);
+      await IndexedDBService.queueChange("UPDATE", "vault", vaultId, updates);
     }
   },
 
   async deleteVault(vaultId: string) {
     const { user, masterKey } = useAuthStore.getState();
     if (!masterKey) return;
-    
+
     const timestamp = new Date().toISOString();
 
     // 1. Update local state - remove from active vaults
-    const vaults = get().vaults.filter(v => v.id !== vaultId);
-    const items = get().items.filter(i => i.vaultId !== vaultId);
+    const vaults = get().vaults.filter((v) => v.id !== vaultId);
+    const items = get().items.filter((i) => i.vaultId !== vaultId);
     set({ vaults, items });
 
     // 2. Update IndexedDB with deletedAt
-    const vault = get().vaults.find(v => v.id === vaultId);
+    const vault = get().vaults.find((v) => v.id === vaultId);
     if (vault) {
       await IndexedDBService.saveVault({
         id: vaultId,
-        userId: user?.id || '',
+        userId: user?.id || "",
         nameEncrypted: await EncryptionService.encrypt(vault.name, masterKey),
-        descriptionEncrypted: vault.description ? await EncryptionService.encrypt(vault.description, masterKey) : undefined,
+        descriptionEncrypted: vault.description
+          ? await EncryptionService.encrypt(vault.description, masterKey)
+          : undefined,
         icon: vault.icon,
         isShared: vault.isShared,
         sharedWith: vault.sharedWith,
-        notesEncrypted: vault.notes ? await EncryptionService.encrypt(vault.notes, masterKey) : undefined,
+        notesEncrypted: vault.notes
+          ? await EncryptionService.encrypt(vault.notes, masterKey)
+          : undefined,
         createdAt: vault.createdAt,
         updatedAt: timestamp,
-        deletedAt: timestamp
+        deletedAt: timestamp,
       });
     }
 
-    // 3. Sync to server if online, otherwise queue for later
+    // 3. Sync to server in background
     if (navigator.onLine && user) {
-      try {
-        await DatabaseService.deleteVault(vaultId);
-        await supabase.from('items').update({ is_deleted: true, deleted_at: timestamp }).eq('vault_id', vaultId);
-        await DatabaseService.logActivity(user.id, 'DELETE', 'Moved vault to trash');
-      } catch (error) {
-        console.log('Vault deletion failed, queuing for sync');
-        await IndexedDBService.queueChange('DELETE', 'vault', vaultId, {});
-      }
+      DatabaseService.deleteVault(vaultId)
+        .then(async () => {
+          await supabase
+            .from("items")
+            .update({ is_deleted: true, deleted_at: timestamp })
+            .eq("vault_id", vaultId);
+          await DatabaseService.logActivity(
+            user.id,
+            "DELETE",
+            "Moved vault to trash"
+          );
+        })
+        .catch(async (error) => {
+          console.log("Vault deletion failed, queuing for sync");
+          await IndexedDBService.queueChange("DELETE", "vault", vaultId, {});
+        });
     } else {
       const existingQueue = await IndexedDBService.getSyncQueue();
-      const alreadyQueued = existingQueue.some(q => q.entityId === vaultId && q.action === 'DELETE');
+      const alreadyQueued = existingQueue.some(
+        (q) => q.entityId === vaultId && q.action === "DELETE"
+      );
       if (!alreadyQueued) {
-        await IndexedDBService.queueChange('DELETE', 'vault', vaultId, {});
+        await IndexedDBService.queueChange("DELETE", "vault", vaultId, {});
       }
     }
   },
@@ -268,14 +339,27 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     if (cachedVault) {
       const vault: Vault = {
         id: cachedVault.id,
-        name: await EncryptionService.decrypt(cachedVault.nameEncrypted, masterKey),
-        description: cachedVault.descriptionEncrypted ? await EncryptionService.decrypt(cachedVault.descriptionEncrypted, masterKey) : undefined,
+        name: await EncryptionService.decrypt(
+          cachedVault.nameEncrypted,
+          masterKey
+        ),
+        description: cachedVault.descriptionEncrypted
+          ? await EncryptionService.decrypt(
+              cachedVault.descriptionEncrypted,
+              masterKey
+            )
+          : undefined,
         icon: cachedVault.icon,
         createdAt: cachedVault.createdAt,
         itemCount: 0,
         isShared: cachedVault.isShared,
         sharedWith: cachedVault.sharedWith,
-        notes: cachedVault.notesEncrypted ? await EncryptionService.decrypt(cachedVault.notesEncrypted, masterKey) : undefined
+        notes: cachedVault.notesEncrypted
+          ? await EncryptionService.decrypt(
+              cachedVault.notesEncrypted,
+              masterKey
+            )
+          : undefined,
       };
       set({ vaults: [...get().vaults, vault] });
 
@@ -283,7 +367,7 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       await IndexedDBService.saveVault({
         ...cachedVault,
         deletedAt: undefined,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
     }
 
@@ -292,15 +376,19 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       try {
         await DatabaseService.restoreVault(vaultId);
         await supabase
-          .from('items')
+          .from("items")
           .update({ is_deleted: false, deleted_at: null })
-          .eq('vault_id', vaultId);
+          .eq("vault_id", vaultId);
       } catch (error) {
-        console.log('Vault restore failed, queuing for sync');
-        await IndexedDBService.queueChange('UPDATE', 'vault', vaultId, { deletedAt: null });
+        console.log("Vault restore failed, queuing for sync");
+        await IndexedDBService.queueChange("UPDATE", "vault", vaultId, {
+          deletedAt: null,
+        });
       }
     } else {
-      await IndexedDBService.queueChange('UPDATE', 'vault', vaultId, { deletedAt: null });
+      await IndexedDBService.queueChange("UPDATE", "vault", vaultId, {
+        deletedAt: null,
+      });
     }
   },
 
@@ -308,8 +396,8 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     const { user } = useAuthStore.getState();
 
     // 1. Remove from local state
-    const vaults = get().vaults.filter(v => v.id !== vaultId);
-    const items = get().items.filter(i => i.vaultId !== vaultId);
+    const vaults = get().vaults.filter((v) => v.id !== vaultId);
+    const items = get().items.filter((i) => i.vaultId !== vaultId);
     set({ vaults, items });
 
     // 2. Delete from IndexedDB
@@ -325,11 +413,15 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       try {
         await DatabaseService.permanentlyDeleteVault(vaultId);
       } catch (error) {
-        console.log('Vault permanent deletion failed, queuing for sync');
-        await IndexedDBService.queueChange('DELETE', 'vault', vaultId, { permanent: true });
+        console.log("Vault permanent deletion failed, queuing for sync");
+        await IndexedDBService.queueChange("DELETE", "vault", vaultId, {
+          permanent: true,
+        });
       }
     } else {
-      await IndexedDBService.queueChange('DELETE', 'vault', vaultId, { permanent: true });
+      await IndexedDBService.queueChange("DELETE", "vault", vaultId, {
+        permanent: true,
+      });
     }
   },
 
@@ -341,10 +433,10 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     try {
       if (navigator.onLine) {
         // Online: Fetch from server and rebuild IndexedDB
-        const items = vaultId 
+        const items = vaultId
           ? await DatabaseService.getItems(vaultId, masterKey)
           : await DatabaseService.getAllItems(user.id, masterKey);
-        
+
         // Rebuild IndexedDB cache with encrypted data
         const itemRecords = await Promise.all(
           items.map(async (i) => ({
@@ -357,40 +449,44 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
             folder: i.folder,
             createdAt: i.lastUpdated,
             updatedAt: i.lastUpdated,
-            deletedAt: i.deletedAt
+            deletedAt: i.deletedAt,
           }))
         );
-        
+
         await IndexedDBService.bulkSaveItems(itemRecords);
-        set({ items: items.filter(i => !i.deletedAt), isLoading: false });
+        set({ items: items.filter((i) => !i.deletedAt), isLoading: false });
       } else {
         // Offline: Load ALL items from IndexedDB, then filter by vault if needed
         const allCachedItems = await IndexedDBService.getDB().items.toArray();
-        const cachedItems = vaultId 
-          ? allCachedItems.filter(i => i.vaultId === vaultId)
+        const cachedItems = vaultId
+          ? allCachedItems.filter((i) => i.vaultId === vaultId)
           : allCachedItems;
-        
+
         const items = await Promise.all(
-          cachedItems.filter(i => i.dataEncrypted && !i.deletedAt).map(async (i) => {
-            const decryptedData = await EncryptionService.decryptObject<Partial<Item>>(i.dataEncrypted, masterKey);
-            return {
-              id: i.id,
-              vaultId: i.vaultId,
-              categoryId: i.categoryId,
-              type: i.type,
-              isFavorite: i.isFavorite,
-              folder: i.folder,
-              lastUpdated: i.updatedAt,
-              deletedAt: i.deletedAt,
-              ...(decryptedData || {})
-            } as Item;
-          })
+          cachedItems
+            .filter((i) => i.dataEncrypted && !i.deletedAt)
+            .map(async (i) => {
+              const decryptedData = await EncryptionService.decryptObject<
+                Partial<Item>
+              >(i.dataEncrypted, masterKey);
+              return {
+                id: i.id,
+                vaultId: i.vaultId,
+                categoryId: i.categoryId,
+                type: i.type,
+                isFavorite: i.isFavorite,
+                folder: i.folder,
+                lastUpdated: i.updatedAt,
+                deletedAt: i.deletedAt,
+                ...(decryptedData || {}),
+              } as Item;
+            })
         );
         set({ items, isLoading: false });
       }
     } catch (error) {
-      console.error('Failed to load items:', error);
-      set({ isLoading: false, error: 'Failed to load items' });
+      console.error("Failed to load items:", error);
+      set({ isLoading: false, error: "Failed to load items" });
     }
   },
 
@@ -399,20 +495,24 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     if (!user || !masterKey) return;
 
     try {
-      const favoriteItems = await DatabaseService.getFavoriteItems(user.id, masterKey, 10);
+      const favoriteItems = await DatabaseService.getFavoriteItems(
+        user.id,
+        masterKey,
+        10
+      );
       set({ favoriteItems });
     } catch (error) {
-      console.error('Failed to load favorite items:', error);
+      console.error("Failed to load favorite items:", error);
     }
   },
 
   async createItem(vaultId: string, itemData: Partial<Item>) {
     const { masterKey } = useAuthStore.getState();
-    if (!masterKey) throw new Error('Not authenticated');
+    if (!masterKey) throw new Error("Not authenticated");
 
     const itemId = crypto.randomUUID();
     const timestamp = new Date().toISOString();
-    
+
     const item: Item = {
       id: itemId,
       vaultId,
@@ -421,14 +521,17 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       isFavorite: itemData.isFavorite || false,
       folder: itemData.folder,
       lastUpdated: timestamp,
-      ...itemData
+      ...itemData,
     } as Item;
 
     // 1. Update local state immediately
     set({ items: [...get().items, item] });
 
     // 2. Save to IndexedDB
-    const dataEncrypted = await EncryptionService.encryptObject(itemData, masterKey);
+    const dataEncrypted = await EncryptionService.encryptObject(
+      itemData,
+      masterKey
+    );
     await IndexedDBService.saveVaultItem({
       id: itemId,
       vaultId,
@@ -438,41 +541,50 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       isFavorite: itemData.isFavorite || false,
       folder: itemData.folder,
       createdAt: timestamp,
-      updatedAt: timestamp
+      updatedAt: timestamp,
     });
 
-    // 3. Sync to server if online, otherwise queue for later
+    // 3. Sync to server in background
     if (navigator.onLine) {
-      try {
-        await DatabaseService.createItem(vaultId, itemData, masterKey);
-      } catch (error) {
-        console.log('Item creation failed, queuing for sync');
-        await IndexedDBService.queueChange('CREATE', 'item', itemId, { vaultId, ...itemData });
-      }
+      DatabaseService.createItem(vaultId, itemData, masterKey, itemId).catch(
+        async (error) => {
+          console.log("Item creation failed, queuing for sync");
+          await IndexedDBService.queueChange("CREATE", "item", itemId, {
+            vaultId,
+            ...itemData,
+          });
+        }
+      );
     } else {
-      await IndexedDBService.queueChange('CREATE', 'item', itemId, { vaultId, ...itemData });
+      await IndexedDBService.queueChange("CREATE", "item", itemId, {
+        vaultId,
+        ...itemData,
+      });
     }
   },
 
   async updateItem(itemId: string, updates: Partial<Item>) {
     const { masterKey } = useAuthStore.getState();
-    if (!masterKey) throw new Error('Not authenticated');
+    if (!masterKey) throw new Error("Not authenticated");
 
     const timestamp = new Date().toISOString();
 
     // 1. Update local state immediately
-    const items = get().items.map(i => 
+    const items = get().items.map((i) =>
       i.id === itemId ? { ...i, ...updates, lastUpdated: timestamp } : i
     );
-    const favoriteItems = get().favoriteItems.map(i => 
+    const favoriteItems = get().favoriteItems.map((i) =>
       i.id === itemId ? { ...i, ...updates, lastUpdated: timestamp } : i
     );
     set({ items, favoriteItems });
 
     // 2. Update IndexedDB
-    const item = items.find(i => i.id === itemId);
+    const item = items.find((i) => i.id === itemId);
     if (item) {
-      const dataEncrypted = await EncryptionService.encryptObject(item, masterKey);
+      const dataEncrypted = await EncryptionService.encryptObject(
+        item,
+        masterKey
+      );
       await IndexedDBService.saveVaultItem({
         id: itemId,
         vaultId: item.vaultId,
@@ -482,27 +594,27 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
         isFavorite: item.isFavorite,
         folder: item.folder,
         createdAt: item.lastUpdated,
-        updatedAt: timestamp
+        updatedAt: timestamp,
       });
     }
 
-    // 3. Sync to server if online, otherwise queue for later
+    // 3. Sync to server in background
     if (navigator.onLine) {
-      try {
-        await DatabaseService.updateItem(itemId, updates, masterKey);
-      } catch (error) {
-        console.log('Item update failed, queuing for sync');
-        await IndexedDBService.queueChange('UPDATE', 'item', itemId, updates);
-      }
+      DatabaseService.updateItem(itemId, updates, masterKey).catch(
+        async (error) => {
+          console.log("Item update failed, queuing for sync");
+          await IndexedDBService.queueChange("UPDATE", "item", itemId, updates);
+        }
+      );
     } else {
-      await IndexedDBService.queueChange('UPDATE', 'item', itemId, updates);
+      await IndexedDBService.queueChange("UPDATE", "item", itemId, updates);
     }
   },
 
   async toggleFavorite(itemId: string) {
-    const item = get().items.find(i => i.id === itemId);
+    const item = get().items.find((i) => i.id === itemId);
     if (!item) return;
-    
+
     await get().updateItem(itemId, { isFavorite: !item.isFavorite });
     await get().loadFavoriteItems();
   },
@@ -511,22 +623,22 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     try {
       await DatabaseService.updateLastAccessed(itemId);
     } catch (error) {
-      console.error('Failed to update last accessed:', error);
+      console.error("Failed to update last accessed:", error);
     }
   },
 
   async deleteItem(itemId: string) {
     const { user, masterKey } = useAuthStore.getState();
     if (!masterKey) return;
-    
+
     const timestamp = new Date().toISOString();
 
     // 1. Update local state - remove from active items
-    const items = get().items.filter(i => i.id !== itemId);
+    const items = get().items.filter((i) => i.id !== itemId);
     set({ items });
 
     // 2. Update IndexedDB with deletedAt
-    const item = get().items.find(i => i.id === itemId);
+    const item = get().items.find((i) => i.id === itemId);
     if (item) {
       await IndexedDBService.saveVaultItem({
         id: itemId,
@@ -538,24 +650,27 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
         folder: item.folder,
         createdAt: item.lastUpdated,
         updatedAt: timestamp,
-        deletedAt: timestamp
+        deletedAt: timestamp,
       });
     }
 
-    // 3. Sync to server if online, otherwise queue for later
+    // 3. Sync to server in background
     if (navigator.onLine && user) {
-      try {
-        await DatabaseService.deleteItem(itemId);
-        await DatabaseService.logActivity(user.id, 'DELETE', 'Moved item to trash');
-      } catch (error) {
-        console.log('Item deletion failed, queuing for sync');
-        await IndexedDBService.queueChange('DELETE', 'item', itemId, {});
-      }
+      DatabaseService.deleteItem(itemId)
+        .then(() => {
+          DatabaseService.logActivity(user.id, "DELETE", "Moved item to trash");
+        })
+        .catch(async (error) => {
+          console.log("Item deletion failed, queuing for sync");
+          await IndexedDBService.queueChange("DELETE", "item", itemId, {});
+        });
     } else {
       const existingQueue = await IndexedDBService.getSyncQueue();
-      const alreadyQueued = existingQueue.some(q => q.entityId === itemId && q.action === 'DELETE');
+      const alreadyQueued = existingQueue.some(
+        (q) => q.entityId === itemId && q.action === "DELETE"
+      );
       if (!alreadyQueued) {
-        await IndexedDBService.queueChange('DELETE', 'item', itemId, {});
+        await IndexedDBService.queueChange("DELETE", "item", itemId, {});
       }
     }
   },
@@ -567,7 +682,10 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     // 1. Get item from IndexedDB and restore to local state
     const cachedItem = await IndexedDBService.getItem(itemId);
     if (cachedItem && cachedItem.dataEncrypted) {
-      const decryptedData = await EncryptionService.decryptObject(cachedItem.dataEncrypted, masterKey);
+      const decryptedData = await EncryptionService.decryptObject(
+        cachedItem.dataEncrypted,
+        masterKey
+      );
       const item: Item = {
         id: cachedItem.id,
         vaultId: cachedItem.vaultId,
@@ -576,7 +694,7 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
         isFavorite: cachedItem.isFavorite,
         folder: cachedItem.folder,
         lastUpdated: cachedItem.updatedAt,
-        ...(decryptedData as Partial<Item>)
+        ...(decryptedData as Partial<Item>),
       } as Item;
       set({ items: [...get().items, item] });
 
@@ -584,7 +702,7 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       await IndexedDBService.saveVaultItem({
         ...cachedItem,
         deletedAt: undefined,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
     }
 
@@ -593,11 +711,15 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       try {
         await DatabaseService.restoreItem(itemId);
       } catch (error) {
-        console.log('Item restore failed, queuing for sync');
-        await IndexedDBService.queueChange('UPDATE', 'item', itemId, { deletedAt: null });
+        console.log("Item restore failed, queuing for sync");
+        await IndexedDBService.queueChange("UPDATE", "item", itemId, {
+          deletedAt: null,
+        });
       }
     } else {
-      await IndexedDBService.queueChange('UPDATE', 'item', itemId, { deletedAt: null });
+      await IndexedDBService.queueChange("UPDATE", "item", itemId, {
+        deletedAt: null,
+      });
     }
   },
 
@@ -605,7 +727,7 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     const { user } = useAuthStore.getState();
 
     // 1. Remove from local state
-    const items = get().items.filter(i => i.id !== itemId);
+    const items = get().items.filter((i) => i.id !== itemId);
     set({ items });
 
     // 2. Delete from IndexedDB
@@ -616,11 +738,15 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       try {
         await DatabaseService.permanentlyDeleteItem(itemId);
       } catch (error) {
-        console.log('Item permanent deletion failed, queuing for sync');
-        await IndexedDBService.queueChange('DELETE', 'item', itemId, { permanent: true });
+        console.log("Item permanent deletion failed, queuing for sync");
+        await IndexedDBService.queueChange("DELETE", "item", itemId, {
+          permanent: true,
+        });
       }
     } else {
-      await IndexedDBService.queueChange('DELETE', 'item', itemId, { permanent: true });
+      await IndexedDBService.queueChange("DELETE", "item", itemId, {
+        permanent: true,
+      });
     }
   },
 
@@ -631,8 +757,11 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     try {
       if (navigator.onLine) {
         // Online: Fetch from server and rebuild IndexedDB
-        const categories = await DatabaseService.getCategories(user.id, masterKey);
-        
+        const categories = await DatabaseService.getCategories(
+          user.id,
+          masterKey
+        );
+
         // Save to IndexedDB
         const categoryRecords = await Promise.all(
           categories.map(async (c) => ({
@@ -640,7 +769,7 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
             userId: user.id,
             nameEncrypted: await EncryptionService.encrypt(c.name, masterKey),
             color: c.color,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
           }))
         );
         await IndexedDBService.bulkSaveCategories(categoryRecords);
@@ -652,20 +781,20 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
           cachedCategories.map(async (c) => ({
             id: c.id,
             name: await EncryptionService.decrypt(c.nameEncrypted, masterKey),
-            color: c.color
+            color: c.color,
           }))
         );
         set({ categories });
       }
     } catch (error) {
-      console.error('Failed to load categories:', error);
+      console.error("Failed to load categories:", error);
       throw error;
     }
   },
 
   async createCategory(name: string, color: string) {
     const { user, masterKey } = useAuthStore.getState();
-    if (!user || !masterKey) throw new Error('Not authenticated');
+    if (!user || !masterKey) throw new Error("Not authenticated");
 
     const categoryId = crypto.randomUUID();
     const timestamp = new Date().toISOString();
@@ -673,7 +802,7 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     const category: Category = {
       id: categoryId,
       name,
-      color
+      color,
     };
 
     // 1. Update local state immediately
@@ -686,19 +815,29 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
       userId: user.id,
       nameEncrypted,
       color,
-      createdAt: timestamp
+      createdAt: timestamp,
     });
 
-    // 3. Sync to server if online, otherwise queue for later
+    // 3. Sync to server in background
     if (navigator.onLine) {
-      try {
-        await DatabaseService.createCategory(user.id, name, color, masterKey);
-      } catch (error) {
-        console.log('Category creation failed, queuing for sync');
-        await IndexedDBService.queueChange('CREATE', 'category', categoryId, { name, color });
-      }
+      DatabaseService.createCategory(
+        user.id,
+        name,
+        color,
+        masterKey,
+        categoryId
+      ).catch(async (error) => {
+        console.log("Category creation failed, queuing for sync");
+        await IndexedDBService.queueChange("CREATE", "category", categoryId, {
+          name,
+          color,
+        });
+      });
     } else {
-      await IndexedDBService.queueChange('CREATE', 'category', categoryId, { name, color });
+      await IndexedDBService.queueChange("CREATE", "category", categoryId, {
+        name,
+        color,
+      });
     }
   },
 
@@ -706,40 +845,43 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     const { user } = useAuthStore.getState();
 
     // 1. Remove from local state
-    const categories = get().categories.filter(c => c.id !== categoryId);
+    const categories = get().categories.filter((c) => c.id !== categoryId);
     set({ categories });
 
     // 2. Delete from IndexedDB
     await IndexedDBService.deleteCategory(categoryId);
 
-    // 3. Sync to server if online, otherwise queue for later
+    // 3. Sync to server in background
     if (navigator.onLine && user) {
-      try {
-        await DatabaseService.deleteCategory(categoryId);
-      } catch (error) {
-        console.log('Category deletion failed, queuing for sync');
-        await IndexedDBService.queueChange('DELETE', 'category', categoryId, {});
-      }
+      DatabaseService.deleteCategory(categoryId).catch(async (error) => {
+        console.log("Category deletion failed, queuing for sync");
+        await IndexedDBService.queueChange(
+          "DELETE",
+          "category",
+          categoryId,
+          {}
+        );
+      });
     } else {
-      await IndexedDBService.queueChange('DELETE', 'category', categoryId, {});
+      await IndexedDBService.queueChange("DELETE", "category", categoryId, {});
     }
   },
 
   async syncWithServer() {
     if (!navigator.onLine) return;
-    
+
     try {
       // Process sync queue first
-      const SyncService = (await import('../services/syncService')).default;
+      const SyncService = (await import("../services/syncService")).default;
       await SyncService.processSyncQueue();
-      
+
       // Then reload from server to rebuild IndexedDB
       await get().loadVaults();
       await get().loadCategories();
       await get().loadItems();
       await get().loadFavoriteItems();
     } catch (error) {
-      console.error('Failed to sync with server:', error);
+      console.error("Failed to sync with server:", error);
       throw error;
     }
   },
@@ -749,22 +891,22 @@ export const useVaultStore = create<VaultState & VaultActions>((set, get) => ({
     if (status) {
       get().syncWithServer();
     }
-  }
+  },
 }));
 
 // Listen for online/offline events
-if (typeof window !== 'undefined') {
-  window.addEventListener('online', async () => {
+if (typeof window !== "undefined") {
+  window.addEventListener("online", async () => {
     useVaultStore.getState().setOnlineStatus(true);
     try {
-      const SyncService = (await import('../services/syncService')).default;
+      const SyncService = (await import("../services/syncService")).default;
       await SyncService.processSyncQueue();
     } catch (error) {
-      console.error('Sync failed:', error);
+      console.error("Sync failed:", error);
     }
   });
-  
-  window.addEventListener('offline', () => {
+
+  window.addEventListener("offline", () => {
     useVaultStore.getState().setOnlineStatus(false);
   });
 }
