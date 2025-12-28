@@ -468,7 +468,9 @@ class DatabaseService {
   ): Promise<Item[]> {
     const { data, error } = await supabase
       .from("items")
-      .select("*, vaults!inner(user_id)")
+      .select(
+        "id, vault_id, type, is_favorite, category_id, folder, deleted_at, updated_at, data_encrypted, vaults!inner(user_id)"
+      )
       .eq("vaults.user_id", userId)
       .eq("is_favorite", true)
       .eq("is_deleted", false)
@@ -526,6 +528,28 @@ class DatabaseService {
 
     if (error) throw error;
     return count || 0;
+  }
+
+  /**
+   * Get item counts for all vaults in a single query
+   * Returns a map of vaultId -> count
+   */
+  async getVaultItemCounts(userId: string): Promise<Record<string, number>> {
+    const { data, error } = await supabase
+      .from("items")
+      .select("vault_id, vaults!inner(user_id)")
+      .eq("vaults.user_id", userId)
+      .eq("is_deleted", false)
+      .is("deleted_at", null);
+
+    if (error) throw error;
+
+    const counts: Record<string, number> = {};
+    data.forEach((item) => {
+      counts[item.vault_id] = (counts[item.vault_id] || 0) + 1;
+    });
+
+    return counts;
   }
 
   /**
