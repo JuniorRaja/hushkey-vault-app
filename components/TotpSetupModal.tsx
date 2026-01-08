@@ -31,6 +31,7 @@ const TotpSetupModal: React.FC<TotpSetupModalProps> = ({
   const [cameraError, setCameraError] = useState("");
   const [hasCamera, setHasCamera] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+  const [isCameraLoading, setIsCameraLoading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -71,12 +72,33 @@ const TotpSetupModal: React.FC<TotpSetupModalProps> = ({
     }
   }, [isOpen]);
 
+  // Check camera permission status
+  const checkCameraPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      // Check if Permissions API is available
+      if ('permissions' in navigator) {
+        const result = await navigator.permissions.query({ name: 'camera' as PermissionName });
+        return result.state === 'granted';
+      }
+      // If Permissions API not available, we'll try to access camera directly
+      return false;
+    } catch {
+      // Permissions API might not be supported, proceed with camera access attempt
+      return false;
+    }
+  }, []);
+
   // Start camera stream
   const startCamera = useCallback(async () => {
     setCameraError("");
+    setIsCameraLoading(true);
     setIsScanning(true);
 
     try {
+      // First check if we already have permission
+      const hasPermission = await checkCameraPermission();
+      
+      // Request camera access (this will prompt if permission not granted)
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
@@ -90,25 +112,31 @@ const TotpSetupModal: React.FC<TotpSetupModalProps> = ({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
+        setIsCameraLoading(false);
       }
     } catch (err: any) {
       console.error("Camera error:", err);
       setIsScanning(false);
+      setIsCameraLoading(false);
 
-      if (err.name === "NotAllowedError") {
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
         setCameraError(
-          "Camera permission denied. Please allow camera access or use file upload."
+          "Camera permission denied. Please allow camera access in your browser settings or use file upload."
         );
       } else if (err.name === "NotFoundError") {
         setCameraError("No camera found. Please use file upload instead.");
         setHasCamera(false);
+      } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+        setCameraError(
+          "Camera is already in use by another application. Please close other apps and try again."
+        );
       } else {
         setCameraError(
-          "Failed to access camera. Please use file upload instead."
+          `Failed to access camera: ${err.message || 'Unknown error'}. Please use file upload instead.`
         );
       }
     }
-  }, []);
+  }, [checkCameraPermission]);
 
   // Stop camera stream
   const stopCamera = useCallback(() => {
@@ -127,6 +155,7 @@ const TotpSetupModal: React.FC<TotpSetupModalProps> = ({
     }
 
     setIsScanning(false);
+    setIsCameraLoading(false);
   }, []);
 
   // Scan video frame for QR code
@@ -248,11 +277,14 @@ const TotpSetupModal: React.FC<TotpSetupModalProps> = ({
     onClose();
   };
 
-  const handleStartCamera = () => {
+  const handleStartCamera = async () => {
     setMode("camera");
     setError("");
     setCameraError("");
-    startCamera(); // Call directly
+    
+    // Small delay to ensure UI updates before camera request
+    await new Promise(resolve => setTimeout(resolve, 100));
+    startCamera();
   };
 
   return (
@@ -356,6 +388,12 @@ const TotpSetupModal: React.FC<TotpSetupModalProps> = ({
                     >
                       Use File Upload
                     </button>
+                  </div>
+                ) : isCameraLoading ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
+                    <Camera size={32} className="text-primary-400 mb-2 animate-pulse" />
+                    <p className="text-sm text-gray-300">Requesting camera access...</p>
+                    <p className="text-xs text-gray-500 mt-2">Please allow camera permission when prompted</p>
                   </div>
                 ) : (
                   <>
