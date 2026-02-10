@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useVaultStore } from "../src/stores/vaultStore";
 import { useShareStore } from "../src/stores/shareStore";
+import { useAuthStore } from "../src/stores/authStore";
 import { Vault, ItemType } from "../types";
 import VaultModal from "../components/VaultModal";
 import ShareModal from "../components/ShareModal";
@@ -99,14 +100,37 @@ const Vaults: React.FC = () => {
     isLoading,
   } = useVaultStore();
   // New: Import active shares count
-  const { shares } = useShareStore();
+  const { user } = useAuthStore();
+  const { shares, fetchShares } = useShareStore();
+
   const activeShareCount = useMemo(
     () =>
       shares.filter(
         (s) =>
           !s.revoked &&
           (!s.expiresAt || new Date(s.expiresAt) > new Date()) &&
-          (!s.maxViews || s.viewCount < s.maxViews)
+          (!s.maxViews || (s.viewCount || 0) < s.maxViews)
+      ).length,
+    [shares]
+  );
+
+  const totalViewsCount = useMemo(
+    () => shares.reduce((acc, s) => acc + (s.viewCount || 0), 0),
+    [shares]
+  );
+
+  const revokedShareCount = useMemo(
+    () => shares.filter((s) => s.revoked).length,
+    [shares]
+  );
+
+  const expiredShareCount = useMemo(
+    () =>
+      shares.filter(
+        (s) =>
+          !s.revoked &&
+          ((s.expiresAt && new Date(s.expiresAt) <= new Date()) ||
+            (s.maxViews && (s.viewCount || 0) >= s.maxViews))
       ).length,
     [shares]
   );
@@ -124,7 +148,14 @@ const Vaults: React.FC = () => {
   useEffect(() => {
     loadVaults();
     loadFavoriteItems();
-  }, []);
+  }, [user?.id]);
+
+  // Secondary data - Fetch shares with lower priority
+  useEffect(() => {
+    if (user?.id) {
+      fetchShares(user.id);
+    }
+  }, [user?.id]);
 
   const activeVaults = useMemo(
     () => vaults.filter((v) => !v.deletedAt),
@@ -180,9 +211,8 @@ const Vaults: React.FC = () => {
     if (!vault) return "This vault will be moved to Trash.";
 
     if (vault.itemCount > 0) {
-      return `This vault contains ${vault.itemCount} item${
-        vault.itemCount > 1 ? "s" : ""
-      }. All items will also be moved to Trash. You can restore them later.`;
+      return `This vault contains ${vault.itemCount} item${vault.itemCount > 1 ? "s" : ""
+        }. All items will also be moved to Trash. You can restore them later.`;
     }
     return "This vault will be moved to Trash. You can restore it later.";
   };
@@ -410,11 +440,10 @@ const Vaults: React.FC = () => {
                 <div className="flex items-start justify-between relative z-10">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`p-3 rounded-xl transition-colors ${
-                        vault.isShared
-                          ? "bg-indigo-500/10 text-indigo-400"
-                          : "bg-gray-800 group-hover:bg-primary-500/20 group-hover:text-primary-400 text-gray-400"
-                      }`}
+                      className={`p-3 rounded-xl transition-colors ${vault.isShared
+                        ? "bg-indigo-500/10 text-indigo-400"
+                        : "bg-gray-800 group-hover:bg-primary-500/20 group-hover:text-primary-400 text-gray-400"
+                        }`}
                     >
                       <VaultIconComponent iconName={vault.icon} size={22} />
                     </div>
@@ -545,27 +574,60 @@ const Vaults: React.FC = () => {
                 <ShareManagement />
               </div>
             ) : (
-              <div className="flex flex-row gap-4">
-                <div className="flex-1 bg-gray-950/50 rounded-xl p-4 border border-gray-800/50">
-                  <p className="text-gray-400 text-sm mb-1">
-                    Active Shared Links
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+                <div className="bg-gray-950/50 rounded-xl p-4 border border-gray-800/50">
+                  <p className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1">
+                    Active
                   </p>
                   <div className="flex items-end gap-2">
-                    <span className="text-3xl font-bold text-white">
+                    <span className="text-2xl font-bold text-green-400">
                       {activeShareCount}
                     </span>
-                    <span className="text-xs text-green-400 mb-1.5 flex items-center gap-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>
-                      Online
+                    <span className="text-[10px] text-green-400/60 mb-1 flex items-center gap-1">
+                      <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse"></span>
+                      Live
                     </span>
                   </div>
                 </div>
-                <div className="flex-1 bg-gray-950/50 rounded-xl p-4 border border-gray-800/50">
-                  <p className="text-gray-400 text-sm mb-1">Total Views</p>
+
+                <div className="bg-gray-950/50 rounded-xl p-4 border border-gray-800/50">
+                  <p className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1">
+                    Expired
+                  </p>
                   <div className="flex items-end gap-2">
-                    <span className="text-3xl font-bold text-white">28</span>
-                    <span className="text-xs text-gray-500 mb-1.5">
-                      lifetime
+                    <span className="text-2xl font-bold text-amber-400">
+                      {expiredShareCount}
+                    </span>
+                    <span className="text-[10px] text-amber-400/40 mb-1">
+                      ended
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-gray-950/50 rounded-xl p-4 border border-gray-800/50">
+                  <p className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1">
+                    Revoked
+                  </p>
+                  <div className="flex items-end gap-2">
+                    <span className="text-2xl font-bold text-rose-400">
+                      {revokedShareCount}
+                    </span>
+                    <span className="text-[10px] text-rose-400/40 mb-1">
+                      stopped
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-gray-950/50 rounded-xl p-4 border border-gray-800/50">
+                  <p className="text-gray-400 text-xs font-medium uppercase tracking-wider mb-1">
+                    Total
+                  </p>
+                  <div className="flex items-end gap-2">
+                    <span className="text-2xl font-bold text-white">
+                      {shares.length}
+                    </span>
+                    <span className="text-[10px] text-gray-500 mb-1">
+                      history
                     </span>
                   </div>
                 </div>
@@ -652,9 +714,8 @@ const Vaults: React.FC = () => {
         >
           <Plus
             size={28}
-            className={`transition-transform duration-300 ${
-              isFabMenuOpen ? "rotate-45" : ""
-            }`}
+            className={`transition-transform duration-300 ${isFabMenuOpen ? "rotate-45" : ""
+              }`}
           />
         </button>
       </div>
