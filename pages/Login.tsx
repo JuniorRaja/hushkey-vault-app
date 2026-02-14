@@ -157,9 +157,8 @@ const Login: React.FC = () => {
               Hushkey Vault
             </h1>
             <p
-              className={`h-6 ${
-                error ? "text-red-400 animate-shake" : "text-gray-400"
-              }`}
+              className={`h-6 ${error ? "text-red-400 animate-shake" : "text-gray-400"
+                }`}
             >
               {error || "Enter your PIN to unlock"}
             </p>
@@ -167,9 +166,8 @@ const Login: React.FC = () => {
 
           {/* PIN Dots */}
           <div
-            className={`h-8 mb-8 flex items-center justify-center ${
-              error ? "animate-shake" : ""
-            }`}
+            className={`h-8 mb-8 flex items-center justify-center ${error ? "animate-shake" : ""
+              }`}
           >
             {isVerifying ? (
               <Loader2 className="animate-spin text-primary-500" size={24} />
@@ -178,13 +176,12 @@ const Login: React.FC = () => {
                 {[0, 1, 2, 3, 4, 5].map((i) => (
                   <div
                     key={i}
-                    className={`rounded-full transition-all duration-200 ${
-                      i < pin.length
+                    className={`rounded-full transition-all duration-200 ${i < pin.length
                         ? error
                           ? "bg-red-500 w-3 h-3"
                           : "bg-primary-500 w-3 h-3"
                         : "bg-gray-800 w-3 h-3"
-                    }`}
+                      }`}
                   />
                 ))}
               </div>
@@ -312,11 +309,7 @@ const Login: React.FC = () => {
               disabled={oauthLoading !== null}
               className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-gray-900 rounded-lg font-medium hover:bg-gray-100 transition-colors disabled:opacity-50"
             >
-              {oauthLoading === "google" ? (
-                <Loader2 className="animate-spin" size={20} />
-              ) : (
-                <Mail size={20} />
-              )}
+              <Mail size={20} />
               Google
             </button>
             <button
@@ -325,11 +318,7 @@ const Login: React.FC = () => {
               disabled={oauthLoading !== null}
               className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors disabled:opacity-50"
             >
-              {oauthLoading === "github" ? (
-                <Loader2 className="animate-spin" size={20} />
-              ) : (
-                <Github size={20} />
-              )}
+              <Github size={20} />
               GitHub
             </button>
           </div>

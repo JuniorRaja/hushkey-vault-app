@@ -49,8 +49,6 @@ import Trash from "./pages/Trash";
 import ShareAccess from "./pages/ShareAccess";
 import Shares from "./pages/Shares";
 import ImportData from "./pages/ImportData";
-import OAuthCallback from "./pages/OAuthCallback";
-import Onboarding from "./pages/Onboarding";
 import AppLayout from "./components/Layout";
 import PWAUpdater from "./components/PWAUpdater";
 import ScreenshotProtection from "./components/ScreenshotProtection";
@@ -632,7 +630,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<UserProfile>(storageService.getUser());
   const { triggerNotification } = useData() || {
-    triggerNotification: () => {},
+    triggerNotification: () => { },
   }; // Handle context not ready initial render
   const navigate = useNavigate();
 
@@ -728,15 +726,6 @@ const AppRoutes = () => {
     return (
       <Routes>
         <Route path="/share/:token" element={<ShareAccess />} />
-      </Routes>
-    );
-  }
-
-  // Allow OAuth callback route
-  if (location.pathname === "/oauth-callback") {
-    return (
-      <Routes>
-        <Route path="/oauth-callback" element={<OAuthCallback />} />
       </Routes>
     );
   }

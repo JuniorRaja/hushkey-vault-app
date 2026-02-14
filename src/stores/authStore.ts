@@ -44,7 +44,6 @@ interface AuthActions {
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithOAuth: (provider: "google" | "github") => Promise<void>;
-  handleOAuthCallback: () => Promise<void>;
   signOut: () => Promise<void>;
   lock: () => Promise<void>;
   setupMasterPin: (pin: string) => Promise<void>;
@@ -274,100 +273,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const { error } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
-            redirectTo: window.location.origin,
+            redirectTo: import.meta.env.VITE_APP_URL || window.location.origin,
           },
         });
 
         if (error) throw error;
-      },
-
-      async handleOAuthCallback() {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-
-        if (error) {
-          console.error("[OAuth] Session error:", error);
-          throw error;
-        }
-        if (!session?.user) {
-          console.error("[OAuth] No session found");
-          throw new Error("No session found");
-        }
-
-        const userId = session.user.id;
-        const email = session.user.email!;
-
-        // Check if profile exists
-        let profile = await DatabaseService.getUserProfile(userId);
-
-        if (!profile) {
-          const salt = EncryptionService.generateSalt();
-          await DatabaseService.createUserProfile(userId, salt);
-          await IndexedDBService.saveUserProfile(userId, salt);
-
-          const defaultSettings = {
-            auto_lock_minutes: 5,
-            clipboard_clear_seconds: 30,
-            theme: "dark",
-            allow_screenshots: false,
-          };
-          await DatabaseService.saveUserSettings(userId, defaultSettings);
-          await IndexedDBService.saveSettings(userId, defaultSettings);
-
-          const deviceId = EncryptionService.generateRandomString();
-          const deviceName = navigator.userAgent.substring(0, 50);
-          await DatabaseService.saveDevice(userId, deviceId, deviceName);
-          await IndexedDBService.saveDevice(userId, deviceId, deviceName);
-
-          await DatabaseService.logActivity(
-            userId,
-            "SIGNUP",
-            "User account created via OAuth"
-          );
-          await IndexedDBService.logActivity(
-            userId,
-            "SIGNUP",
-            "User account created via OAuth"
-          );
-
-          set({
-            user: { id: userId, email },
-            deviceId,
-            isLoading: false,
-            isUnlocked: false,
-            hasPinSet: false,
-            autoLockMinutes: 5,
-          });
-        } else {
-          // Existing user
-          const deviceName = navigator.userAgent.substring(0, 50);
-          await IndexedDBService.logActivity(
-            userId,
-            "LOGIN",
-            `User signed in via OAuth from ${deviceName}`
-          );
-          if (navigator.onLine) {
-            try {
-              await DatabaseService.logActivity(
-                userId,
-                "LOGIN",
-                `User signed in via OAuth from ${deviceName}`
-              );
-            } catch (error) {
-              console.log("Failed to log to server");
-            }
-          }
-
-          set({
-            user: { id: userId, email },
-            isLoading: false,
-            isUnlocked: false,
-            hasPinSet: !!profile.pin_verification,
-            autoLockMinutes: 5,
-          });
-        }
       },
 
       async signOut() {
@@ -889,9 +799,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const lang = navigator.language;
         const platform = navigator.platform;
-        const fingerprintBase = `${screenRes}-${timezone}-${lang}-${platform}-${
-          navigator.hardwareConcurrency || 1
-        }`;
+        const fingerprintBase = `${screenRes}-${timezone}-${lang}-${platform}-${navigator.hardwareConcurrency || 1
+          }`;
         // Simple hash (can be replaced with more robust hashing)
         let hash = 0;
         for (let i = 0; i < fingerprintBase.length; i++) {
