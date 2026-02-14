@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Github, Mail, Loader2, Delete, ScanFace, LogOut } from "lucide-react";
+import { Mail, Loader2, Delete, ScanFace, LogOut } from "lucide-react";
 import { useAuthStore } from "../src/stores/authStore";
 import { BiometricService } from "../src/services/biometric";
 import DatabaseService from "../src/services/database";
@@ -232,9 +232,9 @@ const Login: React.FC = () => {
     setError("");
   };
 
-  const [oauthLoading, setOauthLoading] = useState<"google" | "github" | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<"google" | null>(null);
 
-  const handleOAuth = async (provider: "google" | "github") => {
+  const handleOAuth = async (provider: "google") => {
     console.log("[Login] OAuth button clicked:", provider);
     setOauthLoading(provider);
     try {
@@ -424,7 +424,7 @@ const Login: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-3">
+          <div className="mt-6 grid grid-cols-1 gap-3">
             <button
               type="button"
               onClick={() => handleOAuth("google")}
@@ -433,15 +433,6 @@ const Login: React.FC = () => {
             >
               <Mail size={20} />
               Google
-            </button>
-            <button
-              type="button"
-              onClick={() => handleOAuth("github")}
-              disabled={oauthLoading !== null}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Github size={20} />
-              GitHub
             </button>
           </div>
         </div>

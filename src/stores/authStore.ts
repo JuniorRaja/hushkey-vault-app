@@ -42,7 +42,7 @@ interface AuthState {
 interface AuthActions {
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signInWithOAuth: (provider: "google" | "github") => Promise<void>;
+  signInWithOAuth: (provider: "google") => Promise<void>;
   signOut: () => Promise<void>;
   lock: () => Promise<void>;
   setupMasterPin: (pin: string) => Promise<void>;
@@ -220,7 +220,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         });
       },
 
-      async signInWithOAuth(provider: "google" | "github") {
+      async signInWithOAuth(provider: "google") {
         const { error } = await supabase.auth.signInWithOAuth({
           provider,
           options: {

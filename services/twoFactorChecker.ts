@@ -1,6 +1,6 @@
 // Common domains that support 2FA
 const SUPPORTS_2FA = [
-  'google.com', 'gmail.com', 'github.com', 'facebook.com', 'twitter.com', 'x.com',
+  'google.com', 'gmail.com', 'facebook.com', 'twitter.com', 'x.com',
   'instagram.com', 'linkedin.com', 'microsoft.com', 'amazon.com', 'apple.com',
   'dropbox.com', 'slack.com', 'discord.com', 'reddit.com', 'paypal.com',
   'stripe.com', 'coinbase.com', 'binance.com', 'aws.amazon.com', 'digitalocean.com',
