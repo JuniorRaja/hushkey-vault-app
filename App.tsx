@@ -717,8 +717,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 // --- Main App Logic ---
 
 const AppRoutes = () => {
-  const { user, isUnlocked, onboardingStep, hasPinSet, isLoading } =
-    useAuthStore();
+  const { user, isUnlocked } = useAuthStore();
   const location = useLocation();
 
   // Allow share route without authentication
@@ -730,12 +729,8 @@ const AppRoutes = () => {
     );
   }
 
-  // If not authenticated or not unlocked, show Login or Onboarding
+  // If not authenticated or not unlocked, show Login
   if (!user || !isUnlocked) {
-    // Check if user is in onboarding flow
-    if (user && onboardingStep !== null) {
-      return <Onboarding />;
-    }
     return <Login />;
   }
 
@@ -766,49 +761,18 @@ const AppRoutes = () => {
 
 const App: React.FC = () => {
   const { hydrate, isLoading, user, isUnlocked } = useAuthStore();
-  // Use ref to prevent double-execution in React Strict Mode
-  const isHydratingRef = React.useRef(false);
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      if (isHydratingRef.current) return;
-      isHydratingRef.current = true;
-      try {
-        await hydrate();
-      } finally {
-        isHydratingRef.current = false;
-      }
-    };
-
-    initializeAuth();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Skip INITIAL_SESSION as it fires on page load and hydrate already ran
-      if (event === "INITIAL_SESSION") return;
-
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        if (!isHydratingRef.current) {
-          isHydratingRef.current = true;
-          try {
-            await hydrate();
-          } finally {
-            isHydratingRef.current = false;
-          }
-        }
-      } else if (event === "SIGNED_OUT") {
-        useAuthStore.getState().clearState();
-      }
-    });
+    hydrate();
 
     // Request PWA permissions
     requestNotificationPermission();
     requestClipboardPermission();
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    // Register service worker for offline support
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => { });
+    }
   }, [hydrate]);
 
   // Sync on app start and online events
