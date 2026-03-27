@@ -1,6 +1,6 @@
 
 
-import { Item, Vault, LogEntry, AppSettings, UserProfile, Category, AppNotification, NotificationType } from '../types';
+import { Item, Vault, LogEntry, AppSettings, UserProfile, Category, AppNotification, NotificationType } from '../../types';
 import { INITIAL_ITEMS, INITIAL_VAULTS, INITIAL_LOGS, INITIAL_USER } from './mockData';
 
 const KEYS = {

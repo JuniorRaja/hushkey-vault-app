@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Link2, Eye, Clock, Trash2, Copy, Check, AlertCircle, Lock, Calendar, ExternalLink, ArrowLeft, Filter } from 'lucide-react'
-import { useShareStore } from '../src/stores/shareStore'
-import { useAuthStore } from '../src/stores/auth'
+import { useShareStore } from '../stores/shareStore'
+import { useAuthStore } from '../stores/auth'
 
 const Shares: React.FC = () => {
   const navigate = useNavigate()

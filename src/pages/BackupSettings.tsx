@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useBackupStore } from "../src/stores/backupStore";
-import BackupService, { BackupHealth } from "../src/services/backupService";
+import { useBackupStore } from "../stores/backupStore";
+import BackupService, { BackupHealth } from "../services/backupService";
 import {
   Download,
   Upload,
@@ -16,7 +16,7 @@ import {
   Settings,
   Database,
 } from "lucide-react";
-import BackupOptionCard from "../src/components/BackupOptionCard";
+import BackupOptionCard from "../components/BackupOptionCard";
 
 const BackupSettings: React.FC = () => {
   const navigate = useNavigate();

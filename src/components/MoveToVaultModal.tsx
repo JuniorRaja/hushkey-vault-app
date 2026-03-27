@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Layers, Folder, Briefcase, CreditCard, User, Shield } from 'lucide-react';
-import { Vault } from '../types';
+import { Vault } from '../../types';
 
 interface MoveToVaultModalProps {
   isOpen: boolean;

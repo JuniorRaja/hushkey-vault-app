@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth, useData } from "../App";
-import { useAuthStore } from "../src/stores/auth";
-import { useCategoryStore } from "../src/stores/categoryStore";
-import { useVaultStore } from "../src/stores/vaultStore";
-import { useItemStore } from "../src/stores/itemStore";
-import DatabaseService from "../src/services/database";
-import EncryptionService from "../src/services/encryption";
-import { supabase } from "../src/supabaseClient";
-import { LogEntry, AppSettings, Category, AccentColor } from "../types";
+import { useAuth, useData } from "../../App";
+import { useAuthStore } from "../stores/auth";
+import { useCategoryStore } from "../stores/categoryStore";
+import { useVaultStore } from "../stores/vaultStore";
+import { useItemStore } from "../stores/itemStore";
+import DatabaseService from "../services/database";
+import EncryptionService from "../services/encryption";
+import { supabase } from "../supabaseClient";
+import { LogEntry, AppSettings, Category, AccentColor } from "../../types";
 import { storageService } from "../services/storage";
-import { BiometricService } from "../src/services/biometric";
+import { BiometricService } from "../services/biometric";
 import {
   User,
   Shield,

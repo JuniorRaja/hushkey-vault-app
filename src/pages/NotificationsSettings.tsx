@@ -1,8 +1,8 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../src/stores/auth";
-import { useData } from "../App";
-import DatabaseService from "../src/services/database";
+import { useAuthStore } from "../stores/auth";
+import { useData } from "../../App";
+import DatabaseService from "../services/database";
 import { ChevronLeft, Bell, Mail, Shield, Lock } from "lucide-react";
 
 const ToggleSwitch = ({
@@ -147,7 +147,7 @@ const NotificationsSettings: React.FC = () => {
         <button
           onClick={() => {
             if (authUser) {
-              import("../src/services/notificationService").then((m) => {
+              import("../services/notificationService").then((m) => {
                 m.default.sendNotification(
                   authUser.id,
                   "SECURITY" as any,

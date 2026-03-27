@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { Lock, Eye, EyeOff, AlertCircle, Copy, Check, Shield, Clock, User, CreditCard, Wifi, Globe, StickyNote, Landmark, Database, Server, Terminal, IdCard, FileText } from 'lucide-react'
-import { useShareStore } from '../src/stores/shareStore'
-import { Item, ItemType } from '../types'
+import { useShareStore } from '../stores/shareStore'
+import { Item, ItemType } from '../../types'
 
 const ShareAccess: React.FC = () => {
   const { token } = useParams<{ token: string }>()

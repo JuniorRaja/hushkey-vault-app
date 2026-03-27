@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, Globe, CreditCard, StickyNote, Wifi, User, Landmark, RectangleHorizontal, Database, Server, Terminal, IdCard, FileText, Folder, Star } from 'lucide-react';
-import { Item, Vault, ItemType } from '../types';
+import { Item, Vault, ItemType } from '../../types';
 import { searchVault } from '../utils/searchUtils';
 
 interface SearchOverlayProps {

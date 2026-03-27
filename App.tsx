@@ -24,8 +24,8 @@ import {
   AppNotification,
   NotificationType,
 } from "./types";
-import { storageService } from "./services/storage";
-import { INITIAL_USER } from "./services/mockData";
+import { storageService } from "./src/services/storage";
+import { INITIAL_USER } from "./src/services/mockData";
 import { useAuthStore } from "./src/stores/auth";
 import DatabaseService from "./src/services/database";
 import {
@@ -34,26 +34,26 @@ import {
 } from "./src/services/pwa";
 import notificationService from "./src/services/notificationService";
 import { supabase } from "./src/supabaseClient";
-import LoginV2 from "./pages/LoginV2";
-import OnboardingFlow from "./components/OnboardingFlow";
+import LoginV2 from "./src/pages/LoginV2";
+import OnboardingFlow from "./src/components/OnboardingFlow";
 import { useAuthRedirect } from "./src/hooks/useAuthRedirect";
-import Dashboard from "./pages/Dashboard";
-import Items from "./pages/Items";
-import Vaults from "./pages/Vaults";
-import Guardian from "./pages/Guardian";
-import Settings from "./pages/Settings";
-import NotificationsSettings from "./pages/NotificationsSettings";
-import CategoriesSettings from "./pages/CategoriesSettings";
-import AuditLogsSettings from "./pages/AuditLogsSettings";
-import BackupSettings from "./pages/BackupSettings";
-import ItemDetail from "./pages/ItemDetail";
-import Trash from "./pages/Trash";
-import ShareAccess from "./pages/ShareAccess";
-import Shares from "./pages/Shares";
-import ImportData from "./pages/ImportData";
-import AppLayout from "./components/Layout";
-import PWAUpdater from "./components/PWAUpdater";
-import ScreenshotProtection from "./components/ScreenshotProtection";
+import Dashboard from "./src/pages/Dashboard";
+import Items from "./src/pages/Items";
+import Vaults from "./src/pages/Vaults";
+import Guardian from "./src/pages/Guardian";
+import Settings from "./src/pages/Settings";
+import NotificationsSettings from "./src/pages/NotificationsSettings";
+import CategoriesSettings from "./src/pages/CategoriesSettings";
+import AuditLogsSettings from "./src/pages/AuditLogsSettings";
+import BackupSettings from "./src/pages/BackupSettings";
+import ItemDetail from "./src/pages/ItemDetail";
+import Trash from "./src/pages/Trash";
+import ShareAccess from "./src/pages/ShareAccess";
+import Shares from "./src/pages/Shares";
+import ImportData from "./src/pages/ImportData";
+import AppLayout from "./src/components/Layout";
+import PWAUpdater from "./src/components/PWAUpdater";
+import ScreenshotProtection from "./src/components/ScreenshotProtection";
 
 // --- Color Palettes ---
 const COLOR_PALETTES: Record<AccentColor, Record<string, string>> = {

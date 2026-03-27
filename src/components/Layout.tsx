@@ -15,11 +15,11 @@ import {
   Trash,
   LogOut,
 } from "lucide-react";
-import { useAuth, useData } from "../App";
-import { useAuthStore } from "../src/stores/auth";
-import { useItemStore } from "../src/stores/itemStore";
-import { useAutoLock } from "../src/hooks/useAutoLock";
-import { NotificationType } from "../types";
+import { useAuth, useData } from "../../App";
+import { useAuthStore } from "../stores/auth";
+import { useItemStore } from "../stores/itemStore";
+import { useAutoLock } from "../hooks/useAutoLock";
+import { NotificationType } from "../../types";
 import SyncStatus from "./SyncStatus";
 import SearchOverlay from "./SearchOverlay";
 

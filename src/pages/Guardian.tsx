@@ -1,13 +1,13 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { supabase } from '../src/supabaseClient';
-import { useData } from '../App';
+import { supabase } from '../supabaseClient';
+import { useData } from '../../App';
 import { useNavigate } from 'react-router-dom';
-import { useItemStore } from '../src/stores/itemStore';
-import { useAuthStore } from '../src/stores/auth';
-import { useGuardianStore } from '../src/stores/guardianStore';
-import { useBackupStore } from '../src/stores/backupStore';
-import { analyzePassword } from '../src/services/passwordAnalyzer';
+import { useItemStore } from '../stores/itemStore';
+import { useAuthStore } from '../stores/auth';
+import { useGuardianStore } from '../stores/guardianStore';
+import { useBackupStore } from '../stores/backupStore';
+import { analyzePassword } from '../services/passwordAnalyzer';
 import { generatePassword, generateMemorablePassword } from '../services/passwordGenerator';
 import { 
     RefreshCw, Copy, Check, ShieldAlert, ShieldCheck, Shield, 
@@ -19,8 +19,8 @@ import {
     CheckCircle, XCircle, Clock, Eye, Settings
 } from 'lucide-react';
 import ConfirmationModal from '../components/ConfirmationModal';
-import { FindingsManager } from '../src/components/FindingsManager';
-import { ScanHistory } from '../src/components/ScanHistory';
+import { FindingsManager } from '../components/FindingsManager';
+import { ScanHistory } from '../components/ScanHistory';
 
 // --- Types & Interfaces ---
 

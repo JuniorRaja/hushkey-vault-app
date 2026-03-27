@@ -1,4 +1,4 @@
-import { Item, Vault, ItemType } from '../types';
+import { Item, Vault, ItemType } from '../../types';
 
 /**
  * Search utility functions for testing and validation

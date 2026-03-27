@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useData } from '../App';
+import { useData } from '../../App';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Folder, Briefcase, CreditCard, User, ChevronRight, MoreVertical, Edit2, Share2, Trash2, Shield, Star, Globe, StickyNote, Wifi, FileText, Landmark, RectangleHorizontal, Database, Server, Terminal, IdCard } from 'lucide-react';
-import { Vault, Item, ItemType } from '../types';
+import { Vault, Item, ItemType } from '../../types';
 import VaultModal from '../components/VaultModal';
 import ShareModal from '../components/ShareModal';
 import ConfirmationModal from '../components/ConfirmationModal';

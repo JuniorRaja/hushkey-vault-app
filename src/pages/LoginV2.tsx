@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Mail, Lock, Delete, ScanFace, Loader2, LogOut } from "lucide-react";
-import { useAuthStore } from "../src/stores/auth";
-import { useOnboardingStore } from "../src/stores/onboarding";
-import { BiometricService } from "../src/services/biometric";
-import DatabaseService from "../src/services/database";
+import { useAuthStore } from "../stores/auth";
+import { useOnboardingStore } from "../stores/onboarding";
+import { BiometricService } from "../services/biometric";
+import DatabaseService from "../services/database";
 
 const HushkeyLogo = ({ size = 32 }: { size?: number }) => (
   <img src="/hushkey-icon.png" alt="HushKey" width={size} height={size} />

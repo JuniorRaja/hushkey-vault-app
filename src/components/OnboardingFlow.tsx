@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { User, Lock, ScanFace, Database, ChevronLeft, Loader2, Delete, Check } from "lucide-react";
-import { useOnboardingStore } from "../src/stores/onboarding";
-import { useAuthStore } from "../src/stores/auth";
+import { useOnboardingStore } from "../stores/onboarding";
+import { useAuthStore } from "../stores/auth";
 
 const HushkeyLogo = () => (
   <img src="/hushkey-icon.png" alt="HushKey" className="w-12 h-12" />

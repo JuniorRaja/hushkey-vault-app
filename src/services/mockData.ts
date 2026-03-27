@@ -1,4 +1,4 @@
-import { Item, ItemType, Vault, UserProfile, LogEntry } from '../types';
+import { Item, ItemType, Vault, UserProfile, LogEntry } from '../../types';
 
 export const INITIAL_USER: UserProfile = {
   name: "Alex Sterling",

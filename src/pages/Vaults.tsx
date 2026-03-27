@@ -28,10 +28,10 @@ import {
   Clock,
   LayoutGrid,
 } from "lucide-react";
-import { useVaultStore } from "../src/stores/vaultStore";
-import { useShareStore } from "../src/stores/shareStore";
-import { useAuthStore } from "../src/stores/auth";
-import { Vault, ItemType } from "../types";
+import { useVaultStore } from "../stores/vaultStore";
+import { useShareStore } from "../stores/shareStore";
+import { useAuthStore } from "../stores/auth";
+import { Vault, ItemType } from "../../types";
 import VaultModal from "../components/VaultModal";
 import ShareModal from "../components/ShareModal";
 import ShareManagement from "../components/ShareManagement";

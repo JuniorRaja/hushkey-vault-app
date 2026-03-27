@@ -1,7 +1,7 @@
 import { supabase } from "../supabaseClient";
 import DatabaseService from "./database";
 import { AppNotification, NotificationType, AppSettings } from "../../types";
-import { storageService } from "../../services/storage";
+import { storageService } from "./storage";
 import { sendPushNotification } from "./pwa";
 
 class NotificationService {

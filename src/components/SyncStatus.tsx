@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Cloud, CloudOff, RefreshCw, AlertCircle } from 'lucide-react';
-import { useVaultStore } from '../src/stores/vaultStore';
-import SyncService from '../src/services/syncService';
+import { useVaultStore } from '../stores/vaultStore';
+import SyncService from '../services/syncService';
 
 const SyncStatus: React.FC = () => {
   const { isOnline } = useVaultStore();
@@ -26,7 +26,7 @@ const SyncStatus: React.FC = () => {
     if (!isOnline) return;
     try {
       // Import vault store to trigger full sync
-      const { useVaultStore } = await import('../src/stores/vaultStore');
+      const { useVaultStore } = await import('../stores/vaultStore');
       await useVaultStore.getState().syncWithServer();
       setLastSync(new Date());
     } catch (error) {

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Copy, Clock, Check, QrCode, ShieldCheck, Scan, Lock, AlertCircle, Eye } from 'lucide-react';
-import { Item, Vault } from '../types';
-import { useShareStore } from '../src/stores/shareStore';
-import { useAuthStore } from '../src/stores/auth';
+import { Item, Vault } from '../../types';
+import { useShareStore } from '../stores/shareStore';
+import { useAuthStore } from '../stores/auth';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface ShareModalProps {

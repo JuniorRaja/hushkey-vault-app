@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Trash2, RotateCcw, FileText, Folder } from 'lucide-react';
-import { useTrashStore } from '../src/stores/trashStore';
-import { useAuthStore } from '../src/stores/auth';
-import DatabaseService from '../src/services/database';
+import { useTrashStore } from '../stores/trashStore';
+import { useAuthStore } from '../stores/auth';
+import DatabaseService from '../services/database';
 import ConfirmationModal from '../components/ConfirmationModal';
 import TrashSkeleton from '../components/TrashSkeleton';
 

@@ -1,10 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useItemStore } from '../src/stores/itemStore';
-import { useVaultStore } from '../src/stores/vaultStore';
-import { useData } from '../App';
+import { useItemStore } from '../stores/itemStore';
+import { useVaultStore } from '../stores/vaultStore';
+import { useData } from '../../App';
 import { Plus, Search, Filter, Globe, CreditCard, StickyNote, Wifi, FileText, User, ArrowUpRight, Edit2, Share2, MoreVertical, Trash2, X, Landmark, RectangleHorizontal, Check, ChevronDown, Copy, Star, Files, FolderInput, Database, Server, Terminal, IdCard } from 'lucide-react';
-import { Item, ItemType, Vault, Category } from '../types';
+import { Item, ItemType, Vault, Category } from '../../types';
 import VaultModal from '../components/VaultModal';
 import ShareModal from '../components/ShareModal';
 import ConfirmationModal from '../components/ConfirmationModal';

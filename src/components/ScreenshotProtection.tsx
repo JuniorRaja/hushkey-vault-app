@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useAuthStore } from "../src/stores/auth";
-import DatabaseService from "../src/services/database";
+import { useAuthStore } from "../stores/auth";
+import DatabaseService from "../services/database";
 
 /**
  * ScreenshotProtection Component

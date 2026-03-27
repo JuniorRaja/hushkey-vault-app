@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Folder, Briefcase, CreditCard, User, Shield } from 'lucide-react';
-import { Vault } from '../types';
-import { useVaultStore } from '../src/stores/vaultStore';
+import { Vault } from '../../types';
+import { useVaultStore } from '../stores/vaultStore';
 
 interface VaultModalProps {
   isOpen: boolean;

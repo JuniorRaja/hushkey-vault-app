@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../src/stores/auth";
-import DatabaseService from "../src/services/database";
+import { useAuthStore } from "../stores/auth";
+import DatabaseService from "../services/database";
 import { 
   ChevronLeft, 
   Activity, 

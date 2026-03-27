@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../src/stores/auth";
+import { useAuthStore } from "../stores/auth";
 import { useDropzone } from "react-dropzone";
 import {
   ChevronLeft,
@@ -16,9 +16,9 @@ import {
 import HushKeyBackupService, {
   HKBFormat,
   BackupData,
-} from "../src/services/hushkeyBackup";
-import DatabaseService from "../src/services/database";
-import BackupService from "../src/services/backupService";
+} from "../services/hushkeyBackup";
+import DatabaseService from "../services/database";
+import BackupService from "../services/backupService";
 
 // Types for Preview Items
 interface PreviewItem {
