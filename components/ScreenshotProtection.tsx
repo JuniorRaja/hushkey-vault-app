@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useAuthStore } from "../src/stores/authStore";
+import { useAuthStore } from "../src/stores/auth";
 import DatabaseService from "../src/services/database";
 
 /**

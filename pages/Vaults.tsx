@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useVaultStore } from "../src/stores/vaultStore";
 import { useShareStore } from "../src/stores/shareStore";
-import { useAuthStore } from "../src/stores/authStore";
+import { useAuthStore } from "../src/stores/auth";
 import { Vault, ItemType } from "../types";
 import VaultModal from "../components/VaultModal";
 import ShareModal from "../components/ShareModal";

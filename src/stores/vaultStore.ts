@@ -8,7 +8,7 @@ import { supabase } from "../supabaseClient";
 import DatabaseService from "../services/database";
 import IndexedDBService from "../services/indexedDB";
 import EncryptionService from "../services/encryption";
-import { useAuthStore } from "./authStore";
+import { useAuthStore } from "./auth";
 import type { Vault, Item, Category } from "../../types";
 
 interface VaultState {

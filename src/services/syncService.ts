@@ -4,7 +4,7 @@
 
 import IndexedDBService from "./indexedDB";
 import DatabaseService from "./database";
-import { useAuthStore } from "../stores/authStore";
+import { useAuthStore } from "../stores/auth";
 
 class SyncService {
   private isSyncing = false;

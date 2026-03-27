@@ -51,9 +51,9 @@ class NotificationService {
     // If specific config is FALSE, we skip alerts.
     // If configKey is undefined, we assume it's a general alert and respect master toggle?
     // Or default to true? Let's default to respecting master toggle if no specific key.
-    const isCategoryEnabled = configKey ? settings[configKey] !== false : true;
+    const isCategoryEnabled = configKey ? settings?.[configKey] !== false : true;
 
-    if (!isCategoryEnabled) {
+    if (!settings || !isCategoryEnabled) {
       return notification; // Stop here, no push/email
     }
 

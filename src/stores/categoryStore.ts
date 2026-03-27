@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Category } from '../../types';
 import DatabaseService from '../services/database';
-import { useAuthStore } from './authStore';
+import { useAuthStore } from './auth';
 
 interface CategoryStore {
   categories: Category[];

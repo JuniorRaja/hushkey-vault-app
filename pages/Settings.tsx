@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth, useData } from "../App";
-import { useAuthStore } from "../src/stores/authStore";
+import { useAuthStore } from "../src/stores/auth";
 import { useCategoryStore } from "../src/stores/categoryStore";
 import { useVaultStore } from "../src/stores/vaultStore";
 import { useItemStore } from "../src/stores/itemStore";
@@ -2244,7 +2244,7 @@ const Settings: React.FC = () => {
         <button
           onClick={() => {
             lock();
-            navigate("/login");
+            navigate("/", { replace: true });
           }}
           className="w-full flex items-center justify-center gap-2 py-4 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 rounded-xl transition-colors font-medium border border-transparent hover:border-amber-500/20"
         >
@@ -2255,7 +2255,7 @@ const Settings: React.FC = () => {
         <button
           onClick={async () => {
             await authSignOut();
-            navigate("/login");
+            navigate("/", { replace: true });
           }}
           className="w-full flex items-center justify-center gap-2 py-4 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-colors font-medium border border-transparent hover:border-red-500/20"
         >

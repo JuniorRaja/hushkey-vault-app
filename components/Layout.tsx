@@ -16,7 +16,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { useAuth, useData } from "../App";
-import { useAuthStore } from "../src/stores/authStore";
+import { useAuthStore } from "../src/stores/auth";
 import { useItemStore } from "../src/stores/itemStore";
 import { useAutoLock } from "../src/hooks/useAutoLock";
 import { NotificationType } from "../types";
@@ -191,7 +191,7 @@ const Sidebar = memo(
           <button
             onClick={() => {
               lock();
-              navigate("/login");
+              navigate("/", { replace: true });
             }}
             className={`flex items-center gap-3 px-3 py-2.5 w-full text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-xl transition-colors ${
               collapsed ? "justify-center" : ""
@@ -208,7 +208,7 @@ const Sidebar = memo(
           <button
             onClick={async () => {
               await signOut();
-              navigate("/login");
+              navigate("/", { replace: true });
             }}
             className={`flex items-center gap-3 px-3 py-2.5 w-full text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors ${
               collapsed ? "justify-center" : ""
@@ -525,7 +525,7 @@ const AppLayout: React.FC = () => {
                 setIsLocking(true);
                 setTimeout(() => {
                   lock();
-                  navigate("/login");
+                  navigate("/", { replace: true });
                 }, 800);
               } else {
                 setPullDistance(0);
@@ -548,7 +548,7 @@ const AppLayout: React.FC = () => {
                 setIsLocking(true);
                 setTimeout(() => {
                   lock();
-                  navigate("/login");
+                  navigate("/", { replace: true });
                 }, 800);
               } else {
                 setPullDistance(0);

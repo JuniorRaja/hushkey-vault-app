@@ -8,7 +8,7 @@ import { supabase } from '../supabaseClient';
 import DatabaseService from '../services/database';
 import EncryptionService from '../services/encryption';
 import IndexedDBService from '../services/indexedDB';
-import { useAuthStore } from './authStore';
+import { useAuthStore } from './auth';
 import { SoundService } from '../services/soundService';
 import type { Vault, Item } from '../../types';
 

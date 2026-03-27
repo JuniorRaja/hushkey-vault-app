@@ -4,7 +4,7 @@ import { supabase } from '../src/supabaseClient';
 import { useData } from '../App';
 import { useNavigate } from 'react-router-dom';
 import { useItemStore } from '../src/stores/itemStore';
-import { useAuthStore } from '../src/stores/authStore';
+import { useAuthStore } from '../src/stores/auth';
 import { useGuardianStore } from '../src/stores/guardianStore';
 import { useBackupStore } from '../src/stores/backupStore';
 import { analyzePassword } from '../src/services/passwordAnalyzer';

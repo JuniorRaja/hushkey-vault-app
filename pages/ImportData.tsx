@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../src/stores/authStore";
+import { useAuthStore } from "../src/stores/auth";
 import { useDropzone } from "react-dropzone";
 import {
   ChevronLeft,

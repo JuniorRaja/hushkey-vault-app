@@ -26,7 +26,7 @@ import {
 } from "./types";
 import { storageService } from "./services/storage";
 import { INITIAL_USER } from "./services/mockData";
-import { useAuthStore } from "./src/stores/authStore";
+import { useAuthStore } from "./src/stores/auth";
 import DatabaseService from "./src/services/database";
 import {
   requestNotificationPermission,
@@ -34,7 +34,9 @@ import {
 } from "./src/services/pwa";
 import notificationService from "./src/services/notificationService";
 import { supabase } from "./src/supabaseClient";
-import Login from "./pages/Login";
+import LoginV2 from "./pages/LoginV2";
+import OnboardingFlow from "./components/OnboardingFlow";
+import { useAuthRedirect } from "./src/hooks/useAuthRedirect";
 import Dashboard from "./pages/Dashboard";
 import Items from "./pages/Items";
 import Vaults from "./pages/Vaults";
@@ -686,7 +688,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = () => {
     setIsAuthenticated(false);
-    navigate("/login");
+    navigate("/", { replace: true });
   };
 
   const updateUserProfile = (updates: Partial<UserProfile>) => {
@@ -717,8 +719,19 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 // --- Main App Logic ---
 
 const AppRoutes = () => {
-  const { user, isUnlocked } = useAuthStore();
+  const appView = useAuthRedirect();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (appView === "app" && location.pathname === "/") {
+      // Just unlocked — push into the app
+      navigate("/vaults", { replace: true });
+    } else if ((appView === "login" || appView === "onboarding") && location.pathname !== "/") {
+      // Locked/signed-out — collapse history to root so back button can't reach vault pages
+      navigate("/", { replace: true });
+    }
+  }, [appView, location.pathname, navigate]);
 
   // Allow share route without authentication
   if (location.pathname.startsWith("/share/")) {
@@ -729,10 +742,9 @@ const AppRoutes = () => {
     );
   }
 
-  // If not authenticated or not unlocked, show Login
-  if (!user || !isUnlocked) {
-    return <Login />;
-  }
+  if (appView === "login") return <LoginV2 />;
+  if (appView === "onboarding") return <OnboardingFlow onDone={() => {}} />;
+  if (appView !== "app") return null;
 
   return (
     <Routes>

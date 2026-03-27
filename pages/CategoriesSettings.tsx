@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../src/stores/authStore";
+import { useAuthStore } from "../src/stores/auth";
 import { useCategoryStore } from "../src/stores/categoryStore";
 import { useItemStore } from "../src/stores/itemStore";
 import { ChevronLeft, Layers, Plus, Trash2, AlertTriangle, Loader2, Sparkles } from "lucide-react";

@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../src/stores/authStore";
+import { useAuthStore } from "../src/stores/auth";
 import { useData } from "../App";
 import DatabaseService from "../src/services/database";
 import { ChevronLeft, Bell, Mail, Shield, Lock } from "lucide-react";

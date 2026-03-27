@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useItemStore } from '../src/stores/itemStore';
-import { useAuthStore } from '../src/stores/authStore';
+import { useAuthStore } from '../src/stores/auth';
 import { useData } from '../App';
 import { FaviconService } from '../services/faviconService';
 import { FileAttachments } from '../src/components/FileAttachments';
