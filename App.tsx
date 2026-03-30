@@ -202,6 +202,8 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   );
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
+  const { isUnlocked } = useAuthStore();
+
   const refreshData = useCallback(() => {
     setAllItems(storageService.getItems());
     setAllVaults(storageService.getVaults());
@@ -227,6 +229,16 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     refreshData();
   }, [refreshData]);
+
+  // Re-sync notifications after unlock so login-time notifications (new device, etc.) are visible
+  useEffect(() => {
+    if (!isUnlocked) return;
+    const { user } = useAuthStore.getState();
+    if (!user?.id) return;
+    import("./src/services/notificationService").then(({ default: notificationService }) => {
+      notificationService.syncNotifications(user.id).then(setNotifications);
+    });
+  }, [isUnlocked]);
 
   // Check system health on load (Expiry, Backup)
   useEffect(() => {
@@ -369,11 +381,12 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     // Sync mark read to server
     const { user } = useAuthStore.getState();
     if (user && user.id) {
-      import("./src/services/notificationService").then(({ default: notificationService }) => {
-        updated.filter((n) => !n.read).forEach((n) => {
-          notificationService.markAsRead(user.id, n.id);
+      const unread = notifications.filter((n) => !n.read);
+      if (unread.length > 0) {
+        import("./src/services/notificationService").then(({ default: notificationService }) => {
+          unread.forEach((n) => notificationService.markAsRead(user.id, n.id));
         });
-      });
+      }
     }
   };
 
