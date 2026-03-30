@@ -724,7 +724,7 @@ class BackupService {
   }
 
   private async getMasterKey(): Promise<Uint8Array> {
-    const authStore = await import("../stores/authStore");
+    const authStore = await import("../stores/auth");
     const masterKey = authStore.useAuthStore.getState().masterKey;
     if (!masterKey)
       throw new Error(

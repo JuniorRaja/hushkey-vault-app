@@ -18,7 +18,7 @@ import AttachmentsService, {
   FileMetadata,
   UploadProgress,
 } from "../services/attachmentsService";
-import { useAuthStore } from "../stores/authStore";
+import { useAuthStore } from "../stores/auth";
 import { ItemType } from "../../types";
 
 interface FileAttachmentsProps {

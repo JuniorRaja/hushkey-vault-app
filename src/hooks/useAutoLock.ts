@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../stores/authStore";
+import { useAuthStore } from "../stores/auth";
 
 export const useAutoLock = () => {
   const navigate = useNavigate();
@@ -19,7 +19,7 @@ export const useAutoLock = () => {
         isLockingRef.current = true;
         try {
           await lock();
-          navigate("/login", { replace: true });
+          navigate("/", { replace: true });
         } finally {
           isLockingRef.current = false;
         }

@@ -1,0 +1,118 @@
+# HushKey Vault — Auth Flow (v2)
+
+```mermaid
+flowchart TD
+    START([App Start]) --> HYDRATE[hydrate\nrestore session from storage]
+
+    HYDRATE --> SESSION{Supabase\nsession valid?}
+
+    SESSION -- No --> CLEAR[clear state\nuser = null] --> LOGIN_SCREEN
+
+    SESSION -- Yes, same user --> AUTOLOCK{Auto-lock\ntimer expired?}
+    SESSION -- Yes, new user ID --> LOAD_PROFILE[load profile\ncheck pin_verification\nload settings]
+
+    LOAD_PROFILE --> PROFILE_PIN{pin_verification\nexists?}
+    PROFILE_PIN -- No --> SET_HAPIN_FALSE[hasPinSet = false\nisUnlocked = false] --> REDIRECT
+    PROFILE_PIN -- Yes --> SET_HAPIN_TRUE[hasPinSet = true\nisUnlocked = false] --> REDIRECT
+
+    AUTOLOCK -- Yes --> LOCK[lock\nclear masterKey\nisUnlocked = false] --> REDIRECT
+    AUTOLOCK -- No --> RESTORE_KEY[unwrap masterKey\nfrom secureMemory]
+    RESTORE_KEY -- Success --> SET_UNLOCKED[isUnlocked = true\nmasterKey restored] --> REDIRECT
+    RESTORE_KEY -- Fail --> LOCK
+
+    REDIRECT --> HOOK{useAuthRedirect}
+
+    HOOK -- isLoading --> LOADING_SCREEN([Loading Screen])
+    HOOK -- no user --> LOGIN_SCREEN
+    HOOK -- user + onboarding active --> ONBOARDING_FLOW
+    HOOK -- user + no hasPinSet --> ONBOARDING_FLOW
+    HOOK -- user + hasPinSet + not unlocked --> LOGIN_SCREEN
+    HOOK -- user + hasPinSet + unlocked --> APP([Dashboard / Vault])
+
+    %% ── LOGIN SCREEN ──────────────────────────────────────────
+    LOGIN_SCREEN([LoginV2]) --> HAS_USER{user in store?}
+
+    HAS_USER -- No --> EMAIL_SCREEN[EmailScreen\nemail + password]
+    HAS_USER -- Yes, hasPinSet --> PIN_SCREEN[PinUnlockScreen\n6-digit numpad]
+
+    EMAIL_SCREEN --> SIGNUP_OR_IN{mode?}
+
+    SIGNUP_OR_IN -- Sign In --> SIGNIN[authStore.signIn\nsupabase.signInWithPassword\nfetch profile → set hasPinSet]
+    SIGNUP_OR_IN -- Sign Up --> SIGNUP[authStore.signUp\nsupabase.signUp\nhasPinSet = false]
+
+    SIGNIN -- Error --> EMAIL_ERROR[show error] --> EMAIL_SCREEN
+    SIGNIN -- Success, hasPinSet=true --> REDIRECT
+    SIGNIN -- Success, hasPinSet=false --> START_ONBOARDING
+
+    SIGNUP -- Error --> EMAIL_ERROR
+    SIGNUP -- Success --> START_ONBOARDING[onboardingStore.startOnboarding\nisActive = true] --> REDIRECT
+
+    PIN_SCREEN --> BIOMETRIC{biometric\nenabled?}
+    BIOMETRIC -- Yes, tap icon --> BIO_AUTH[BiometricService.authenticate\nunwrap masterKey from secureMemory]
+    BIOMETRIC -- No / use PIN --> PIN_ENTRY[enter 6 digits]
+
+    PIN_ENTRY --> RATE_LIMIT{rate limit\ncheck}
+    RATE_LIMIT -- Blocked --> RATE_ERROR[show lockout message] --> PIN_SCREEN
+    RATE_LIMIT -- OK --> DERIVE_KEY[deriveMasterKey\nPBKDF2 600k iterations]
+    DERIVE_KEY --> VERIFY_PIN[verifyPin\ndecrypt verification hash]
+    VERIFY_PIN -- Invalid --> FAIL_ATTEMPT[record failed attempt\nshow error] --> PIN_SCREEN
+    VERIFY_PIN -- Valid --> UNLOCK_SUCCESS
+
+    BIO_AUTH -- Fail --> BIO_ERROR[show error\nfall back to PIN] --> PIN_SCREEN
+    BIO_AUTH -- Success --> UNLOCK_SUCCESS
+
+    UNLOCK_SUCCESS[set masterKey\nisUnlocked = true\nhasPinSet = true\nload settings + userName\nloadItems async] --> REDIRECT
+
+    %% ── ONBOARDING FLOW ───────────────────────────────────────
+    ONBOARDING_FLOW([OnboardingFlow\n4-step wizard])
+
+    ONBOARDING_FLOW --> STEP0[Step 1\nPersonalize Name\nvalidate: non-empty, ≤100 chars]
+    STEP0 --> STEP1[Step 2\nSet PIN\n6-digit × 2, must match]
+    STEP1 --> STEP2[Step 3\nEnable Biometric\nyes / no]
+    STEP2 --> STEP3[Step 4\nLoad Sample Data?\nyes / no]
+
+    STEP3 --> COMPLETE[completeOnboarding\n① createUserProfile + salt\n② deriveMasterKey from PIN+salt\n③ updateUserProfileName encrypted\n④ saveUserSettings\n⑤ saveDevice\n⑥ BiometricService.register if chosen\n⑦ loadSampleData if chosen\n⑧ logActivity]
+
+    COMPLETE --> SETUP_PIN[setupMasterPin\nread stored salt\nderiveMasterKey\ncreatePinVerification\nwrapMasterKey\nisUnlocked = true\nhasPinSet = true]
+
+    SETUP_PIN --> REDIRECT
+
+    %% ── LOCK / SIGN OUT ───────────────────────────────────────
+    APP --> LOCK_ACTION{user action}
+    LOCK_ACTION -- Lock vault --> LOCK_VAULT[lock\nsecureWipe masterKey\nclear IntegrityChecker\nisUnlocked = false] --> REDIRECT
+    LOCK_ACTION -- Sign out --> SIGNOUT[signOut\nsupabase.signOut\nclearAll IndexedDB\nuser = null] --> REDIRECT
+    LOCK_ACTION -- Auto-lock timer --> LOCK_VAULT
+
+    %% ── STYLES ────────────────────────────────────────────────
+    classDef screen fill:#1e1b4b,stroke:#7c3aed,color:#e9d5ff
+    classDef action fill:#1e3a5f,stroke:#2563eb,color:#bfdbfe
+    classDef decision fill:#1a2e1a,stroke:#059669,color:#a7f3d0
+    classDef error fill:#3b1a1a,stroke:#dc2626,color:#fca5a5
+    classDef success fill:#14532d,stroke:#16a34a,color:#bbf7d0
+
+    class LOGIN_SCREEN,ONBOARDING_FLOW,APP,LOADING_SCREEN screen
+    class HYDRATE,SIGNIN,SIGNUP,DERIVE_KEY,VERIFY_PIN,UNLOCK_SUCCESS,COMPLETE,SETUP_PIN,LOCK_VAULT,SIGNOUT action
+    class SESSION,AUTOLOCK,HAS_USER,SIGNUP_OR_IN,BIOMETRIC,RATE_LIMIT,PROFILE_PIN decision
+    class EMAIL_ERROR,RATE_ERROR,FAIL_ATTEMPT,BIO_ERROR error
+    class UNLOCK_SUCCESS,COMPLETE success
+```
+
+## State Machine Summary
+
+| State | `user` | `hasPinSet` | `isUnlocked` | `onboarding.isActive` | → View |
+|---|---|---|---|---|---|
+| App start / loading | any | any | any | any | Loading |
+| No session | null | — | — | — | LoginV2 → EmailScreen |
+| Signed in, no PIN | set | false | false | false | OnboardingFlow |
+| Signed in, no PIN | set | false | false | true | OnboardingFlow |
+| Signed in, PIN set, locked | set | true | false | false | LoginV2 → PinUnlockScreen |
+| Signed in, PIN set, unlocked | set | true | true | false | Dashboard / App |
+
+## Key Security Properties
+
+- **masterKey** lives only in memory (`Uint8Array`), never persisted to localStorage
+- **wrappedMasterKey** is persisted (AES-GCM wrapped with a session-scoped wrapping key)
+- **PIN** is never stored — only a `pin_verification` hash (encrypted constant) in Supabase
+- **Salt** is stored in `user_profiles` — unique per user, used for PBKDF2 key derivation
+- **Auto-lock** checks `Date.now() - lastActivity > autoLockMinutes * 60000` on hydration
+- **Rate limiting** blocks unlock after 5 failed attempts with exponential backoff

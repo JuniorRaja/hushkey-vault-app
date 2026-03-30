@@ -24,34 +24,35 @@ import {
   AppNotification,
   NotificationType,
 } from "./types";
-import { storageService } from "./services/storage";
-import { INITIAL_USER } from "./services/mockData";
-import { useAuthStore } from "./src/stores/authStore";
+import { storageService } from "./src/services/storage";
+import { INITIAL_USER } from "./src/services/mockData";
+import { useAuthStore } from "./src/stores/auth";
 import DatabaseService from "./src/services/database";
 import {
   requestNotificationPermission,
   requestClipboardPermission,
 } from "./src/services/pwa";
-import notificationService from "./src/services/notificationService";
 import { supabase } from "./src/supabaseClient";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import Items from "./pages/Items";
-import Vaults from "./pages/Vaults";
-import Guardian from "./pages/Guardian";
-import Settings from "./pages/Settings";
-import NotificationsSettings from "./pages/NotificationsSettings";
-import CategoriesSettings from "./pages/CategoriesSettings";
-import AuditLogsSettings from "./pages/AuditLogsSettings";
-import BackupSettings from "./pages/BackupSettings";
-import ItemDetail from "./pages/ItemDetail";
-import Trash from "./pages/Trash";
-import ShareAccess from "./pages/ShareAccess";
-import Shares from "./pages/Shares";
-import ImportData from "./pages/ImportData";
-import AppLayout from "./components/Layout";
-import PWAUpdater from "./components/PWAUpdater";
-import ScreenshotProtection from "./components/ScreenshotProtection";
+import { useAuthRedirect } from "./src/hooks/useAuthRedirect";
+import AppLayout from "./src/components/Layout";
+import PWAUpdater from "./src/components/PWAUpdater";
+import ScreenshotProtection from "./src/components/ScreenshotProtection";
+
+const LoginV2 = React.lazy(() => import("./src/pages/LoginV2"));
+const OnboardingFlow = React.lazy(() => import("./src/components/OnboardingFlow"));
+const Items = React.lazy(() => import("./src/pages/Items"));
+const Vaults = React.lazy(() => import("./src/pages/Vaults"));
+const Guardian = React.lazy(() => import("./src/pages/Guardian"));
+const Settings = React.lazy(() => import("./src/pages/Settings"));
+const NotificationsSettings = React.lazy(() => import("./src/pages/NotificationsSettings"));
+const CategoriesSettings = React.lazy(() => import("./src/pages/CategoriesSettings"));
+const AuditLogsSettings = React.lazy(() => import("./src/pages/AuditLogsSettings"));
+const BackupSettings = React.lazy(() => import("./src/pages/BackupSettings"));
+const ItemDetail = React.lazy(() => import("./src/pages/ItemDetail"));
+const Trash = React.lazy(() => import("./src/pages/Trash"));
+const ShareAccess = React.lazy(() => import("./src/pages/ShareAccess"));
+const Shares = React.lazy(() => import("./src/pages/Shares"));
+const ImportData = React.lazy(() => import("./src/pages/ImportData"));
 
 // --- Color Palettes ---
 const COLOR_PALETTES: Record<AccentColor, Record<string, string>> = {
@@ -201,6 +202,8 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   );
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
+  const { isUnlocked } = useAuthStore();
+
   const refreshData = useCallback(() => {
     setAllItems(storageService.getItems());
     setAllVaults(storageService.getVaults());
@@ -210,8 +213,10 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     // Sync notifications from remote if user exists
     const { user } = useAuthStore.getState();
     if (user && user.id) {
-      notificationService.syncNotifications(user.id).then((notifs) => {
-        setNotifications(notifs);
+      import("./src/services/notificationService").then(({ default: notificationService }) => {
+        notificationService.syncNotifications(user.id).then((notifs) => {
+          setNotifications(notifs);
+        });
       });
     } else {
       // Fallback to local only if absolutely no user yet (e.g. login screen)
@@ -224,6 +229,16 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     refreshData();
   }, [refreshData]);
+
+  // Re-sync notifications after unlock so login-time notifications (new device, etc.) are visible
+  useEffect(() => {
+    if (!isUnlocked) return;
+    const { user } = useAuthStore.getState();
+    if (!user?.id) return;
+    import("./src/services/notificationService").then(({ default: notificationService }) => {
+      notificationService.syncNotifications(user.id).then(setNotifications);
+    });
+  }, [isUnlocked]);
 
   // Check system health on load (Expiry, Backup)
   useEffect(() => {
@@ -336,28 +351,26 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     const { user } = useAuthStore.getState();
     if (!user || !user.id) return;
 
-    // Use Service
-    notificationService
-      .sendNotification(
-        user.id,
-        type,
-        title,
-        message,
-        currentSettings.notifications
-      )
-      .then((newNotif) => {
-        // Update local state immediately for UI responsiveness
-        if (newNotif) {
-          setNotifications((prev) => [newNotif, ...prev]);
-          // Sync to local storage for offline viewing if desired,
-          // reusing the service's sync logic or simple cache
-          const updated = [
-            newNotif,
-            ...storageService.getNotifications(),
-          ].slice(0, 50);
-          storageService.saveNotifications(updated);
-        }
-      });
+    import("./src/services/notificationService").then(({ default: notificationService }) => {
+      notificationService
+        .sendNotification(
+          user.id,
+          type,
+          title,
+          message,
+          currentSettings.notifications
+        )
+        .then((newNotif) => {
+          if (newNotif) {
+            setNotifications((prev) => [newNotif, ...prev]);
+            const updated = [
+              newNotif,
+              ...storageService.getNotifications(),
+            ].slice(0, 50);
+            storageService.saveNotifications(updated);
+          }
+        });
+    });
   };
 
   const markNotificationsRead = () => {
@@ -368,11 +381,12 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     // Sync mark read to server
     const { user } = useAuthStore.getState();
     if (user && user.id) {
-      updated
-        .filter((n) => !n.read)
-        .forEach((n) => {
-          notificationService.markAsRead(user.id, n.id);
+      const unread = notifications.filter((n) => !n.read);
+      if (unread.length > 0) {
+        import("./src/services/notificationService").then(({ default: notificationService }) => {
+          unread.forEach((n) => notificationService.markAsRead(user.id, n.id));
         });
+      }
     }
   };
 
@@ -382,7 +396,9 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     storageService.saveNotifications([]);
     const { user } = useAuthStore.getState();
     if (user && user.id) {
-      notificationService.clearAll(user.id);
+      import("./src/services/notificationService").then(({ default: notificationService }) => {
+        notificationService.clearAll(user.id);
+      });
     }
   };
 
@@ -686,7 +702,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = () => {
     setIsAuthenticated(false);
-    navigate("/login");
+    navigate("/", { replace: true });
   };
 
   const updateUserProfile = (updates: Partial<UserProfile>) => {
@@ -717,45 +733,56 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 // --- Main App Logic ---
 
 const AppRoutes = () => {
-  const { user, isUnlocked } = useAuthStore();
+  const appView = useAuthRedirect();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (appView === "app" && location.pathname === "/") {
+      // Just unlocked — push into the app
+      navigate("/vaults", { replace: true });
+    } else if ((appView === "login" || appView === "onboarding") && location.pathname !== "/") {
+      // Locked/signed-out — collapse history to root so back button can't reach vault pages
+      navigate("/", { replace: true });
+    }
+  }, [appView, location.pathname, navigate]);
 
   // Allow share route without authentication
   if (location.pathname.startsWith("/share/")) {
     return (
-      <Routes>
-        <Route path="/share/:token" element={<ShareAccess />} />
-      </Routes>
+      <React.Suspense fallback={null}>
+        <Routes>
+          <Route path="/share/:token" element={<ShareAccess />} />
+        </Routes>
+      </React.Suspense>
     );
   }
 
-  // If not authenticated or not unlocked, show Login
-  if (!user || !isUnlocked) {
-    return <Login />;
-  }
+  if (appView === "login") return <React.Suspense fallback={null}><LoginV2 /></React.Suspense>;
+  if (appView === "onboarding") return <React.Suspense fallback={null}><OnboardingFlow onDone={() => {}} /></React.Suspense>;
+  if (appView !== "app") return null;
 
   return (
-    <Routes>
-      <Route path="/" element={<AppLayout />}>
-        <Route index element={<Navigate to="/vaults" replace />} />
-        <Route path="vaults" element={<Vaults />} />
-        <Route path="items" element={<Items />} />
-        <Route path="items/:itemId" element={<ItemDetail />} />
-        <Route path="items/new" element={<ItemDetail isNew />} />
-        <Route path="guardian" element={<Guardian />} />
-        <Route path="settings" element={<Settings />} />
-        <Route
-          path="settings/notifications"
-          element={<NotificationsSettings />}
-        />
-        <Route path="settings/categories" element={<CategoriesSettings />} />
-        <Route path="settings/audit-logs" element={<AuditLogsSettings />} />
-        <Route path="settings/backup" element={<BackupSettings />} />
-        <Route path="import" element={<ImportData />} />
-        <Route path="trash" element={<Trash />} />
-        <Route path="shares" element={<Shares />} />
-      </Route>
-    </Routes>
+    <React.Suspense fallback={null}>
+      <Routes>
+        <Route path="/" element={<AppLayout />}>
+          <Route index element={<Navigate to="/vaults" replace />} />
+          <Route path="vaults" element={<Vaults />} />
+          <Route path="items" element={<Items />} />
+          <Route path="items/:itemId" element={<ItemDetail />} />
+          <Route path="items/new" element={<ItemDetail isNew />} />
+          <Route path="guardian" element={<Guardian />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="settings/notifications" element={<NotificationsSettings />} />
+          <Route path="settings/categories" element={<CategoriesSettings />} />
+          <Route path="settings/audit-logs" element={<AuditLogsSettings />} />
+          <Route path="settings/backup" element={<BackupSettings />} />
+          <Route path="import" element={<ImportData />} />
+          <Route path="trash" element={<Trash />} />
+          <Route path="shares" element={<Shares />} />
+        </Route>
+      </Routes>
+    </React.Suspense>
   );
 };
 

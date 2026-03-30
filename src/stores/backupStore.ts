@@ -58,7 +58,7 @@ export const useBackupStore = create<BackupState & BackupActions>((set, get) => 
 
       if (file.name.endsWith('.hkb')) {
         if (!pin) throw new Error('PIN required for HKB restore')
-        const authStore = await import('./authStore')
+        const authStore = await import('./auth')
         const masterKey = authStore.useAuthStore.getState().masterKey
         if (!masterKey) throw new Error('Master key not available')
 

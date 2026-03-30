@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import AttachmentsService, { FileMetadata } from '../services/attachmentsService';
-import { useAuthStore } from '../stores/authStore';
+import { useAuthStore } from '../stores/auth';
 
 export const useAttachments = (itemId: string) => {
   const { masterKey } = useAuthStore();
