@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Cloud, CloudOff, RefreshCw, AlertCircle } from 'lucide-react';
 import { useVaultStore } from '../stores/vaultStore';
-import SyncService from '../services/syncService';
 
 const SyncStatus: React.FC = () => {
   const { isOnline } = useVaultStore();
@@ -10,6 +9,7 @@ const SyncStatus: React.FC = () => {
 
   useEffect(() => {
     const updateStatus = async () => {
+      const { default: SyncService } = await import('../services/syncService');
       const status = await SyncService.getSyncStatus();
       setSyncStatus(status);
       if (status.pending === 0 && !status.syncing && isOnline) {

@@ -14,7 +14,6 @@ import RateLimiterService from "../services/rateLimiter";
 import IntegrityCheckerService from "../services/integrityChecker";
 import { BiometricService } from "../services/biometric";
 import { SoundService } from "../services/soundService";
-import notificationService from "../services/notificationService";
 import { NotificationType } from "../../types";
 
 interface User {
@@ -293,6 +292,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
               await DatabaseService.logActivity(user.id, "FAILED_LOGIN", `Failed PIN attempt #${newFailedAttempts} from ${deviceName}`);
               const settings = await DatabaseService.getUserSettings(user.id);
               if (settings) {
+                const { default: notificationService } = await import("../services/notificationService");
                 notificationService.sendNotification(user.id, NotificationType.SECURITY, "Failed Login Attempt", `A failed login attempt was detected from ${deviceName}.`, settings.notifications);
               }
             } catch { /* offline */ }
@@ -366,6 +366,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
               await DatabaseService.logActivity(user.id, "FAILED_LOGIN", `Failed biometric attempt #${newFailedAttempts} from ${deviceName}`);
               const settings = await DatabaseService.getUserSettings(user.id);
               if (settings) {
+                const { default: notificationService } = await import("../services/notificationService");
                 notificationService.sendNotification(user.id, NotificationType.SECURITY, "Failed Login Attempt", `A failed biometric login attempt was detected from ${deviceName}.`, settings.notifications);
               }
             } catch { /* offline */ }
@@ -410,6 +411,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             try {
               const settings = await DatabaseService.getUserSettings(user.id);
               if (settings) {
+                const { default: notificationService } = await import("../services/notificationService");
                 notificationService.sendNotification(user.id, NotificationType.SECURITY, "New Device Detected", `Your account was accessed from a new device: ${deviceName}.`, settings.notifications);
               }
             } catch { /* ignore */ }

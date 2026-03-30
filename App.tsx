@@ -32,28 +32,27 @@ import {
   requestNotificationPermission,
   requestClipboardPermission,
 } from "./src/services/pwa";
-import notificationService from "./src/services/notificationService";
 import { supabase } from "./src/supabaseClient";
-import LoginV2 from "./src/pages/LoginV2";
-import OnboardingFlow from "./src/components/OnboardingFlow";
 import { useAuthRedirect } from "./src/hooks/useAuthRedirect";
-import Dashboard from "./src/pages/Dashboard";
-import Items from "./src/pages/Items";
-import Vaults from "./src/pages/Vaults";
-import Guardian from "./src/pages/Guardian";
-import Settings from "./src/pages/Settings";
-import NotificationsSettings from "./src/pages/NotificationsSettings";
-import CategoriesSettings from "./src/pages/CategoriesSettings";
-import AuditLogsSettings from "./src/pages/AuditLogsSettings";
-import BackupSettings from "./src/pages/BackupSettings";
-import ItemDetail from "./src/pages/ItemDetail";
-import Trash from "./src/pages/Trash";
-import ShareAccess from "./src/pages/ShareAccess";
-import Shares from "./src/pages/Shares";
-import ImportData from "./src/pages/ImportData";
 import AppLayout from "./src/components/Layout";
 import PWAUpdater from "./src/components/PWAUpdater";
 import ScreenshotProtection from "./src/components/ScreenshotProtection";
+
+const LoginV2 = React.lazy(() => import("./src/pages/LoginV2"));
+const OnboardingFlow = React.lazy(() => import("./src/components/OnboardingFlow"));
+const Items = React.lazy(() => import("./src/pages/Items"));
+const Vaults = React.lazy(() => import("./src/pages/Vaults"));
+const Guardian = React.lazy(() => import("./src/pages/Guardian"));
+const Settings = React.lazy(() => import("./src/pages/Settings"));
+const NotificationsSettings = React.lazy(() => import("./src/pages/NotificationsSettings"));
+const CategoriesSettings = React.lazy(() => import("./src/pages/CategoriesSettings"));
+const AuditLogsSettings = React.lazy(() => import("./src/pages/AuditLogsSettings"));
+const BackupSettings = React.lazy(() => import("./src/pages/BackupSettings"));
+const ItemDetail = React.lazy(() => import("./src/pages/ItemDetail"));
+const Trash = React.lazy(() => import("./src/pages/Trash"));
+const ShareAccess = React.lazy(() => import("./src/pages/ShareAccess"));
+const Shares = React.lazy(() => import("./src/pages/Shares"));
+const ImportData = React.lazy(() => import("./src/pages/ImportData"));
 
 // --- Color Palettes ---
 const COLOR_PALETTES: Record<AccentColor, Record<string, string>> = {
@@ -212,8 +211,10 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     // Sync notifications from remote if user exists
     const { user } = useAuthStore.getState();
     if (user && user.id) {
-      notificationService.syncNotifications(user.id).then((notifs) => {
-        setNotifications(notifs);
+      import("./src/services/notificationService").then(({ default: notificationService }) => {
+        notificationService.syncNotifications(user.id).then((notifs) => {
+          setNotifications(notifs);
+        });
       });
     } else {
       // Fallback to local only if absolutely no user yet (e.g. login screen)
@@ -338,28 +339,26 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     const { user } = useAuthStore.getState();
     if (!user || !user.id) return;
 
-    // Use Service
-    notificationService
-      .sendNotification(
-        user.id,
-        type,
-        title,
-        message,
-        currentSettings.notifications
-      )
-      .then((newNotif) => {
-        // Update local state immediately for UI responsiveness
-        if (newNotif) {
-          setNotifications((prev) => [newNotif, ...prev]);
-          // Sync to local storage for offline viewing if desired,
-          // reusing the service's sync logic or simple cache
-          const updated = [
-            newNotif,
-            ...storageService.getNotifications(),
-          ].slice(0, 50);
-          storageService.saveNotifications(updated);
-        }
-      });
+    import("./src/services/notificationService").then(({ default: notificationService }) => {
+      notificationService
+        .sendNotification(
+          user.id,
+          type,
+          title,
+          message,
+          currentSettings.notifications
+        )
+        .then((newNotif) => {
+          if (newNotif) {
+            setNotifications((prev) => [newNotif, ...prev]);
+            const updated = [
+              newNotif,
+              ...storageService.getNotifications(),
+            ].slice(0, 50);
+            storageService.saveNotifications(updated);
+          }
+        });
+    });
   };
 
   const markNotificationsRead = () => {
@@ -370,11 +369,11 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     // Sync mark read to server
     const { user } = useAuthStore.getState();
     if (user && user.id) {
-      updated
-        .filter((n) => !n.read)
-        .forEach((n) => {
+      import("./src/services/notificationService").then(({ default: notificationService }) => {
+        updated.filter((n) => !n.read).forEach((n) => {
           notificationService.markAsRead(user.id, n.id);
         });
+      });
     }
   };
 
@@ -384,7 +383,9 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
     storageService.saveNotifications([]);
     const { user } = useAuthStore.getState();
     if (user && user.id) {
-      notificationService.clearAll(user.id);
+      import("./src/services/notificationService").then(({ default: notificationService }) => {
+        notificationService.clearAll(user.id);
+      });
     }
   };
 
@@ -736,38 +737,39 @@ const AppRoutes = () => {
   // Allow share route without authentication
   if (location.pathname.startsWith("/share/")) {
     return (
-      <Routes>
-        <Route path="/share/:token" element={<ShareAccess />} />
-      </Routes>
+      <React.Suspense fallback={null}>
+        <Routes>
+          <Route path="/share/:token" element={<ShareAccess />} />
+        </Routes>
+      </React.Suspense>
     );
   }
 
-  if (appView === "login") return <LoginV2 />;
-  if (appView === "onboarding") return <OnboardingFlow onDone={() => {}} />;
+  if (appView === "login") return <React.Suspense fallback={null}><LoginV2 /></React.Suspense>;
+  if (appView === "onboarding") return <React.Suspense fallback={null}><OnboardingFlow onDone={() => {}} /></React.Suspense>;
   if (appView !== "app") return null;
 
   return (
-    <Routes>
-      <Route path="/" element={<AppLayout />}>
-        <Route index element={<Navigate to="/vaults" replace />} />
-        <Route path="vaults" element={<Vaults />} />
-        <Route path="items" element={<Items />} />
-        <Route path="items/:itemId" element={<ItemDetail />} />
-        <Route path="items/new" element={<ItemDetail isNew />} />
-        <Route path="guardian" element={<Guardian />} />
-        <Route path="settings" element={<Settings />} />
-        <Route
-          path="settings/notifications"
-          element={<NotificationsSettings />}
-        />
-        <Route path="settings/categories" element={<CategoriesSettings />} />
-        <Route path="settings/audit-logs" element={<AuditLogsSettings />} />
-        <Route path="settings/backup" element={<BackupSettings />} />
-        <Route path="import" element={<ImportData />} />
-        <Route path="trash" element={<Trash />} />
-        <Route path="shares" element={<Shares />} />
-      </Route>
-    </Routes>
+    <React.Suspense fallback={null}>
+      <Routes>
+        <Route path="/" element={<AppLayout />}>
+          <Route index element={<Navigate to="/vaults" replace />} />
+          <Route path="vaults" element={<Vaults />} />
+          <Route path="items" element={<Items />} />
+          <Route path="items/:itemId" element={<ItemDetail />} />
+          <Route path="items/new" element={<ItemDetail isNew />} />
+          <Route path="guardian" element={<Guardian />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="settings/notifications" element={<NotificationsSettings />} />
+          <Route path="settings/categories" element={<CategoriesSettings />} />
+          <Route path="settings/audit-logs" element={<AuditLogsSettings />} />
+          <Route path="settings/backup" element={<BackupSettings />} />
+          <Route path="import" element={<ImportData />} />
+          <Route path="trash" element={<Trash />} />
+          <Route path="shares" element={<Shares />} />
+        </Route>
+      </Routes>
+    </React.Suspense>
   );
 };
 
