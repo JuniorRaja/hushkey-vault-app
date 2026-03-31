@@ -555,6 +555,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                 // Sync originalPassword to the new value so repeated edits
                 // in the same session still detect further password changes.
                 setOriginalPassword(finalData.password);
+                // Sync formData with the updated data (including new passwordLastModified)
+                // so getExpiryText() reflects the reset expiry countdown immediately.
+                setFormData(prev => ({ ...prev, faviconData, data: finalData as any }));
                 setIsEditing(false);
             }
         } catch (error) {
