@@ -386,7 +386,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           }
         }
 
-        SoundService.playLockSound();
+        SoundService.playVaultLock();
 
         set({
           masterKey: null,
@@ -437,7 +437,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           user.id,
           masterKey
         );
-        SoundService.playLockSound();
+        SoundService.playVaultUnlock();
 
         set({
           masterKey,
@@ -535,7 +535,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           // Record successful attempt
           RateLimiterService.recordSuccessfulAttempt(user.id);
 
-          SoundService.playLockSound();
+          SoundService.playVaultUnlock();
 
           set({
             masterKey,
@@ -668,7 +668,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           // Record successful attempt
           RateLimiterService.recordSuccessfulAttempt(user.id);
 
-          SoundService.playLockSound();
+          SoundService.playVaultUnlock();
 
           set({
             masterKey,

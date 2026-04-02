@@ -169,7 +169,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             try { await DatabaseService.logActivity(user.id, "LOCK", "Vault locked"); } catch { /* offline */ }
           }
         }
-        SoundService.playLockSound();
+        SoundService.playVaultLock();
         set({ masterKey: null, isUnlocked: false, lastActivity: Date.now() });
       },
 
@@ -198,7 +198,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         await IndexedDBService.saveSettings(user.id, settings);
 
         const userName = await DatabaseService.getUserProfileName(user.id, masterKey);
-        SoundService.playLockSound();
+        SoundService.playVaultUnlock();
 
         set({
           masterKey,
@@ -254,7 +254,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           }
 
           RateLimiterService.recordSuccessfulAttempt(user.id);
-          SoundService.playLockSound();
+          SoundService.playVaultUnlock();
 
           set({
             masterKey,
@@ -330,7 +330,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           }
 
           RateLimiterService.recordSuccessfulAttempt(user.id);
-          SoundService.playLockSound();
+          SoundService.playVaultUnlock();
 
           set({
             masterKey,

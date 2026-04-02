@@ -1,7 +1,9 @@
-const newLockSound = new Audio('/sounds/lock-sound.mp3');
 const trashSound = new Audio('/sounds/trash.mp3');
+const vaultUnlockSound = new Audio('/sounds/vault-unlock.mp3');
+const vaultLockSound = new Audio('/sounds/vault-lock.mp3');
 
 export const SoundService = {
-  playLockSound : () => newLockSound.play().catch(() => {}),
-  playTrash: () => trashSound.play().catch(() => {})
+  playTrash: () => trashSound.play().catch(() => {}),
+  playVaultUnlock: () => vaultUnlockSound.play().catch(() => {}),
+  playVaultLock: () => vaultLockSound.play().catch(() => {})
 };
