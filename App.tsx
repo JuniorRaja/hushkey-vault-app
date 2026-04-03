@@ -737,17 +737,9 @@ const AppRoutes = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (appView === "app" && location.pathname === "/") {
-      // Just unlocked — push into the app
-      navigate("/vaults", { replace: true });
-    } else if ((appView === "login" || appView === "onboarding") && location.pathname !== "/") {
-      // Locked/signed-out — collapse history to root so back button can't reach vault pages
-      navigate("/", { replace: true });
-    }
-  }, [appView, location.pathname, navigate]);
-
-  // Allow share route without authentication
+  // Allow share route without authentication - check BEFORE any redirects
+  // Note: With HashRouter, location.pathname contains the route path (e.g., "/share/token")
+  // The encryption key is stored in window.location.hash after the route
   if (location.pathname.startsWith("/share/")) {
     return (
       <React.Suspense fallback={null}>
@@ -757,6 +749,16 @@ const AppRoutes = () => {
       </React.Suspense>
     );
   }
+
+  useEffect(() => {
+    if (appView === "app" && location.pathname === "/") {
+      // Just unlocked — push into the app
+      navigate("/vaults", { replace: true });
+    } else if ((appView === "login" || appView === "onboarding") && location.pathname !== "/") {
+      // Locked/signed-out — collapse history to root so back button can't reach vault pages
+      navigate("/", { replace: true });
+    }
+  }, [appView, location.pathname, navigate]);
 
   if (appView === "login") return <React.Suspense fallback={null}><LoginV2 /></React.Suspense>;
   if (appView === "onboarding") return <React.Suspense fallback={null}><OnboardingFlow onDone={() => {}} /></React.Suspense>;
