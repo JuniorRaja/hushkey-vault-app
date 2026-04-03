@@ -15,6 +15,7 @@ const ShareAccess: React.FC = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [requiresPassword, setRequiresPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
 
   useEffect(() => {
@@ -43,7 +44,10 @@ const ShareAccess: React.FC = () => {
       setData(shareData)
       setLoading(false)
     } catch (err: any) {
-      if (err.message.includes('password')) {
+      if (err.message.toLowerCase().includes('incorrect password')) {
+        setPasswordError('Incorrect password')
+        setLoading(false)
+      } else if (err.message.toLowerCase().includes('password')) {
         setRequiresPassword(true)
         setLoading(false)
       } else if (err.message.includes('encryption key')) {
@@ -60,6 +64,7 @@ const ShareAccess: React.FC = () => {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setPasswordError('')
     await loadShare()
   }
 
@@ -146,6 +151,9 @@ const ShareAccess: React.FC = () => {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+              {passwordError && (
+                <p className="text-red-500 text-sm">{passwordError}</p>
+              )}
               
               <button
                 type="submit"

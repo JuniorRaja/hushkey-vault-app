@@ -158,7 +158,8 @@ export const useShareStore = create<ShareState & ShareActions>((set, get) => ({
     if (share.max_views && share.view_count >= share.max_views)
       throw new Error("Maximum views reached");
 
-    if (share.password_protected && password) {
+    if (share.password_protected) {
+      if (!password) throw new Error("Password required");
       const passwordHash = await ShareEncryptionService.hashPassword(password);
       if (passwordHash !== share.password_hash)
         throw new Error("Incorrect password");
