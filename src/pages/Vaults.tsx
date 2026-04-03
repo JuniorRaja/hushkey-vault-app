@@ -36,6 +36,7 @@ import VaultModal from "../components/VaultModal";
 import ShareModal from "../components/ShareModal";
 import ShareManagement from "../components/ShareManagement";
 import ConfirmationModal from "../components/ConfirmationModal";
+import { formatRelativeDate } from '../utils/dateUtils';
 
 const ItemTypeIcon = ({ type, size = 20 }: { type: string; size?: number }) => {
   switch (type) {
@@ -452,7 +453,7 @@ const Vaults: React.FC = () => {
                         {vault.name}
                       </h3>
                       <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
-                        Updated today
+                        Last Updated{formatRelativeDate(vault.updatedAt ?? vault.createdAt)}
                       </p>
                     </div>
                   </div>

@@ -24,6 +24,7 @@ export interface Vault {
   description?: string;
   icon: string;
   createdAt: string;
+  updatedAt?: string;
   itemCount: number;
   isShared: boolean;
   sharedWith: string[];

@@ -14,6 +14,7 @@ import { checkUrlSupports2FA } from '../services/twoFactorChecker';
 import { generateWifiQR } from '../services/wifiDetector';
 import { QRCodeSVG } from 'qrcode.react';
 import ShareModal from '../components/ShareModal';
+import { formatDate } from '../utils/dateUtils';
 import ConfirmationModal from '../components/ConfirmationModal';
 import MoveToVaultModal from '../components/MoveToVaultModal';
 import TotpSetupModal from '../components/TotpSetupModal';
@@ -2246,7 +2247,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                         )}
                                         {!isEditing && formData.lastUpdated && (
                                             <span className="text-xs text-gray-600 flex items-center gap-1">
-                                                <Clock size={12} /> Updated {new Date(formData.lastUpdated).toLocaleDateString()}
+                                                <Clock size={12} /> Updated {formatDate(formData.lastUpdated)}
                                             </span>
                                         )}
                                     </div>
@@ -2413,13 +2414,13 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 {formData.lastUpdated && (
                                     <div className="flex justify-between">
                                         <span>Last Modified</span>
-                                        <span>{new Date(formData.lastUpdated).toLocaleDateString()}</span>
+                                        <span>{formatDate(formData.lastUpdated)}</span>
                                     </div>
                                 )}
                                 {formData.data?.passwordLastModified && (
                                     <div className="flex justify-between">
                                         <span>Password Changed</span>
-                                        <span>{new Date(formData.data.passwordLastModified).toLocaleDateString()}</span>
+                                        <span>{formatDate(formData.data.passwordLastModified)}</span>
                                     </div>
                                 )}
                             </div>

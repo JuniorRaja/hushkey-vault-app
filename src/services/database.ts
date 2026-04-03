@@ -219,6 +219,7 @@ class DatabaseService {
           : undefined,
         icon: vault.icon,
         createdAt: vault.created_at,
+        updatedAt: vault.updated_at,
         itemCount: 0, // Will be populated separately
         isShared: vault.is_shared,
         sharedWith: vault.shared_with || [],

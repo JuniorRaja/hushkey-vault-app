@@ -18,7 +18,7 @@ import {
     ChevronRight, ExternalLink, Lightbulb, TrendingDown, TrendingUp,
     CheckCircle, XCircle, Clock, Eye, Settings
 } from 'lucide-react';
-import ConfirmationModal from '../components/ConfirmationModal';
+import { formatRelativeDate } from '../utils/dateUtils';
 import { FindingsManager } from '../components/FindingsManager';
 import { ScanHistory } from '../components/ScanHistory';
 
@@ -594,23 +594,7 @@ const Guardian: React.FC = () => {
   const [scanModalOpen, setScanModalOpen] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
   
-  // Calculate relative time from lastScan
-  const getRelativeTime = (date: string | undefined) => {
-    if (!date) return 'Never';
-    const now = Date.now();
-    const scanTime = new Date(date).getTime();
-    const diff = now - scanTime;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
-  };
-  
-  const lastScanTime = getRelativeTime(lastScan?.scanDate);
+  const lastScanTime = formatRelativeDate(lastScan?.scanDate);
 
   // Detail View State
   const [detailViewId, setDetailViewId] = useState<KpiId | null>(null);
@@ -822,15 +806,7 @@ const Guardian: React.FC = () => {
     if (items.length > 0) fetchAttachments();
   }, [user]);
 
-  const getSessionStatus = (lastSeen: string) => {
-    const diff = Date.now() - new Date(lastSeen).getTime();
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 5) return 'Active Now';
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
-  };
+  const getSessionStatus = (lastSeen: string) => formatRelativeDate(lastSeen);
 
   const handleTerminateSession = async (sessionId: string) => {
     try {

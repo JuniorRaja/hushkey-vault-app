@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Link2, Eye, Clock, Trash2, Copy, Check, AlertCircle, Lock, Calendar, ExternalLink, ArrowLeft, Filter } from 'lucide-react'
+import { formatDate } from '../utils/dateUtils'
 import { useShareStore } from '../stores/shareStore'
 import { useAuthStore } from '../stores/auth'
 
@@ -106,7 +107,7 @@ const Shares: React.FC = () => {
                       <h3 className="text-white font-medium">Share #{share.shareToken.substring(0, 12)}</h3>
                       <span className={`px-2 py-0.5 text-xs rounded-full ${status.class}`}>{status.text}</span>
                     </div>
-                    <p className="text-xs text-gray-500">Created {new Date(share.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-gray-500">Created {formatDate(share.createdAt)}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs mb-3">
@@ -116,7 +117,7 @@ const Shares: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-1.5 text-gray-400">
                     <Clock size={14} />
-                    <span>{share.expiresAt ? new Date(share.expiresAt).toLocaleDateString() : 'No expiry'}</span>
+                    <span>{share.expiresAt ? formatDate(share.expiresAt) : 'No expiry'}</span>
                   </div>
                 </div>
                 <div className="flex gap-2 mt-auto pt-3 border-t border-gray-800">

@@ -3,6 +3,7 @@ import { useData } from '../../App';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Folder, Briefcase, CreditCard, User, ChevronRight, MoreVertical, Edit2, Share2, Trash2, Shield, Star, Globe, StickyNote, Wifi, FileText, Landmark, RectangleHorizontal, Database, Server, Terminal, IdCard } from 'lucide-react';
 import { Vault, Item, ItemType } from '../../types';
+import { formatRelativeDate } from '../utils/dateUtils';
 import VaultModal from '../components/VaultModal';
 import ShareModal from '../components/ShareModal';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -168,7 +169,7 @@ const Dashboard: React.FC = () => {
             
             {/* Merged Footer into Card Body */}
             <div className="flex items-center justify-between mt-auto">
-                <span className="text-[10px] text-gray-600 font-medium">Last updated today</span>
+                <span className="text-[10px] text-gray-600 font-medium">Last updated{' '}{formatRelativeDate(vault.updatedAt ?? vault.createdAt)}</span>
                 <ChevronRight size={14} className="text-gray-700 group-hover:text-primary-400 transition-colors opacity-50 group-hover:opacity-100" />
             </div>
           </div>
