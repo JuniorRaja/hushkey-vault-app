@@ -30,6 +30,9 @@ interface ShareActions {
   fetchShares: (userId: string) => Promise<void>;
   revokeShare: (shareId: string) => Promise<void>;
   accessShare: (token: string, key: string, password?: string) => Promise<any>;
+  fetchShareMetadata: (token: string) => Promise<any>;
+  verifyPasswordAndDecrypt: (share: any, key: string, password?: string) => Promise<any>;
+  recordShareAccess: (shareId: string, oneTimeAccess: boolean) => Promise<void>;
   getShareUrl: (shareId: string, masterKey: Uint8Array) => Promise<string>;
 }
 
@@ -191,6 +194,69 @@ export const useShareStore = create<ShareState & ShareActions>((set, get) => ({
     });
 
     return decryptedData;
+  },
+
+  fetchShareMetadata: async (token) => {
+    const { data: shares, error } = await supabase
+      .from("shares")
+      .select("*")
+      .eq("share_token", token);
+
+    if (error) throw error;
+    if (!shares || shares.length === 0) throw new Error("Share not found");
+
+    const share = shares[0];
+    if (share.revoked) throw new Error("Share has been revoked");
+    if (share.expires_at && new Date(share.expires_at) < new Date())
+      throw new Error("Share has expired");
+    if (share.max_views && share.view_count >= share.max_views)
+      throw new Error("Maximum views reached");
+
+    return share;
+  },
+
+  verifyPasswordAndDecrypt: async (share, key, password) => {
+    if (share.password_protected) {
+      if (!password) throw new Error("Password required");
+      const passwordHash = await ShareEncryptionService.hashPassword(password);
+      if (passwordHash !== share.password_hash)
+        throw new Error("Incorrect password");
+    }
+
+    const shareKey = ShareEncryptionService.stringToShareKey(key);
+    const decryptedData = await ShareEncryptionService.decryptShare(
+      share.encrypted_data,
+      shareKey
+    );
+
+    return decryptedData;
+  },
+
+  recordShareAccess: async (shareId, oneTimeAccess) => {
+    const now = new Date().toISOString();
+    const { data: currentShare } = await supabase
+      .from("shares")
+      .select("view_count")
+      .eq("id", shareId)
+      .single();
+
+    const updateData: any = {
+      view_count: (currentShare?.view_count || 0) + 1,
+      last_accessed_at: now,
+    };
+
+    if (oneTimeAccess) {
+      updateData.revoked = true;
+      updateData.revoked_at = now;
+    }
+
+    await supabase.from("shares").update(updateData).eq("id", shareId);
+
+    await supabase.from("share_access_logs").insert({
+      share_id: shareId,
+      accessed_at: now,
+      access_granted: true,
+    });
   },
 
   getShareUrl: async (shareId, masterKey) => {

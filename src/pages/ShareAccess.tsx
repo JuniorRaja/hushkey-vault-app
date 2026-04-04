@@ -6,7 +6,7 @@ import { Item, ItemType } from '../../types'
 
 const ShareAccess: React.FC = () => {
   const { token } = useParams<{ token: string }>()
-  const { accessShare } = useShareStore()
+  const { fetchShareMetadata, verifyPasswordAndDecrypt, recordShareAccess } = useShareStore()
 
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -17,12 +17,14 @@ const ShareAccess: React.FC = () => {
   const [requiresPassword, setRequiresPassword] = useState(false)
   const [passwordError, setPasswordError] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
+  const [shareMetadata, setShareMetadata] = useState<any>(null)
+  const [encryptionKey, setEncryptionKey] = useState<string | null>(null)
 
   useEffect(() => {
-    loadShare()
+    loadShareMetadata()
   }, [token])
 
-  const loadShare = async () => {
+  const loadShareMetadata = async () => {
     if (!token) {
       setError('Invalid share link - missing token')
       setLoading(false)
@@ -39,22 +41,46 @@ const ShareAccess: React.FC = () => {
       return
     }
 
+    setEncryptionKey(key)
+
     try {
-      const shareData = await accessShare(token, key, password || undefined)
-      setData(shareData)
+      const share = await fetchShareMetadata(token)
+      setShareMetadata(share)
+      
+      if (share.password_protected) {
+        setRequiresPassword(true)
+        setLoading(false)
+      } else {
+        // No password required, decrypt immediately
+        await decryptAndDisplayShare(share, key)
+      }
+    } catch (err: any) {
+      if (err.message.includes('encryption key')) {
+        setError('Invalid or corrupted share link')
+      } else {
+        setError(err.message || 'Failed to access share')
+      }
       setLoading(false)
+    }
+  }
+
+  const decryptAndDisplayShare = async (share: any, key: string, pwd?: string) => {
+    try {
+      const decryptedData = await verifyPasswordAndDecrypt(share, key, pwd)
+      setData(decryptedData)
+      setLoading(false)
+      
+      // Record the access after successful decryption
+      await recordShareAccess(share.id, share.one_time_access)
     } catch (err: any) {
       if (err.message.toLowerCase().includes('incorrect password')) {
         setPasswordError('Incorrect password')
-        setLoading(false)
-      } else if (err.message.toLowerCase().includes('password')) {
-        setRequiresPassword(true)
         setLoading(false)
       } else if (err.message.includes('encryption key')) {
         setError('Invalid or corrupted share link')
         setLoading(false)
       } else {
-        setError(err.message || 'Failed to access share')
+        setError(err.message || 'Failed to decrypt share')
         setLoading(false)
       }
     }
@@ -65,7 +91,10 @@ const ShareAccess: React.FC = () => {
     setLoading(true)
     setError('')
     setPasswordError('')
-    await loadShare()
+    
+    if (shareMetadata && encryptionKey) {
+      await decryptAndDisplayShare(shareMetadata, encryptionKey, password)
+    }
   }
 
   const copyToClipboard = async (text: string, field: string) => {
