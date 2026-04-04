@@ -124,6 +124,20 @@ export default defineConfig(({ mode }) => {
       "process.env.API_KEY": JSON.stringify(env.GEMINI_API_KEY),
       "process.env.GEMINI_API_KEY": JSON.stringify(env.GEMINI_API_KEY),
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            "vendor-react": ["react", "react-dom", "react-router-dom"],
+            "vendor-supabase": ["@supabase/supabase-js"],
+            "vendor-aws": ["@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner"],
+            "vendor-charts": ["recharts"],
+            "vendor-crypto": ["dexie", "pako", "jszip"],
+            "vendor-ui": ["lucide-react", "qrcode.react"],
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "."),
