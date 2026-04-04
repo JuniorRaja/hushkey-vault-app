@@ -4,6 +4,86 @@ import { Lock, Eye, EyeOff, AlertCircle, Copy, Check, Shield, Clock, User, Credi
 import { useShareStore } from '../stores/shareStore'
 import { Item, ItemType } from '../../types'
 
+const getDetailedError = (error: string): { title: string; message: string } => {
+  const lowerError = error.toLowerCase()
+  
+  if (lowerError.includes('not found')) {
+    return {
+      title: 'Share Not Found',
+      message: 'This share link is invalid or no longer exists. Please verify the link you\'re using and try again, or contact the person who shared this with you.'
+    }
+  }
+  
+  if (lowerError.includes('expired')) {
+    return {
+      title: 'Share Expired',
+      message: 'This share link has expired and is no longer accessible. Please contact the person who shared this with you to request a new share link.'
+    }
+  }
+  
+  if (lowerError.includes('maximum views') || lowerError.includes('view limit')) {
+    return {
+      title: 'Access Limit Exceeded',
+      message: 'This share was set to be accessed a limited number of times, and that limit has been reached. Please contact the share creator for a new share link.'
+    }
+  }
+  
+  if (lowerError.includes('revoked')) {
+    return {
+      title: 'Share Revoked',
+      message: 'This share has been revoked by the person who created it. The content is no longer available. Please contact the share creator for a new link.'
+    }
+  }
+  
+  if (lowerError.includes('encryption key')) {
+    return {
+      title: 'Invalid Share Link',
+      message: 'The link you\'re using appears to be corrupted or incomplete. Make sure you copied the entire link including everything after the # symbol.'
+    }
+  }
+  
+  if (lowerError.includes('missing token')) {
+    return {
+      title: 'Invalid Share Link',
+      message: 'This share link is missing required information. Please request a new share link from the person who shared this with you.'
+    }
+  }
+  
+  return {
+    title: 'Access Denied',
+    message: error || 'An unexpected error occurred while trying to access this share. Please try again or contact the share creator.'
+  }
+}
+
+const formatRelativeTime = (dateString: string): string => {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMins / 60)
+  const diffDays = Math.floor(diffHours / 24)
+  
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+  return date.toLocaleDateString()
+}
+
+const formatExpiryTime = (dateString: string): { text: string; isUrgent: boolean } => {
+  const expiryDate = new Date(dateString)
+  const now = new Date()
+  const diffMs = expiryDate.getTime() - now.getTime()
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffHours / 24)
+  
+  if (diffMs < 0) return { text: 'Expired', isUrgent: true }
+  if (diffHours < 1) return { text: 'Expires in a few minutes', isUrgent: true }
+  if (diffHours < 24) return { text: `Expires in ${diffHours} hour${diffHours > 1 ? 's' : ''}`, isUrgent: true }
+  if (diffDays <= 7) return { text: `Expires in ${diffDays} day${diffDays > 1 ? 's' : ''}`, isUrgent: diffDays <= 2 }
+  return { text: `Expires ${expiryDate.toLocaleDateString()}`, isUrgent: false }
+}
+
 const ShareAccess: React.FC = () => {
   const { token } = useParams<{ token: string }>()
   const { fetchShareMetadata, verifyPasswordAndDecrypt, recordShareAccess } = useShareStore()
@@ -111,33 +191,34 @@ const ShareAccess: React.FC = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Shield size={48} className="text-primary-500 animate-pulse" />
-          <div className="text-white text-lg">Loading secure share...</div>
+          <Shield size={32} className="text-primary-500 animate-pulse sm:w-12 sm:h-12" />
+          <div className="text-white text-sm sm:text-lg">Loading secure share...</div>
         </div>
       </div>
     )
   }
 
   if (error) {
+    const errorDetails = getDetailedError(error)
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col">
-        <header className="p-6 border-b border-gray-800">
-          <div className="flex items-center gap-3">
-            <Shield size={32} className="text-primary-500" />
+        <header className="p-3 sm:p-6 border-b border-gray-800">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Shield size={24} className="text-primary-500 sm:w-8 sm:h-8" />
             <div>
-              <h1 className="text-xl font-bold text-white">HushKey Vault</h1>
+              <h1 className="text-base sm:text-xl font-bold text-white">HushKey Vault</h1>
               <p className="text-xs text-gray-500">Secure Password Manager</p>
             </div>
           </div>
         </header>
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full text-center">
-            <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
-            <p className="text-gray-400">{error}</p>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-8 max-w-md w-full text-center">
+            <AlertCircle size={36} className="text-red-500 mx-auto mb-3 sm:mb-4 sm:w-12 sm:h-12" />
+            <h2 className="text-lg sm:text-xl font-bold text-white mb-2">{errorDetails.title}</h2>
+            <p className="text-sm sm:text-base text-gray-400">{errorDetails.message}</p>
           </div>
         </div>
-        <footer className="p-6 border-t border-gray-800 text-center text-sm text-gray-500">
+        <footer className="p-3 sm:p-6 border-t border-gray-800 text-center text-xs sm:text-sm text-gray-500">
           <p>Secured by HushKey Vault • End-to-End Encrypted</p>
         </footer>
       </div>
@@ -147,53 +228,53 @@ const ShareAccess: React.FC = () => {
   if (requiresPassword && !data) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col">
-        <header className="p-6 border-b border-gray-800">
-          <div className="flex items-center gap-3">
-            <Shield size={32} className="text-primary-500" />
+        <header className="p-3 sm:p-6 border-b border-gray-800">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Shield size={24} className="text-primary-500 sm:w-8 sm:h-8" />
             <div>
-              <h1 className="text-xl font-bold text-white">HushKey Vault</h1>
+              <h1 className="text-base sm:text-xl font-bold text-white">HushKey Vault</h1>
               <p className="text-xs text-gray-500">Secure Password Manager</p>
             </div>
           </div>
         </header>
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full">
-            <Lock size={48} className="text-primary-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-white mb-2 text-center">Password Required</h2>
-            <p className="text-gray-400 text-center mb-6">This share is password protected</p>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl sm:rounded-2xl p-4 sm:p-8 max-w-md w-full">
+            <Lock size={36} className="text-primary-500 mx-auto mb-3 sm:mb-4 sm:w-12 sm:h-12" />
+            <h2 className="text-lg sm:text-xl font-bold text-white mb-2 text-center">Password Required</h2>
+            <p className="text-sm sm:text-base text-gray-400 text-center mb-4 sm:mb-6">This share is password protected</p>
             
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <form onSubmit={handlePasswordSubmit} className="space-y-3 sm:space-y-4">
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter password"
-                  className="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-3 text-white pr-12"
+                  className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base text-white pr-10"
                   autoFocus
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                  className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
                 >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  {showPassword ? <EyeOff size={16} className="sm:w-5 sm:h-5" /> : <Eye size={16} className="sm:w-5 sm:h-5" />}
                 </button>
               </div>
               {passwordError && (
-                <p className="text-red-500 text-sm">{passwordError}</p>
+                <p className="text-red-500 text-xs sm:text-sm">{passwordError}</p>
               )}
               
               <button
                 type="submit"
-                className="w-full py-3 bg-primary-600 hover:bg-primary-500 text-white rounded-lg font-medium transition-colors"
+                className="w-full py-2 sm:py-3 bg-primary-600 hover:bg-primary-500 text-sm sm:text-base text-white rounded-lg font-medium transition-colors"
               >
                 Access Share
               </button>
             </form>
           </div>
         </div>
-        <footer className="p-6 border-t border-gray-800 text-center text-sm text-gray-500">
+        <footer className="p-3 sm:p-6 border-t border-gray-800 text-center text-xs sm:text-sm text-gray-500">
           <p>Secured by HushKey Vault • End-to-End Encrypted</p>
         </footer>
       </div>
@@ -203,15 +284,15 @@ const ShareAccess: React.FC = () => {
   if (!data) return null
 
   const FieldDisplay = ({ label, value, field, multiline = false }: { label: string; value: string; field: string; multiline?: boolean }) => (
-    <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+    <div className="bg-gray-950 border border-gray-800 rounded-lg p-3 sm:p-4">
       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</label>
-      <div className="flex items-center justify-between mt-2">
-        <p className={`text-white ${multiline ? 'text-sm font-mono whitespace-pre-wrap' : 'text-lg'} flex-1 break-all`}>{value}</p>
+      <div className="flex items-center justify-between mt-2 gap-2">
+        <p className={`text-white ${multiline ? 'text-xs sm:text-sm font-mono whitespace-pre-wrap' : 'text-sm sm:text-lg'} flex-1 break-all`}>{value}</p>
         <button
           onClick={() => copyToClipboard(value, field)}
-          className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white ml-2 shrink-0"
+          className="p-1.5 sm:p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white shrink-0"
         >
-          {copied === field ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+          {copied === field ? <Check size={16} className="text-green-500 sm:w-4.5 sm:h-4.5" /> : <Copy size={16} className="sm:w-4.5 sm:h-4.5" />}
         </button>
       </div>
     </div>
@@ -220,24 +301,24 @@ const ShareAccess: React.FC = () => {
   const PasswordField = ({ label, value, field, multiline = false }: { label: string; value: string; field: string; multiline?: boolean }) => {
     const [show, setShow] = useState(false)
     return (
-      <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+      <div className="bg-gray-950 border border-gray-800 rounded-lg p-3 sm:p-4">
         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</label>
-        <div className="flex items-center justify-between mt-2 gap-3">
-          <p className={`text-white ${multiline ? 'text-sm' : 'text-lg'} font-mono flex-1 break-all ${multiline ? 'whitespace-pre-wrap' : ''}`}>
+        <div className="flex items-center justify-between mt-2 gap-2">
+          <p className={`text-white ${multiline ? 'text-xs sm:text-sm' : 'text-sm sm:text-lg'} font-mono flex-1 break-all ${multiline ? 'whitespace-pre-wrap' : ''}`}>
             {show ? value : '••••••••••••'}
           </p>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <button
               onClick={() => setShow(!show)}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+              className="p-1.5 sm:p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
             >
-              {show ? <EyeOff size={18} /> : <Eye size={18} />}
+              {show ? <EyeOff size={16} className="sm:w-4.5 sm:h-4.5" /> : <Eye size={16} className="sm:w-4.5 sm:h-4.5" />}
             </button>
             <button
               onClick={() => copyToClipboard(value, field)}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+              className="p-1.5 sm:p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
             >
-              {copied === field ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+              {copied === field ? <Check size={16} className="text-green-500 sm:w-4.5 sm:h-4.5" /> : <Copy size={16} className="sm:w-4.5 sm:h-4.5" />}
             </button>
           </div>
         </div>
@@ -246,17 +327,17 @@ const ShareAccess: React.FC = () => {
   }
 
   const LinkField = ({ label, value, field }: { label: string; value: string; field: string }) => (
-    <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+    <div className="bg-gray-950 border border-gray-800 rounded-lg p-3 sm:p-4">
       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</label>
-      <div className="flex items-center justify-between mt-2">
-        <a href={value} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:text-primary-300 hover:underline text-lg truncate flex-1">
+      <div className="flex items-center justify-between mt-2 gap-2">
+        <a href={value} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:text-primary-300 hover:underline text-sm sm:text-lg truncate flex-1">
           {value}
         </a>
         <button
           onClick={() => copyToClipboard(value, field)}
-          className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white ml-2"
+          className="p-1.5 sm:p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white shrink-0"
         >
-          {copied === field ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+          {copied === field ? <Check size={16} className="text-green-500 sm:w-4.5 sm:h-4.5" /> : <Copy size={16} className="sm:w-4.5 sm:h-4.5" />}
         </button>
       </div>
     </div>
@@ -264,45 +345,82 @@ const ShareAccess: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col">
-      <header className="p-6 border-b border-gray-800 bg-gray-950/50 backdrop-blur-sm">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Shield size={32} className="text-primary-500" />
-            <div>
-              <h1 className="text-xl font-bold text-white">HushKey Vault</h1>
+      <header className="p-3 sm:p-6 border-b border-gray-800 bg-gray-950/50 backdrop-blur-sm">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Shield size={24} className="text-primary-500 sm:w-8 sm:h-8 shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-xl font-bold text-white truncate">HushKey Vault</h1>
               <p className="text-xs text-gray-500">Secure Password Manager</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <Lock size={14} />
-            <span>End-to-End Encrypted</span>
+          <div className="flex items-center gap-1 sm:gap-2 text-xs text-gray-500 shrink-0">
+            <Lock size={12} className="sm:w-3.5 sm:h-3.5" />
+            <span className="hidden sm:inline">End-to-End Encrypted</span>
           </div>
         </div>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
-          <div className="bg-gradient-to-r from-primary-900/20 to-primary-800/20 border-b border-gray-800 p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-1">{data.name}</h2>
-                <div className="flex items-center gap-4 text-sm text-gray-400">
-                  <span className="flex items-center gap-1">
-                    <User size={14} />
-                    Shared {data.type}
-                  </span>
-                  {data.createdAt && (
+      <div className="flex-1 flex items-center justify-center p-3 sm:p-4">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl sm:rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
+          <div className="bg-gradient-to-r from-primary-900/20 to-primary-800/20 border-b border-gray-800 p-4 sm:p-6">
+            <div className="flex flex-row gap-3 justify-between">
+              <div className="flex items-start justify-between">
+                <div className="min-w-0">
+                  <h2 className="text-lg sm:text-2xl font-bold text-white mb-1 truncate">{data.name}</h2>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 gap-1 text-xs sm:text-sm text-gray-400">
                     <span className="flex items-center gap-1">
-                      <Clock size={14} />
-                      {new Date(data.createdAt).toLocaleDateString()}
+                      <User size={12} className="sm:w-3.5 sm:h-3.5" />
+                      Shared {data.type}
                     </span>
-                  )}
+                    {data.createdAt && (
+                      <span className="flex items-center gap-1">
+                        <Clock size={12} className="sm:w-3.5 sm:h-3.5" />
+                        {formatRelativeTime(data.createdAt)}
+                      </span>
+                    )}
+                  </div>
                 </div>
+              </div>
+              
+              {/* Metadata Badges */}
+              <div className="flex flex-wrap gap-2">
+                {shareMetadata?.password_protected && (
+                  <span className="inline-flex items-center gap-1 px-1 py-1 h-[50%] rounded-md bg-amber-500/10 text-amber-400 text-xs font-medium border border-amber-500/20">
+                    <Lock size={12} />
+                    Password Protected
+                  </span>
+                )}
+                {shareMetadata?.one_time_access && (
+                  <span className="inline-flex items-center gap-1 px-1 py-1 h-[50%] rounded-md bg-red-500/10 text-red-400 text-xs font-medium border border-red-500/20">
+                    <FileText size={12} />
+                    One-time Access
+                  </span>
+                )}
+                {shareMetadata?.expires_at && (() => {
+                  const expiry = formatExpiryTime(shareMetadata.expires_at)
+                  return (
+                    <span className={`inline-flex items-center gap-1 px-1 py-1 h-[50%] rounded-md text-xs font-medium border ${
+                      expiry.isUrgent 
+                        ? 'bg-red-500/10 text-red-400 border-red-500/20' 
+                        : 'bg-gray-800 text-gray-400 border-gray-700'
+                    }`}>
+                      <Clock size={12} />
+                      {expiry.text}
+                    </span>
+                  )
+                })()}
+                {shareMetadata?.max_views && (
+                  <span className="inline-flex items-center gap-1 px-1 py-1 h-[50%] rounded-md bg-gray-800 text-gray-400 text-xs font-medium border border-gray-700">
+                    <User size={12} />
+                    {shareMetadata.view_count || 0} / {shareMetadata.max_views} views
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="p-6 space-y-4">
+          <div className="p-3 sm:p-6 space-y-3 sm:space-y-4">
             {/* LOGIN fields */}
             {data.data?.username && <FieldDisplay label="Username" value={data.data.username} field="username" />}
             {data.data?.password && <PasswordField label="Password" value={data.data.password} field="password" />}
@@ -353,30 +471,30 @@ const ShareAccess: React.FC = () => {
             
             {/* NOTE fields */}
             {data.data?.content && (
-              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+              <div className="bg-gray-950 border border-gray-800 rounded-lg p-3 sm:p-4">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Content</label>
-                <p className="text-white mt-2 whitespace-pre-wrap leading-relaxed font-mono text-sm">{data.data.content}</p>
+                <p className="text-white mt-2 whitespace-pre-wrap leading-relaxed font-mono text-xs sm:text-sm">{data.data.content}</p>
               </div>
             )}
             
             {/* Common notes field */}
             {data.notes && (
-              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+              <div className="bg-gray-950 border border-gray-800 rounded-lg p-3 sm:p-4">
                 <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Notes</label>
-                <p className="text-white mt-2 whitespace-pre-wrap leading-relaxed">{data.notes}</p>
+                <p className="text-white mt-2 whitespace-pre-wrap leading-relaxed text-sm">{data.notes}</p>
               </div>
             )}
           </div>
 
-          <div className="bg-gray-950/50 border-t border-gray-800 p-4 text-center">
+          <div className="bg-gray-950/50 border-t border-gray-800 p-3 sm:p-4 text-center">
             <p className="text-xs text-gray-500">This share is encrypted and secure. Only you can view this content.</p>
           </div>
         </div>
       </div>
 
-      <footer className="p-6 border-t border-gray-800 bg-gray-950/50 backdrop-blur-sm">
-        <div className="max-w-4xl mx-auto text-center space-y-2">
-          <p className="text-sm text-gray-400 font-medium">Secured by HushKey Vault</p>
+      <footer className="p-3 sm:p-6 border-t border-gray-800 bg-gray-950/50 backdrop-blur-sm">
+        <div className="max-w-4xl mx-auto text-center space-y-1 sm:space-y-2">
+          <p className="text-xs sm:text-sm text-gray-400 font-medium">Secured by HushKey Vault</p>
           <p className="text-xs text-gray-600">End-to-End Encrypted • Zero-Knowledge Architecture • Open Source</p>
         </div>
       </footer>
