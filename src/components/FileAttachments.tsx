@@ -1,9 +1,10 @@
 /**
  * File Attachments Component
  * Upload, view, download, and delete file attachments
+ * Deletions are staged during editing and committed by the parent on save.
  */
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Upload,
   Download,
@@ -13,6 +14,7 @@ import {
   AlertTriangle,
   X,
   Plus,
+  Undo2,
 } from "lucide-react";
 import AttachmentsService, {
   FileMetadata,
@@ -27,6 +29,10 @@ interface FileAttachmentsProps {
   attachments: FileMetadata[];
   onAttachmentsChange: () => void;
   isEditing?: boolean;
+  /** Called whenever the set of staged-for-deletion IDs changes */
+  onPendingDeletesChange?: (ids: string[]) => void;
+  /** Parent resets this to [] after a successful save or cancel */
+  pendingDeleteIds?: string[];
 }
 
 export const FileAttachments: React.FC<FileAttachmentsProps> = ({
@@ -35,6 +41,8 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
   attachments,
   onAttachmentsChange,
   isEditing = false,
+  onPendingDeletesChange,
+  pendingDeleteIds = [],
 }) => {
   const { user, masterKey } = useAuthStore();
   const [uploading, setUploading] = useState(false);
@@ -48,6 +56,19 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
   );
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Local staged deletes – kept in sync with parent via callback
+  const [localPendingDeletes, setLocalPendingDeletes] = useState<string[]>(pendingDeleteIds);
+
+  // Sync from parent (e.g. parent resets to [] on cancel)
+  useEffect(() => {
+    setLocalPendingDeletes(pendingDeleteIds);
+  }, [pendingDeleteIds]);
+
+  const notifyParent = (ids: string[]) => {
+    setLocalPendingDeletes(ids);
+    onPendingDeletesChange?.(ids);
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -65,8 +86,7 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
 
       if (!AttachmentsService.isFileSizeValid(file.size)) {
         setError(
-          `File size exceeds ${
-            AttachmentsService.getMaxFileSize() / 1024 / 1024
+          `File size exceeds ${AttachmentsService.getMaxFileSize() / 1024 / 1024
           }MB`
         );
         return;
@@ -136,15 +156,21 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
     }
   };
 
-  const handleDelete = async (fileId: string) => {
-    if (!confirm("Delete this file?")) return;
-    try {
-      await AttachmentsService.deleteFile(fileId);
-      onAttachmentsChange();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
-    }
+  const stageDelete = (fileId: string) => {
+    notifyParent([...localPendingDeletes, fileId]);
   };
+
+  const unstageDelete = (fileId: string) => {
+    notifyParent(localPendingDeletes.filter((id) => id !== fileId));
+  };
+
+  // Visible attachments: all except those staged for deletion (unless viewing)
+  const visibleAttachments = attachments.filter(
+    (f) => !localPendingDeletes.includes(f.id)
+  );
+  const markedForDelete = attachments.filter((f) =>
+    localPendingDeletes.includes(f.id)
+  );
 
   return (
     <div className="space-y-2">
@@ -155,9 +181,8 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className={`p-1.5 hover:bg-gray-800 rounded text-primary-400 disabled:opacity-50  ${
-            isEditing ? "" : "hidden"
-          }`}
+          className={`p-1.5 hover:bg-gray-800 rounded text-primary-400 disabled:opacity-50  ${isEditing ? "" : "hidden"
+            }`}
           title="Add files"
         >
           <Plus className={`w-4 h-4`} />
@@ -170,7 +195,7 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
         onChange={handleFileSelect}
         className="hidden"
       />
-      
+
       {error && (
         <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
           {error}
@@ -195,54 +220,78 @@ export const FileAttachments: React.FC<FileAttachmentsProps> = ({
       )}
 
       <div className="space-y-2">
-        {attachments.map((file) => (
-            <div
-              key={file.id}
-              className="flex items-center justify-between p-3 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors"
-            >
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <File className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-200 truncate">{file.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {(file.size / 1024).toFixed(1)} KB
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {!isEditing &&
-                  (file.mimeType.startsWith("image/") ||
-                    file.mimeType === "application/pdf" ||
-                    file.mimeType === "text/plain") && (
-                    <button
-                      onClick={() => handleView(file.id, file.mimeType)}
-                      className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-                      title="View"
-                    >
-                      <Eye className="w-4 h-4 text-gray-400" />
-                    </button>
-                  )}
-                {!isEditing && (
-                  <button
-                    onClick={() => handleDownload(file.id, file.name)}
-                    className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-                    title="Download"
-                  >
-                    <Download className="w-4 h-4 text-gray-400" />
-                  </button>
-                )}
-                {isEditing && (
-                  <button
-                    onClick={() => handleDelete(file.id)}
-                    className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-400" />
-                  </button>
-                )}
+        {visibleAttachments.map((file) => (
+          <div
+            key={file.id}
+            className="flex items-center justify-between p-3 bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors"
+          >
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <File className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-gray-200 truncate">{file.name}</p>
+                <p className="text-xs text-gray-500">
+                  {(file.size / 1024).toFixed(1)} KB
+                </p>
               </div>
             </div>
+            <div className="flex items-center gap-2">
+              {!isEditing &&
+                (file.mimeType.startsWith("image/") ||
+                  file.mimeType === "application/pdf" ||
+                  file.mimeType === "text/plain") && (
+                  <button
+                    onClick={() => handleView(file.id, file.mimeType)}
+                    className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                    title="View"
+                  >
+                    <Eye className="w-4 h-4 text-gray-400" />
+                  </button>
+                )}
+              {!isEditing && (
+                <button
+                  onClick={() => handleDownload(file.id, file.name)}
+                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                  title="Download"
+                >
+                  <Download className="w-4 h-4 text-gray-400" />
+                </button>
+              )}
+              {isEditing && (
+                <button
+                  onClick={() => stageDelete(file.id)}
+                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="w-4 h-4 text-red-400" />
+                </button>
+              )}
+            </div>
+          </div>
         ))}
+
+        {/* Show staged-for-deletion files with undo option */}
+        {isEditing && markedForDelete.map((file) => (
+          <div
+            key={file.id}
+            className="flex items-center justify-between p-3 bg-red-900/10 border border-red-900/20 rounded-lg opacity-60"
+          >
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <File className="w-5 h-5 text-red-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-red-300 truncate line-through">{file.name}</p>
+                <p className="text-xs text-red-400/60">Will be deleted on save</p>
+              </div>
+            </div>
+            <button
+              onClick={() => unstageDelete(file.id)}
+              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+              title="Undo delete"
+            >
+              <Undo2 className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+        ))}
+
         {attachments.length === 0 && !isEditing && (
           <div className="text-center py-2 text-gray-500 text-sm">
             No attachments

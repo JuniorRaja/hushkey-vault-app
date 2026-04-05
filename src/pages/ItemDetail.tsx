@@ -6,8 +6,9 @@ import { useData } from '../../App';
 import { FaviconService } from '../services/faviconService';
 import { FileAttachments } from '../components/FileAttachments';
 import { useAttachments } from '../hooks/useAttachments';
+import AttachmentsService from '../services/attachmentsService';
 import { Item, ItemType, FileAttachment } from '../../types';
-import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers, Lock, Check, Copy as CopyIcon, Key, Trash, Scan } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Eye, EyeOff, Copy, RefreshCw, Edit2, Share2, X, ExternalLink, ShieldAlert, ShieldCheck, Shield, ChevronDown, QrCode, AlertCircle, Clock, Upload, Image as ImageIcon, Camera, Database, Server, Terminal, IdCard, FileText, Download, Paperclip, File as FileIcon, Bell, Globe, CreditCard, Wifi, User, Landmark, RectangleHorizontal, Plus, Layers, Lock, Check, Copy as CopyIcon, Key, Trash, Scan } from 'lucide-react';
 import { generatePassword, generateTOTP } from '../services/passwordGenerator';
 import { analyzePassword } from '../services/passwordAnalyzer';
 import { checkUrlSupports2FA } from '../services/twoFactorChecker';
@@ -170,7 +171,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
     const [searchParams] = useSearchParams();
     const typeParam = searchParams.get('type') as ItemType;
     const { items, vaults, categories, getItem, createItem, updateItem, deleteItem, loadVaults, loadCategories } = useItemStore();
-    const { masterKey } = useAuthStore();
+    const { user, masterKey } = useAuthStore();
     const { settings } = useData();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { attachments: fileAttachments, refresh: refreshAttachments } = useAttachments(itemId || '');
@@ -196,6 +197,9 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
     const [isSaving, setIsSaving] = useState(false);
     const [copiedField, setCopiedField] = useState<string | null>(null);
     const [copyTimer, setCopyTimer] = useState<number>(0);
+    const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+    const stagedFileInputRef = useRef<HTMLInputElement>(null);
+    const [pendingAttachmentDeletes, setPendingAttachmentDeletes] = useState<string[]>([]);
     // Tracks the password value at the time the item was last loaded / saved,
     // so we can reliably detect a change regardless of store state.
     const [originalPassword, setOriginalPassword] = useState<string | undefined>(undefined);
@@ -548,10 +552,44 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                     faviconData,
                     data: finalData as any
                 });
+
+                // Upload staged files now that we have an itemId
+                if (stagedFiles.length > 0 && user && masterKey) {
+                    const failedUploads: string[] = [];
+                    for (const file of stagedFiles) {
+                        try {
+                            await AttachmentsService.uploadFile(file, newItem.id, user.id, masterKey);
+                        } catch {
+                            failedUploads.push(file.name);
+                        }
+                    }
+                    if (failedUploads.length > 0) {
+                        alert(`Item saved, but ${failedUploads.length} attachment(s) failed to upload: ${failedUploads.join(', ')}`);
+                    }
+                }
+
                 await new Promise(resolve => setTimeout(resolve, 800));
                 navigate(-1);
             } else {
                 await updateItem(itemId!, { ...formData, faviconData, data: finalData });
+
+                // Commit staged attachment deletions
+                if (pendingAttachmentDeletes.length > 0) {
+                    const failedDeletes: string[] = [];
+                    for (const fileId of pendingAttachmentDeletes) {
+                        try {
+                            await AttachmentsService.deleteFile(fileId);
+                        } catch {
+                            failedDeletes.push(fileId);
+                        }
+                    }
+                    setPendingAttachmentDeletes([]);
+                    refreshAttachments();
+                    if (failedDeletes.length > 0) {
+                        alert(`Item saved, but ${failedDeletes.length} attachment(s) failed to delete.`);
+                    }
+                }
+
                 await new Promise(resolve => setTimeout(resolve, 800));
                 // Sync originalPassword to the new value so repeated edits
                 // in the same session still detect further password changes.
@@ -579,6 +617,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                 setFormData(JSON.parse(JSON.stringify(existing)));
             }
             setIsEditing(false);
+            setPendingAttachmentDeletes([]);
             setUrlError('');
             setDescriptionError('');
             setUsernameError('');
@@ -1079,12 +1118,45 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 attachments={fileAttachments}
                                 onAttachmentsChange={refreshAttachments}
                                 isEditing={isEditing}
+                                pendingDeleteIds={pendingAttachmentDeletes}
+                                onPendingDeletesChange={setPendingAttachmentDeletes}
                             />
                         )}
                         {!itemId && (
-                            <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg text-center text-gray-400">
-                                <Paperclip size={24} className="mx-auto mb-2 opacity-50" />
-                                <p className="text-sm">Save this item first to add attachments</p>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-400 font-medium ml-1 uppercase tracking-wider">Files</span>
+                                    <button
+                                        onClick={() => stagedFileInputRef.current?.click()}
+                                        className="p-1.5 hover:bg-gray-800 rounded text-primary-400"
+                                    >
+                                        <Plus size={16} />
+                                    </button>
+                                </div>
+                                {stagedFiles.length > 0 ? (
+                                    stagedFiles.map((file, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <FileIcon className="w-5 h-5 text-gray-400 shrink-0" />
+                                                <div className="min-w-0">
+                                                    <p className="text-sm text-gray-200 truncate">{file.name}</p>
+                                                    <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => setStagedFiles(prev => prev.filter((_, i) => i !== idx))}
+                                                className="p-2 hover:bg-gray-700 rounded-lg"
+                                            >
+                                                <Trash2 className="w-4 h-4 text-red-400" />
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg text-center text-gray-400">
+                                        <Paperclip size={24} className="mx-auto mb-2 opacity-50" />
+                                        <p className="text-sm">Add files to attach</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </>
@@ -2366,8 +2438,8 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
 
                 {/* Sidebar / Metadata */}
                 <div className="space-y-6">
-                    {/* Image Preview (Card/ID) */}
-                    {(formData.type === ItemType.CARD || formData.type === ItemType.ID_CARD) && isEditing && (
+                    {/* Image Preview (Card only - ID Card uses attachments below) */}
+                    {formData.type === ItemType.CARD && isEditing && (
                         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Card Image</label>
                             <div className="relative w-full aspect-video bg-gray-950 rounded-xl border-2 border-dashed border-gray-800 hover:border-primary-500/50 transition-colors flex flex-col items-center justify-center group overflow-hidden cursor-pointer" onClick={() => fileInputRef.current?.click()}>
@@ -2402,7 +2474,70 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 attachments={fileAttachments}
                                 onAttachmentsChange={refreshAttachments}
                                 isEditing={isEditing}
+                                pendingDeleteIds={pendingAttachmentDeletes}
+                                onPendingDeletesChange={setPendingAttachmentDeletes}
                             />
+                        </div>
+                    )}
+
+                    {/* Staged attachments for new items */}
+                    {!itemId && isEditing && (
+                        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Attachments</h3>
+                                <button
+                                    onClick={() => stagedFileInputRef.current?.click()}
+                                    className="p-1.5 hover:bg-gray-800 rounded text-primary-400"
+                                    title="Add files"
+                                >
+                                    <Plus size={16} />
+                                </button>
+                            </div>
+                            <input
+                                ref={stagedFileInputRef}
+                                type="file"
+                                multiple
+                                className="hidden"
+                                onChange={(e) => {
+                                    const files = e.target.files;
+                                    if (!files) return;
+                                    const valid: File[] = [];
+                                    for (let i = 0; i < files.length; i++) {
+                                        const f = files[i];
+                                        if (AttachmentsService.isFileTypeAllowed(f.type) && AttachmentsService.isFileSizeValid(f.size)) {
+                                            valid.push(f);
+                                        }
+                                    }
+                                    if (valid.length < (files?.length || 0)) {
+                                        alert('Some files were skipped (unsupported type or >5MB)');
+                                    }
+                                    setStagedFiles(prev => [...prev, ...valid]);
+                                    e.target.value = '';
+                                }}
+                            />
+                            {stagedFiles.length > 0 ? (
+                                <div className="space-y-2">
+                                    {stagedFiles.map((file, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <FileIcon className="w-5 h-5 text-gray-400 shrink-0" />
+                                                <div className="min-w-0">
+                                                    <p className="text-sm text-gray-200 truncate">{file.name}</p>
+                                                    <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => setStagedFiles(prev => prev.filter((_, i) => i !== idx))}
+                                                className="p-2 hover:bg-gray-700 rounded-lg"
+                                            >
+                                                <Trash2 className="w-4 h-4 text-red-400" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-center py-2 text-gray-500 text-sm">No attachments</p>
+                            )}
                         </div>
                     )}
 
