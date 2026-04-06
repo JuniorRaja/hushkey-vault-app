@@ -358,13 +358,12 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
       if (navigator.onLine) {
         const vaults = await DatabaseService.getVaults(user.id, masterKey);
 
-        // Get actual item counts
-        const vaultsWithCounts = await Promise.all(
-          vaults.map(async (v) => ({
-            ...v,
-            itemCount: await DatabaseService.getVaultItemCount(v.id),
-          }))
-        );
+        // Get actual item counts in a single batch query
+        const countMap = await DatabaseService.getVaultItemCounts(user.id);
+        const vaultsWithCounts = vaults.map((v) => ({
+          ...v,
+          itemCount: countMap[v.id] ?? 0,
+        }));
 
         set({ vaults: vaultsWithCounts, isLoading: false });
       } else {
