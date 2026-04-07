@@ -2,7 +2,7 @@ name: Supabase Migrate
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - 'supabase/migrations/**'
 
