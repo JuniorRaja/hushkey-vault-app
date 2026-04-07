@@ -208,7 +208,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
               `User signed in from ${deviceName}`
             );
           } catch (error) {
-            console.log("Failed to log to server");
           }
         }
 
@@ -232,7 +231,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       async handleOAuthCallback() {
-        console.log("[OAuth] handleOAuthCallback started");
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error) {
@@ -246,19 +244,15 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
         const userId = session.user.id;
         const email = session.user.email!;
-        console.log("[OAuth] User authenticated:", { userId, email });
 
         // Check if profile exists
-        console.log("[OAuth] Checking if profile exists...");
         let profile = await DatabaseService.getUserProfile(userId);
 
         if (!profile) {
-          console.log("[OAuth] New user - creating profile and settings");
           // New OAuth user - create profile and settings FIRST
           const salt = EncryptionService.generateSalt();
           await DatabaseService.createUserProfile(userId, salt);
           await IndexedDBService.saveUserProfile(userId, salt);
-          console.log("[OAuth] Profile created");
 
           const defaultSettings = {
             auto_lock_minutes: 5,
@@ -268,17 +262,14 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           };
           await DatabaseService.saveUserSettings(userId, defaultSettings);
           await IndexedDBService.saveSettings(userId, defaultSettings);
-          console.log("[OAuth] Settings created");
 
           const deviceId = EncryptionService.generateRandomString();
           const deviceName = navigator.userAgent.substring(0, 50);
           await DatabaseService.saveDevice(userId, deviceId, deviceName);
           await IndexedDBService.saveDevice(userId, deviceId, deviceName);
-          console.log("[OAuth] Device registered");
 
           await DatabaseService.logActivity(userId, "SIGNUP", "User account created via OAuth");
           await IndexedDBService.logActivity(userId, "SIGNUP", "User account created via OAuth");
-          console.log("[OAuth] Activity logged");
 
           set({
             user: { id: userId, email },
@@ -288,9 +279,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             hasPinSet: false,
             autoLockMinutes: 5,
           });
-          console.log("[OAuth] State updated - hasPinSet: false");
         } else {
-          console.log("[OAuth] Existing user - loading profile");
           // Existing user
           const deviceName = navigator.userAgent.substring(0, 50);
           await IndexedDBService.logActivity(userId, "LOGIN", `User signed in via OAuth from ${deviceName}`);
@@ -298,7 +287,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             try {
               await DatabaseService.logActivity(userId, "LOGIN", `User signed in via OAuth from ${deviceName}`);
             } catch (error) {
-              console.log("Failed to log to server");
             }
           }
 
@@ -309,9 +297,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             hasPinSet: !!profile.pin_verification,
             autoLockMinutes: 5,
           });
-          console.log("[OAuth] State updated - hasPinSet:", !!profile.pin_verification);
         }
-        console.log("[OAuth] handleOAuthCallback completed");
       },
 
       async signOut() {
@@ -342,7 +328,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                 "User signed out"
               );
             } catch (error) {
-              console.log("Failed to log to server (offline)");
             }
           }
         }
@@ -381,7 +366,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                 "Vault locked"
               );
             } catch (error) {
-              console.log("Failed to log to server (offline)");
             }
           }
         }
@@ -526,7 +510,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                 masterKey
               );
             } catch (error) {
-              console.log("Using cached settings (offline)");
             }
           }
 
@@ -564,7 +547,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                 `Vault unlocked via PIN from ${deviceName}`
               );
             } catch (error) {
-              console.log("Failed to log to server (offline)");
             }
           }
 
@@ -611,7 +593,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                 );
               }
             } catch (error) {
-              console.log("Failed to log to server (offline)");
             }
           }
 
@@ -659,7 +640,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                 masterKey
               );
             } catch (error) {
-              console.log("Using cached settings (offline)");
             }
           }
 
@@ -695,7 +675,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                 `Vault unlocked via biometrics from ${deviceName}`
               );
             } catch (error) {
-              console.log("Failed to log to server (offline)");
             }
           }
 
@@ -741,7 +720,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                 );
               }
             } catch (error) {
-              console.log("Failed to log to server (offline)");
             }
           }
 
@@ -983,7 +961,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
                   );
                 }
               } catch (error) {
-                console.log("Failed to load settings from server");
               }
             }
             biometricEnabled = settings?.biometric_enabled || false;
@@ -1016,7 +993,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           const autoLockMs = state.autoLockMinutes * 60 * 1000;
 
           if (timeSince > autoLockMs) {
-            console.log("Auto-lock triggered on hydration");
             get().lock();
           } else {
             // Attempt to restore master key
