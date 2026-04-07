@@ -6,15 +6,16 @@ export const useAutoLock = () => {
   const navigate = useNavigate();
   const { lock, isUnlocked, lastActivity, updateActivity, autoLockMinutes } = useAuthStore();
   const isLockingRef = useRef(false);
+  const lastActivityRef = useRef(lastActivity);
+  useEffect(() => { lastActivityRef.current = lastActivity; }, [lastActivity]);
 
   useEffect(() => {
     if (!isUnlocked || autoLockMinutes <= 0) return;
 
     const checkAndLock = async () => {
-      // Prevent multiple simultaneous lock attempts
       if (isLockingRef.current) return;
-      
-      const elapsed = Date.now() - lastActivity;
+
+      const elapsed = Date.now() - lastActivityRef.current;
       if (elapsed >= autoLockMinutes * 60 * 1000) {
         isLockingRef.current = true;
         try {
@@ -36,5 +37,5 @@ export const useAutoLock = () => {
       clearInterval(interval);
       events.forEach((e) => window.removeEventListener(e, handleActivity));
     };
-  }, [isUnlocked, autoLockMinutes, lastActivity, lock, navigate, updateActivity]);
+  }, [isUnlocked, autoLockMinutes, lock, navigate, updateActivity]);
 };
