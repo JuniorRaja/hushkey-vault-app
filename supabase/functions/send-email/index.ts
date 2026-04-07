@@ -1,3 +1,4 @@
+// @ts-ignore: Deno URL import — resolved at runtime by Supabase Edge Functions
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
@@ -14,7 +15,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -62,7 +63,7 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,
     });

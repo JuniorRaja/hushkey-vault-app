@@ -1,12 +1,25 @@
+// @ts-ignore: Deno URL import — resolved at runtime by Supabase Edge Functions
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+// @ts-ignore: Deno URL import — resolved at runtime by Supabase Edge Functions
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-serve(async (req) => {
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
         status: 401,
+        headers: corsHeaders,
       });
     }
 
@@ -26,6 +39,7 @@ serve(async (req) => {
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
+        headers: corsHeaders,
       });
     }
 
@@ -35,6 +49,7 @@ serve(async (req) => {
     if (user.id !== userId) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
+        headers: corsHeaders,
       });
     }
 
@@ -45,13 +60,18 @@ serve(async (req) => {
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
+        headers: corsHeaders,
       });
     }
 
-    return new Response(JSON.stringify({ success: true }), { status: 200 });
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: corsHeaders,
+    });
   } catch (err) {
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,
+      headers: corsHeaders,
     });
   }
 });

@@ -811,6 +811,33 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
   const [clearDataConfirmText, setClearDataConfirmText] = useState("");
   const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
   const [emailError, setEmailError] = useState("");
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteAccountStep, setDeleteAccountStep] = useState<1 | 2>(1);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== "DELETE MY ACCOUNT") return;
+    setIsDeleting(true);
+    try {
+      const userId = useAuthStore.getState().user?.id;
+      if (userId) {
+        await DatabaseService.deleteUserAccount(userId);
+        await useAuthStore.getState().signOut();
+        window.location.href = "/login";
+      }
+    } catch (err: any) {
+      alert("Error deleting account: " + err.message);
+      setIsDeleting(false);
+    }
+  };
+
+  const closeDeleteAccountModal = () => {
+    setShowDeleteAccountModal(false);
+    setDeleteAccountStep(1);
+    setDeleteConfirmText("");
+    setIsDeleting(false);
+  };
 
   useEffect(() => {
     const loadRecoveryEmail = async () => {
@@ -841,8 +868,8 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
   };
 
   const handleClearData = async () => {
-    if (clearDataConfirmText !== "yes, delete") {
-      alert('Please type "yes, delete" to confirm');
+    if (clearDataConfirmText !== "YES, DELETE") {
+      alert('Please type "YES, DELETE" to confirm');
       return;
     }
 
@@ -1174,13 +1201,13 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">
-                  Type "yes, delete" to confirm
+                  Type "YES, DELETE" to confirm
                 </label>
                 <input
                   type="text"
                   value={clearDataConfirmText}
                   onChange={(e) => setClearDataConfirmText(e.target.value)}
-                  placeholder="yes, delete"
+                  placeholder="YES, DELETE"
                   className="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-white focus:border-primary-500 outline-none"
                 />
               </div>
@@ -1196,7 +1223,7 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
                 </button>
                 <button
                   onClick={handleClearData}
-                  disabled={isLoading || clearDataConfirmText !== "yes, delete"}
+                  disabled={isLoading || clearDataConfirmText !== "YES, DELETE"}
                   className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   {isLoading ? "Clearing..." : "Clear Data"}
@@ -1234,30 +1261,7 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
                 and preferences. Auth and profile preserved.
               </p>
               <button
-                onClick={async () => {
-                  if (
-                    window.confirm(
-                      "CRITICAL WARNING: This will permanently delete your account and ALL data from the server. This cannot be undone. Are you absolutely sure?"
-                    )
-                  ) {
-                    if (
-                      window.confirm(
-                        "Final confirmation: Delete account permanently?"
-                      )
-                    ) {
-                      try {
-                        const userId = useAuthStore.getState().user?.id;
-                        if (userId) {
-                          await DatabaseService.deleteUserAccount(userId);
-                          await useAuthStore.getState().signOut();
-                          window.location.href = "/login";
-                        }
-                      } catch (err: any) {
-                        alert("Error deleting account: " + err.message);
-                      }
-                    }
-                  }
-                }}
+                onClick={() => setShowDeleteAccountModal(true)}
                 className="w-full py-3 bg-red-600 hover:bg-red-700 border border-red-500 text-white rounded-xl text-sm font-bold transition-colors"
               >
                 Delete Account Permanently
@@ -1269,6 +1273,88 @@ const ProfileModal = ({ onClose }: { onClose: () => void }) => {
             </div>
           )}
         </div>
+
+        {showDeleteAccountModal && (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+            onClick={closeDeleteAccountModal}
+          >
+            <div
+              className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {deleteAccountStep === 1 ? (
+                <div className="p-6 text-center space-y-4">
+                  <div className="w-14 h-14 rounded-full bg-red-900/30 flex items-center justify-center mx-auto">
+                    <AlertTriangle size={28} className="text-red-500" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white">Delete Account?</h3>
+                  <div className="text-left space-y-2 text-sm text-gray-400 bg-gray-950 border border-gray-800 rounded-xl p-4">
+                    <p className="font-semibold text-red-400">This action will permanently:</p>
+                    <ul className="space-y-1.5 ml-1">
+                      <li className="flex items-start gap-2"><span className="text-red-500 mt-0.5">•</span>Delete all your vaults and stored items</li>
+                      <li className="flex items-start gap-2"><span className="text-red-500 mt-0.5">•</span>Remove all categories and preferences</li>
+                      <li className="flex items-start gap-2"><span className="text-red-500 mt-0.5">•</span>Erase your authentication account</li>
+                      <li className="flex items-start gap-2"><span className="text-red-500 mt-0.5">•</span>Revoke all device sessions</li>
+                    </ul>
+                    <p className="text-red-400 font-semibold pt-2 border-t border-gray-800">This cannot be undone. There is no recovery.</p>
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={closeDeleteAccountModal}
+                      className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => setDeleteAccountStep(2)}
+                      className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-bold transition-all active:scale-95 shadow-lg shadow-red-900/30"
+                    >
+                      I Understand
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 text-center space-y-4">
+                  <div className="w-14 h-14 rounded-full bg-red-900/30 flex items-center justify-center mx-auto">
+                    <ShieldAlert size={28} className="text-red-500" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white">Final Confirmation</h3>
+                  <p className="text-sm text-gray-400">
+                    Type <span className="font-mono font-bold text-red-400">DELETE MY ACCOUNT</span> below to confirm.
+                  </p>
+                  <input
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="DELETE MY ACCOUNT"
+                    className="w-full bg-gray-950 border border-gray-800 rounded-xl p-3 text-white text-sm focus:border-red-500 outline-none transition-colors text-center font-mono"
+                    autoFocus
+                  />
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={closeDeleteAccountModal}
+                      className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={deleteConfirmText !== "DELETE MY ACCOUNT" || isDeleting}
+                      className="flex-1 py-3 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-all active:scale-95 shadow-lg shadow-red-900/30 flex items-center justify-center gap-2"
+                    >
+                      {isDeleting ? (
+                        <><Loader2 size={16} className="animate-spin" /> Deleting...</>
+                      ) : (
+                        "Delete Forever"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="pt-2">
           <button
