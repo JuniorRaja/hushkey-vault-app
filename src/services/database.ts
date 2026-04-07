@@ -894,8 +894,10 @@ class DatabaseService {
     await supabase.from("user_settings").delete().eq("user_id", userId);
     await supabase.from("user_profiles").delete().eq("user_id", userId);
 
-    // Delete the auth user account
-    const { error } = await supabase.auth.admin.deleteUser(userId);
+    // Delete the auth user via server-side Edge Function (admin API must not run client-side)
+    const { error } = await supabase.functions.invoke('delete-user-account', {
+      body: { userId },
+    });
     if (error) throw error;
   }
 
