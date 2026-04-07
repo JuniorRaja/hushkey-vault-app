@@ -2352,8 +2352,8 @@ const Settings: React.FC = () => {
 
       <div className="text-center text-[10px] text-gray-600 pb-8 flex flex-col gap-1">
         <span className="font-bold">HUSHKEY VAULT</span>
-        <span>Version 2.5.0 (Build 2024.10.15)</span>
-        <span>© 2024 Hushkey Security Inc.</span>
+        <span>Version {__APP_VERSION__}</span>
+        <span>© {new Date().getFullYear()} Hushkey Vault</span>
       </div>
     </div>
   );

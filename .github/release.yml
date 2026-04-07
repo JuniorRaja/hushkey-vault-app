@@ -1,0 +1,40 @@
+changelog:
+  categories:
+    - title: "🚀 Features"
+      labels:
+        - "feat"
+      exclude:
+        labels:
+          - "chore"
+    - title: "🐛 Bug Fixes"
+      labels:
+        - "fix"
+    - title: "🔒 Security"
+      labels:
+        - "fix(security)"
+        - "fix(csp)"
+    - title: "⚡ Performance"
+      labels:
+        - "fix(perf)"
+        - "perf"
+    - title: "🧹 Maintenance"
+      labels:
+        - "chore"
+        - "refactor"
+        - "docs"
+  exclude:
+    labels:
+      - "skip-changelog"
+  commit_types:
+    - type: "feat"
+      label: "feat"
+    - type: "fix"
+      label: "fix"
+    - type: "chore"
+      label: "chore"
+    - type: "refactor"
+      label: "refactor"
+    - type: "perf"
+      label: "perf"
+    - type: "docs"
+      label: "docs"
