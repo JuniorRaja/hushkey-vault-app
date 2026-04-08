@@ -105,11 +105,11 @@ class SessionManagerService {
   }
 
   /**
-   * Store session in secure storage
+   * Store session in sessionStorage (cleared on tab close, not persisted across sessions)
    */
   private storeSession(userId: string, session: SessionToken): void {
     const key = `hushkey-session-${userId}`;
-    localStorage.setItem(key, JSON.stringify(session));
+    sessionStorage.setItem(key, JSON.stringify(session));
   }
 
   /**
@@ -118,7 +118,7 @@ class SessionManagerService {
   loadSession(userId: string): SessionToken | null {
     try {
       const key = `hushkey-session-${userId}`;
-      const stored = localStorage.getItem(key);
+      const stored = sessionStorage.getItem(key);
       
       if (!stored) return null;
       
@@ -142,7 +142,7 @@ class SessionManagerService {
    */
   private removeStoredSession(userId: string): void {
     const key = `hushkey-session-${userId}`;
-    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
   }
 
   /**
