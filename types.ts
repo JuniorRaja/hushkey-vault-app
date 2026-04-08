@@ -175,18 +175,21 @@ export interface FileData {
   attachments?: FileAttachment[];
 }
 
+export type ItemData =
+  | ({ type: ItemType.LOGIN } & LoginData)
+  | ({ type: ItemType.CARD } & CardData)
+  | ({ type: ItemType.IDENTITY } & IdentityData)
+  | ({ type: ItemType.NOTE } & NoteData)
+  | ({ type: ItemType.WIFI } & WifiData)
+  | ({ type: ItemType.BANK } & BankData)
+  | ({ type: ItemType.DATABASE } & DatabaseData)
+  | ({ type: ItemType.SERVER } & ServerData)
+  | ({ type: ItemType.SSH_KEY } & SSHKeyData)
+  | ({ type: ItemType.ID_CARD } & IdCardData)
+  | ({ type: ItemType.FILE } & FileData);
+
 export interface Item extends ItemBase {
-  data: LoginData &
-    CardData &
-    IdentityData &
-    NoteData &
-    WifiData &
-    BankData &
-    DatabaseData &
-    ServerData &
-    SSHKeyData &
-    IdCardData &
-    FileData;
+  data: LoginData & CardData & IdentityData & NoteData & WifiData & BankData & DatabaseData & ServerData & SSHKeyData & IdCardData & FileData;
 }
 
 export interface UserProfile {
