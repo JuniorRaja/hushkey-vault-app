@@ -180,23 +180,12 @@ class BackupService {
     return new Blob([json], { type: "application/json" });
   }
 
-  async exportToRawCSV(
-    data: { vaults: Vault[]; categories: Category[]; items: Item[] },
-    onProgress?: (progress: BackupProgress) => void
-  ): Promise<Blob> {
+  private async buildCsvFiles(
+    data: { vaults: Vault[]; categories: Category[]; items: Item[] }
+  ): Promise<{ name: string; content: string | Blob }[]> {
     const files: { name: string; content: string | Blob }[] = [];
-
-    onProgress?.({ stage: "preparing", progress: 20 });
-    files.push({
-      name: "vaults.csv",
-      content: await CSVExporter.exportVaults(data.vaults),
-    });
-    files.push({
-      name: "categories.csv",
-      content: await CSVExporter.exportCategories(data.categories),
-    });
-
-    onProgress?.({ stage: "preparing", progress: 40 });
+    files.push({ name: "vaults.csv", content: await CSVExporter.exportVaults(data.vaults) });
+    files.push({ name: "categories.csv", content: await CSVExporter.exportCategories(data.categories) });
     const types = Object.values(ItemType);
     for (const type of types) {
       const typeItems = data.items.filter((item) => item.type === type);
@@ -205,7 +194,15 @@ class BackupService {
         files.push({ name: `items_${type.toLowerCase()}.csv`, content });
       }
     }
+    return files;
+  }
 
+  async exportToRawCSV(
+    data: { vaults: Vault[]; categories: Category[]; items: Item[] },
+    onProgress?: (progress: BackupProgress) => void
+  ): Promise<Blob> {
+    onProgress?.({ stage: "preparing", progress: 20 });
+    const files = await this.buildCsvFiles(data);
     onProgress?.({ stage: "compressing", progress: 80 });
     return ZIPService.createZip(files);
   }
@@ -214,34 +211,10 @@ class BackupService {
     data: { vaults: Vault[]; categories: Category[]; items: Item[] },
     onProgress?: (progress: BackupProgress) => void
   ): Promise<Blob> {
-    const files: { name: string; content: string | Blob }[] = [];
-
-    // 1. CSVs (Reusing logic logic or calling exportToRawCSV logic?
-    // exportToRawCSV returns a ZIP blob, so we can't reuse it to get files list easily without refactoring.
-    // I will duplicate the CSV generation logic here for clean separation or refactor.
-    // I'll duplicate for now to avoid breaking exportToRawCSV if that changes.
-
     onProgress?.({ stage: "preparing", progress: 10 });
-    files.push({
-      name: "vaults.csv",
-      content: await CSVExporter.exportVaults(data.vaults),
-    });
-    files.push({
-      name: "categories.csv",
-      content: await CSVExporter.exportCategories(data.categories),
-    });
+    const files = await this.buildCsvFiles(data);
 
-    onProgress?.({ stage: "preparing", progress: 20 });
-    const types = Object.values(ItemType);
-    for (const type of types) {
-      const typeItems = data.items.filter((item) => item.type === type);
-      if (typeItems.length > 0) {
-        const content = await CSVExporter.exportByType(data.items, type);
-        files.push({ name: `items_${type.toLowerCase()}.csv`, content });
-      }
-    }
-
-    // 2. Attachments
+    // Attachments
     onProgress?.({ stage: "preparing", progress: 40 });
 
     let attachmentCount = 0;

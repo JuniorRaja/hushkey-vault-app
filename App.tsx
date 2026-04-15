@@ -393,7 +393,6 @@ const DataProvider: React.FC<{ children: React.ReactNode }> = ({
   const clearNotifications = () => {
     setNotifications([]);
     storageService.saveNotifications([]);
-    storageService.saveNotifications([]);
     const { user } = useAuthStore.getState();
     if (user && user.id) {
       import("./src/services/notificationService").then(({ default: notificationService }) => {
