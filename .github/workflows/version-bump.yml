@@ -21,15 +21,41 @@ jobs:
         with:
           node-version: 20
 
-      - name: Bump patch version
-        run: npm version patch --no-git-tag-version
+      - name: Determine version bump type
+        id: bump_type
+        run: |
+          # Count feat and fix commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"%s" 2>/dev/null)
+          else
+            COMMITS=$(git log "$LAST_TAG"..HEAD --pretty=format:"%s" 2>/dev/null)
+          fi
+
+          FEAT_COUNT=$(echo "$COMMITS" | grep -c "^feat" || true)
+          FIX_COUNT=$(echo "$COMMITS" | grep -c "^fix" || true)
+
+          if [ "$FEAT_COUNT" -gt 2 ] && [ "$FIX_COUNT" -gt 2 ]; then
+            BUMP="major"
+          elif [ "$FEAT_COUNT" -gt 0 ]; then
+            BUMP="minor"
+          else
+            BUMP="patch"
+          fi
+
+          echo "bump=$BUMP" >> $GITHUB_OUTPUT
+          echo "Bump type: $BUMP (feat: $FEAT_COUNT, fix: $FIX_COUNT)"
+
+      - name: Bump version
+        run: npm version ${{ steps.bump_type.outputs.bump }} --no-git-tag-version
 
       - name: Commit version bump
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           VERSION=$(node -p "require('./package.json').version")
-          git add package.json package-lock.json
+          sed -i "s|version-[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*-blue|version-$VERSION-blue|" README.md
+          git add package.json package-lock.json README.md
           git commit -m "chore: bump version to $VERSION [skip ci]"
           git push
           git tag "v$VERSION"
