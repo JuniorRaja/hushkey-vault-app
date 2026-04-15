@@ -11,7 +11,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS backup_history (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    backup_type VARCHAR(20) NOT NULL CHECK (backup_type IN ('csv', 'zip', 'hkb')),
+    backup_type VARCHAR(20) NOT NULL CHECK (backup_type IN ('csv', 'zip', 'hkb', 'raw_csv', 'raw_zip')),
     created_at TIMESTAMP DEFAULT NOW(),
     item_count INTEGER,
     file_size_bytes BIGINT,
