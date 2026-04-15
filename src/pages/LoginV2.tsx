@@ -3,7 +3,7 @@ import { Mail, Lock, Delete, ScanFace, Loader2, LogOut } from "lucide-react";
 import { useAuthStore } from "../stores/auth";
 import { useOnboardingStore } from "../stores/onboarding";
 import { BiometricService } from "../services/biometric";
-import DatabaseService from "../services/database";
+import { SoundService } from "../services/soundService";
 
 const HushkeyLogo = ({ size = 32 }: { size?: number }) => (
   <img src="/hushkey-icon.png" alt="HushKey" width={size} height={size} />
@@ -109,6 +109,7 @@ const PinUnlockScreen: React.FC = () => {
     try {
       await unlockWithPin(inputPin);
     } catch (err: any) {
+      SoundService.playVaultError();
       setError("Incorrect PIN");
       setTimeout(() => { setPin(""); setError(""); }, 1200);
     } finally {
