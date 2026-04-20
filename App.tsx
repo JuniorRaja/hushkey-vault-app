@@ -797,10 +797,6 @@ const App: React.FC = () => {
     requestNotificationPermission();
     requestClipboardPermission();
 
-    // Register service worker for offline support
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => { });
-    }
   }, [hydrate]);
 
   // Sync on app start and online events
