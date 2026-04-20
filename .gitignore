@@ -25,3 +25,5 @@ dev-docs
 *.sln
 *.sw?
 .amazonq
+.github/
+docs/
