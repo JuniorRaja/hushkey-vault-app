@@ -2101,9 +2101,9 @@ const Settings: React.FC = () => {
             </div>
             <ToggleSwitch
               checked={
-                userSettings?.allow_screenshots ?? settings.allowScreenshots
+                !(userSettings?.allow_screenshots ?? settings.allowScreenshots)
               }
-              onChange={(val) => handleSettingChange("allow_screenshots", val)}
+              onChange={(val) => handleSettingChange("allow_screenshots", !val)}
             />
           </div>
 
