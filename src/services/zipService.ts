@@ -48,7 +48,8 @@ class ZIPService {
     const encoder = new TextEncoder();
     const data = encoder.encode(content);
 
-    const passwordKey = await this.deriveKey(password);
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const passwordKey = await this.deriveKey(password, salt);
     const iv = crypto.getRandomValues(new Uint8Array(12));
 
     const encryptedData = await crypto.subtle.encrypt(
@@ -57,10 +58,13 @@ class ZIPService {
       data
     );
 
-    // Combine IV and encrypted data
-    const result = new Uint8Array(iv.length + encryptedData.byteLength);
-    result.set(iv, 0);
-    result.set(new Uint8Array(encryptedData), iv.length);
+    // Combine salt + IV + encrypted data
+    const result = new Uint8Array(
+      salt.length + iv.length + encryptedData.byteLength
+    );
+    result.set(salt, 0);
+    result.set(iv, salt.length);
+    result.set(new Uint8Array(encryptedData), salt.length + iv.length);
 
     // Convert to base64 for storage in ZIP
     return btoa(String.fromCharCode(...result));
@@ -96,10 +100,12 @@ class ZIPService {
       c.charCodeAt(0)
     );
 
-    const iv = encryptedData.slice(0, 12);
-    const data = encryptedData.slice(12);
+    // Extract salt (16 bytes) + IV (12 bytes) + ciphertext
+    const salt = encryptedData.slice(0, 16);
+    const iv = encryptedData.slice(16, 28);
+    const data = encryptedData.slice(28);
 
-    const passwordKey = await this.deriveKey(password);
+    const passwordKey = await this.deriveKey(password, salt);
 
     const decryptedData = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv },
@@ -111,7 +117,10 @@ class ZIPService {
     return decoder.decode(decryptedData);
   }
 
-  private async deriveKey(password: string): Promise<CryptoKey> {
+  private async deriveKey(
+    password: string,
+    salt: Uint8Array
+  ): Promise<CryptoKey> {
     const encoder = new TextEncoder();
     const passwordData = encoder.encode(password);
 
@@ -123,13 +132,11 @@ class ZIPService {
       ["deriveBits", "deriveKey"]
     );
 
-    const salt = encoder.encode("hushkey-zip-salt-v1");
-
     return crypto.subtle.deriveKey(
       {
         name: "PBKDF2",
         salt,
-        iterations: 100000,
+        iterations: 600000,
         hash: "SHA-256",
       },
       baseKey,
