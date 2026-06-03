@@ -163,9 +163,8 @@ export const useShareStore = create<ShareState & ShareActions>((set, get) => ({
 
     if (share.password_protected) {
       if (!password) throw new Error("Password required");
-      const passwordHash = await ShareEncryptionService.hashPassword(password);
-      if (passwordHash !== share.password_hash)
-        throw new Error("Incorrect password");
+      const isValid = await ShareEncryptionService.verifyPassword(password, share.password_hash);
+      if (!isValid) throw new Error("Incorrect password");
     }
 
     const shareKey = ShareEncryptionService.stringToShareKey(key);
@@ -218,9 +217,8 @@ export const useShareStore = create<ShareState & ShareActions>((set, get) => ({
   verifyPasswordAndDecrypt: async (share, key, password) => {
     if (share.password_protected) {
       if (!password) throw new Error("Password required");
-      const passwordHash = await ShareEncryptionService.hashPassword(password);
-      if (passwordHash !== share.password_hash)
-        throw new Error("Incorrect password");
+      const isValid = await ShareEncryptionService.verifyPassword(password, share.password_hash);
+      if (!isValid) throw new Error("Incorrect password");
     }
 
     const shareKey = ShareEncryptionService.stringToShareKey(key);

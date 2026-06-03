@@ -20,9 +20,52 @@ class ShareEncryptionService {
 
   async hashPassword(password: string): Promise<string> {
     const encoder = new TextEncoder()
-    const data = encoder.encode(password)
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-    return EncryptionService.toBase64(new Uint8Array(hashBuffer))
+    const salt = crypto.getRandomValues(new Uint8Array(16))
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveBits']
+    )
+    const derivedBits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
+      keyMaterial,
+      256
+    )
+    return 'pbkdf2:' + EncryptionService.toBase64(salt) + ':' + EncryptionService.toBase64(new Uint8Array(derivedBits))
+  }
+
+  async verifyPassword(password: string, storedHash: string): Promise<boolean> {
+    if (!storedHash.startsWith('pbkdf2:')) {
+      // Legacy SHA-256 path for shares created before this fix
+      const encoder = new TextEncoder()
+      const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(password))
+      return EncryptionService.toBase64(new Uint8Array(hashBuffer)) === storedHash
+    }
+    const parts = storedHash.split(':')
+    if (parts.length !== 3) return false
+    const salt = EncryptionService.fromBase64(parts[1])
+    const expected = EncryptionService.fromBase64(parts[2])
+    const encoder = new TextEncoder()
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveBits']
+    )
+    const derivedBits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
+      keyMaterial,
+      256
+    )
+    const derived = new Uint8Array(derivedBits)
+    if (derived.length !== expected.length) return false
+    // Constant-time comparison to prevent timing attacks
+    let diff = 0
+    for (let i = 0; i < derived.length; i++) diff |= derived[i] ^ expected[i]
+    return diff === 0
   }
 
   shareKeyToString(key: Uint8Array): string {
