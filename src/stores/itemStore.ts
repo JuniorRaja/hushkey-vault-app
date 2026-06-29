@@ -10,6 +10,7 @@ import IndexedDBService from "../services/indexedDB";
 import EncryptionService from "../services/encryption";
 import { useAuthStore } from "./auth";
 import { SoundService } from "../services/soundService";
+import { processInBatches } from "../utils/batchUtils";
 import type { Item, Vault, Category } from "../../types";
 
 interface ItemState {
@@ -74,8 +75,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
         const items = allItems.filter((i) => !i.deletedAt);
 
         // Rebuild IndexedDB cache with encrypted data
-        const itemRecords = await Promise.all(
-          items.map(async (i) => ({
+        const itemRecords = await processInBatches(items, async (i) => ({
             id: i.id,
             vaultId: i.vaultId,
             categoryId: i.categoryId,
@@ -86,8 +86,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
             createdAt: i.lastUpdated,
             updatedAt: i.lastUpdated,
             deletedAt: i.deletedAt,
-          }))
-        );
+          }));
 
         await IndexedDBService.bulkSaveItems(itemRecords);
         set({ items, isLoading: false });
@@ -97,10 +96,9 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
           ? await IndexedDBService.getVaultItems(vaultId)
           : [];
 
-        const items = await Promise.all(
-          cachedItems
-            .filter((i) => i.dataEncrypted)
-            .map(async (i) => {
+        const items = await processInBatches(
+          cachedItems.filter((i) => i.dataEncrypted),
+          async (i) => {
               const decryptedData = await EncryptionService.decryptObject<
                 Partial<Item>
               >(i.dataEncrypted, masterKey);
@@ -115,8 +113,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
                 deletedAt: i.deletedAt,
                 ...(decryptedData || {}),
               } as Item;
-            })
-        );
+          });
         set({ items: items.filter((i) => !i.deletedAt), isLoading: false });
       }
     } catch (error) {
@@ -369,10 +366,9 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
       } else {
         // Offline: Load from IndexedDB
         const cachedVaults = await IndexedDBService.getVaults(user.id);
-        const vaults = await Promise.all(
-          cachedVaults
-            .filter((v) => v.nameEncrypted && !v.deletedAt)
-            .map(async (v) => ({
+        const vaults = await processInBatches(
+          cachedVaults.filter((v) => v.nameEncrypted && !v.deletedAt),
+          async (v) => ({
               id: v.id,
               name: await EncryptionService.decrypt(v.nameEncrypted, masterKey),
               description: v.descriptionEncrypted
@@ -389,8 +385,7 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
               notes: v.notesEncrypted
                 ? await EncryptionService.decrypt(v.notesEncrypted, masterKey)
                 : undefined,
-            }))
-        );
+          }));
         set({ vaults, isLoading: false });
       }
     } catch (error) {
@@ -422,13 +417,11 @@ export const useItemStore = create<ItemState & ItemActions>((set, get) => ({
       } else {
         // Offline: Load from IndexedDB
         const cachedCategories = await IndexedDBService.getCategories(user.id);
-        const categories = await Promise.all(
-          cachedCategories.map(async (c) => ({
+        const categories = await processInBatches(cachedCategories, async (c) => ({
             id: c.id,
             name: await EncryptionService.decrypt(c.nameEncrypted, masterKey),
             color: c.color,
-          }))
-        );
+          }));
         set({ categories });
       }
     } catch (error) {
