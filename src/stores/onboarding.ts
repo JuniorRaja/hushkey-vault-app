@@ -111,6 +111,7 @@ export const useOnboardingStore = create<OnboardingState & OnboardingActions>()(
 
         // 2. Derive master key from PIN + stored salt
         const masterKey = await EncryptionService.deriveMasterKey(pin, salt);
+        IndexedDBService.setMasterKey(masterKey);
 
         // 3. Save encrypted name
         if (formData.name.trim()) {
