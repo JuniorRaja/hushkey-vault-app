@@ -9,24 +9,42 @@ const HushkeyLogo = ({ size = 32 }: { size?: number }) => (
   <img src="/hushkey-icon.png" alt="HushKey" width={size} height={size} />
 );
 
+type AuthMode = "signin" | "signup";
+
 // ── Email/Password Screen ─────────────────────────────────────────────────────
-const EmailScreen: React.FC = () => {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+interface EmailScreenProps {
+  mode: AuthMode;
+  onModeChange: (mode: AuthMode) => void;
+}
+
+const EmailScreen: React.FC<EmailScreenProps> = ({ mode, onModeChange }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const { signIn, signUp } = useAuthStore();
   const { startOnboarding } = useOnboardingStore();
 
+  const switchMode = (next: AuthMode) => {
+    onModeChange(next);
+    setError("");
+    setInfo("");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setInfo("");
     setIsLoading(true);
     try {
       if (mode === "signup") {
-        await signUp(email, password);
+        const result = await signUp(email, password);
+        if (result.requiresConfirmation) {
+          setInfo("Account created! Please check your email to confirm before signing in.");
+          return;
+        }
         startOnboarding();
       } else {
         await signIn(email, password);
@@ -40,6 +58,32 @@ const EmailScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Tab switcher */}
+      <div className="flex rounded-lg bg-gray-800/60 p-1">
+        <button
+          type="button"
+          onClick={() => switchMode("signin")}
+          className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            mode === "signin"
+              ? "bg-primary-600 text-white shadow-sm"
+              : "text-gray-400 hover:text-white"
+          }`}
+        >
+          Sign In
+        </button>
+        <button
+          type="button"
+          onClick={() => switchMode("signup")}
+          className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            mode === "signup"
+              ? "bg-primary-600 text-white shadow-sm"
+              : "text-gray-400 hover:text-white"
+          }`}
+        >
+          Sign Up
+        </button>
+      </div>
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="relative">
           <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -66,25 +110,27 @@ const EmailScreen: React.FC = () => {
           />
         </div>
 
+        {info && (
+          <div className="flex items-start gap-2 rounded-lg bg-blue-900/30 border border-blue-700/40 px-3 py-2.5 text-blue-300 text-sm">
+            <span className="mt-0.5 shrink-0">ℹ</span>
+            <span>{info}</span>
+          </div>
+        )}
         {error && <p className="text-red-400 text-sm text-center">{error}</p>}
 
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          className={`w-full py-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
+            mode === "signin"
+              ? "bg-primary-600 hover:bg-primary-700 text-white"
+              : "border border-primary-500 text-primary-400 hover:bg-primary-500/10"
+          }`}
         >
           {isLoading && <Loader2 size={18} className="animate-spin" />}
           {mode === "signin" ? "Sign In" : "Create Account"}
         </button>
       </form>
-
-      <button
-        type="button"
-        onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }}
-        className="text-sm text-primary-400 hover:text-primary-300 transition-colors text-center"
-      >
-        {mode === "signin" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
-      </button>
     </div>
   );
 };
@@ -223,9 +269,15 @@ const PinUnlockScreen: React.FC = () => {
 // ── LoginV2 ───────────────────────────────────────────────────────────────────
 const LoginV2: React.FC = () => {
   const { user, hasPinSet } = useAuthStore();
+  const [mode, setMode] = useState<AuthMode>("signin");
 
-  // Determine which screen to show
   const showUnlock = !!user && hasPinSet;
+
+  const subtitle = showUnlock
+    ? `Welcome back, ${user?.email}`
+    : mode === "signin"
+    ? "Sign in to your vault"
+    : "Create your HushKey account";
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -237,13 +289,15 @@ const LoginV2: React.FC = () => {
             <HushkeyLogo size={48} />
           </div>
           <h1 className="text-3xl font-bold text-white">HushKey Vault</h1>
-          <p className="text-gray-400 text-sm mt-1">
-            {showUnlock ? `Welcome back, ${user?.email}` : "Zero-knowledge password manager"}
-          </p>
+          <p className="text-gray-400 text-sm mt-1">{subtitle}</p>
         </div>
 
         <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6">
-          {showUnlock ? <PinUnlockScreen /> : <EmailScreen />}
+          {showUnlock ? (
+            <PinUnlockScreen />
+          ) : (
+            <EmailScreen mode={mode} onModeChange={setMode} />
+          )}
         </div>
       </div>
     </div>

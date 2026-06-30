@@ -37,7 +37,7 @@ interface AuthState {
 }
 
 interface AuthActions {
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<{ requiresConfirmation: boolean }>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   lock: () => Promise<void>;
@@ -92,7 +92,12 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       async signUp(email, password) {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: appUrl },
+        });
         if (error) {
           if (error.message.includes("already registered") || error.message.includes("already been registered")) {
             throw new Error("An account with this email already exists");
@@ -101,7 +106,7 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         }
         if (!data.user) throw new Error("Signup failed");
         if (!data.session) {
-          throw new Error("Please check your email to confirm your account before logging in");
+          return { requiresConfirmation: true };
         }
         // Profile creation is deferred to onboarding.completeOnboarding()
         set({
@@ -110,11 +115,17 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           isUnlocked: false,
           hasPinSet: false,
         });
+        return { requiresConfirmation: false };
       },
 
       async signIn(email, password) {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          if (error.message === "Invalid login credentials") {
+            throw new Error("Incorrect email or password. Please try again.");
+          }
+          throw error;
+        }
         if (!data.user) throw new Error("Login failed");
 
         const deviceName = navigator.userAgent.substring(0, 50);
