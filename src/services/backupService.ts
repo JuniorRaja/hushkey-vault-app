@@ -616,7 +616,7 @@ class BackupService {
       .from("user_settings")
       .select("last_backup_at")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
     return data?.last_backup_at ? new Date(data.last_backup_at) : null;
   }
@@ -628,7 +628,7 @@ class BackupService {
       .from("user_settings")
       .select("last_backup_at, backup_frequency_days")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
     const { data: history, count } = await supabase
       .from("backup_history")
