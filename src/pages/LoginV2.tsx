@@ -48,6 +48,12 @@ const EmailScreen: React.FC<EmailScreenProps> = ({ mode, onModeChange }) => {
         startOnboarding();
       } else {
         await signIn(email, password);
+        // If the user confirmed their email but never finished onboarding
+        // (pin_verification is still null), kick off onboarding now.
+        const { hasPinSet } = useAuthStore.getState();
+        if (!hasPinSet) {
+          startOnboarding();
+        }
       }
     } catch (err: any) {
       setError(err.message || "An error occurred");
@@ -63,22 +69,20 @@ const EmailScreen: React.FC<EmailScreenProps> = ({ mode, onModeChange }) => {
         <button
           type="button"
           onClick={() => switchMode("signin")}
-          className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            mode === "signin"
+          className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === "signin"
               ? "bg-primary-600 text-white shadow-sm"
               : "text-gray-400 hover:text-white"
-          }`}
+            }`}
         >
           Sign In
         </button>
         <button
           type="button"
           onClick={() => switchMode("signup")}
-          className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            mode === "signup"
+          className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === "signup"
               ? "bg-primary-600 text-white shadow-sm"
               : "text-gray-400 hover:text-white"
-          }`}
+            }`}
         >
           Sign Up
         </button>
@@ -121,11 +125,10 @@ const EmailScreen: React.FC<EmailScreenProps> = ({ mode, onModeChange }) => {
         <button
           type="submit"
           disabled={isLoading}
-          className={`w-full py-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
-            mode === "signin"
+          className={`w-full py-3 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${mode === "signin"
               ? "bg-primary-600 hover:bg-primary-700 text-white"
               : "border border-primary-500 text-primary-400 hover:bg-primary-500/10"
-          }`}
+            }`}
         >
           {isLoading && <Loader2 size={18} className="animate-spin" />}
           {mode === "signin" ? "Sign In" : "Create Account"}
@@ -202,15 +205,14 @@ const PinUnlockScreen: React.FC = () => {
           [0, 1, 2, 3, 4, 5].map((i) => (
             <div
               key={i}
-              className={`rounded-full transition-all duration-200 ${
-                i < pin.length
+              className={`rounded-full transition-all duration-200 ${i < pin.length
                   ? error
                     ? "bg-red-500 w-3 h-3"
                     : pin.length === 6
-                    ? "bg-primary-500 w-2 h-2"
-                    : "bg-primary-500 w-3 h-3 scale-110"
+                      ? "bg-primary-500 w-2 h-2"
+                      : "bg-primary-500 w-3 h-3 scale-110"
                   : "bg-gray-800 w-3 h-3"
-              }`}
+                }`}
             />
           ))
         )}
@@ -276,8 +278,8 @@ const LoginV2: React.FC = () => {
   const subtitle = showUnlock
     ? `Welcome back, ${user?.email}`
     : mode === "signin"
-    ? "Sign in to your vault"
-    : "Create your HushKey account";
+      ? "Sign in to your vault"
+      : "Create your HushKey account";
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
