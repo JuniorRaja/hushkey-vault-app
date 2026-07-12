@@ -1830,7 +1830,7 @@ const ItemDetail: React.FC<ItemDetailProps> = ({ isNew }) => {
                                 )}
                             </div>
                         </div>
-                        {isEditing && showCardProviderManual && <div className="space-y-1">
+                        {isEditing && <div className="space-y-1">
                             <label className={labelClass}>Card Provider</label>
                             <div className="flex flex-wrap gap-2">
                                 {['visa', 'mastercard', 'amex', 'rupay'].map(type => (

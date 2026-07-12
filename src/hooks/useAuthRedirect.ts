@@ -20,8 +20,9 @@ export function useAuthRedirect(): AppView {
   // Authenticated but onboarding in progress (new user after signup)
   if (onboardingActive) return "onboarding";
 
-  // Authenticated but PIN not yet set (edge case: profile exists but no PIN)
-  if (!hasPinSet) return "onboarding";
+  // Authenticated but PIN not yet set — only route to onboarding if the flow
+  // is actively in progress (onboardingActive).
+  if (!hasPinSet) return "login";
 
   // Authenticated + PIN set but vault locked
   if (!isUnlocked) return "login";

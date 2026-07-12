@@ -113,9 +113,9 @@ class DatabaseService {
       .from("user_profiles")
       .select("*")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle(); // returns null (not 406) when no row exists
 
-    if (error && error.code !== "PGRST116") throw error; // PGRST116 = not found
+    if (error) throw error;
     return data;
   }
 
@@ -213,9 +213,9 @@ class DatabaseService {
         name: await EncryptionService.decrypt(vault.name_encrypted, masterKey),
         description: vault.description_encrypted
           ? await EncryptionService.decrypt(
-              vault.description_encrypted,
-              masterKey
-            )
+            vault.description_encrypted,
+            masterKey
+          )
           : undefined,
         icon: vault.icon,
         createdAt: vault.created_at,
@@ -849,9 +849,9 @@ class DatabaseService {
       .from("user_settings")
       .select("*")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== "PGRST116") throw error;
+    if (error) throw error;
     return data;
   }
 

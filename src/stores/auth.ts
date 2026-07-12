@@ -124,6 +124,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
           if (error.message === "Invalid login credentials") {
             throw new Error("Incorrect email or password. Please try again.");
           }
+          if (error.message === "Email not confirmed") {
+            throw new Error("Please confirm your email address before signing in. Check your inbox for the confirmation link.");
+          }
           throw error;
         }
         if (!data.user) throw new Error("Login failed");
